@@ -109,6 +109,7 @@ class WebSocketService {
 
             try {
                 this.socket = io(this.serverUrl, {
+                    path: '/api/socket.io/',
                     transports: ['websocket', 'polling'],
                     timeout: 20000,
                     forceNew: false,
