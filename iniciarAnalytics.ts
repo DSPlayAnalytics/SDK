@@ -13,6 +13,11 @@ export interface AnalyticsConfig {
   coletarPerformance?: boolean;
   /** Maximo de pontos de mouse_move por segundo. Default: 5. */
   taxaAmostragemMouseMove?: number;
+  /** publishable_key emitida pelo backend (ver docs/plano-clientes-ambientes.md).
+   *  Opcional durante migracao; obrigatoria quando SDK_AUTH_REQUIRED=true no backend. */
+  publishableKey?: string;
+  /** Base URL HTTP do backend (default: derivada de websocketUrl). Usado para chamar /auth/sdk-token. */
+  backendBaseUrl?: string;
 }
 
 /**
@@ -25,7 +30,7 @@ export function iniciarAnalytics(config: AnalyticsConfig): void {
   }
 
   WebSocketService.configurar(config);
-  WebSocketService.connect();
+  void WebSocketService.connect();
 
   const coletarPerformance = config.coletarPerformance ?? true;
   if (coletarPerformance && typeof window !== 'undefined') {
