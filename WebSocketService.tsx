@@ -5,6 +5,7 @@ import {
   FilaAnalytics,
   criarStorageFila,
   emitirEventoDeadLetter,
+  emitirEventoEnqueueFailed,
   emitirEventoPayloadRejected,
   type ItemFila,
   type StorageFila,
@@ -281,7 +282,7 @@ class WebSocketService {
 
   async sendAnalyticsData(heatmapDados: HeatmapDados): Promise<boolean> {
     if (!this.fila) return false;
-    await this.fila.enfileirar({ ...heatmapDados });
+    if (!(await this._enfileirarSeguro(heatmapDados))) return false;
     await this._atualizarTamanhoFila();
     return this._drenar();
   }
@@ -296,6 +297,28 @@ class WebSocketService {
       return ack?.status === 'success';
     }
     return this.sendAnalyticsData(heatmapDados);
+  }
+
+  /** Enfileira propagando falhas de storage como evento observavel + retorno false. */
+  private async _enfileirarSeguro(heatmapDados: HeatmapDados): Promise<boolean> {
+    if (!this.fila) return false;
+    try {
+      await this.fila.enfileirar({ ...heatmapDados });
+      return true;
+    } catch (erro) {
+      const idRegistro = (heatmapDados as unknown as { id_registro?: string })?.id_registro ?? null;
+      const reason = erro instanceof Error ? `${erro.name}: ${erro.message}` : String(erro);
+      const storage = typeof indexedDB !== 'undefined'
+        ? 'indexeddb'
+        : typeof localStorage !== 'undefined'
+          ? 'localstorage'
+          : 'memoria';
+      if (this.debug) {
+        console.warn('[sdk] falha ao enfileirar analytics:', reason);
+      }
+      emitirEventoEnqueueFailed({ idRegistro, reason, storage });
+      return false;
+    }
   }
 
   private async _drenar(forceSynchronous: boolean = false): Promise<boolean> {

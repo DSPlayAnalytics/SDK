@@ -201,6 +201,7 @@ export function criarStorageFila(): StorageFila {
 const EVENTO_QUEUE_OVERFLOW = 'analytics:queue_overflow';
 const EVENTO_ITEM_DEAD_LETTER = 'analytics:item_dead_lettered';
 const EVENTO_PAYLOAD_REJECTED = 'analytics:payload_rejected';
+const EVENTO_ENQUEUE_FAILED = 'analytics:enqueue_failed';
 
 export function emitirEventoOverflow(detalhe: {
   droppedCount: number;
@@ -227,6 +228,15 @@ export function emitirEventoPayloadRejected(detalhe: {
 }): void {
   if (typeof window === 'undefined') return;
   window.dispatchEvent(new CustomEvent(EVENTO_PAYLOAD_REJECTED, { detail: detalhe }));
+}
+
+export function emitirEventoEnqueueFailed(detalhe: {
+  idRegistro: string | null;
+  reason: string;
+  storage: string;
+}): void {
+  if (typeof window === 'undefined') return;
+  window.dispatchEvent(new CustomEvent(EVENTO_ENQUEUE_FAILED, { detail: detalhe }));
 }
 
 /** Ordem de descarte: mais descartavel primeiro. Menor = descarta antes. */
