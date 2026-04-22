@@ -278,12 +278,18 @@ export class FilaAnalytics {
 
   async enfileirar(payload: HeatmapDados): Promise<ItemFila> {
     const payloadLimpo = sanitizarPayload(payload);
+    // id_registro segue o id do item da fila: cada batch novo ganha um id unico
+    // (o cache de idempotencia do backend chaveia por (site_id, id_registro) com
+    // TTL de 10min, entao reusar o mesmo valor entre batches derruba todos menos
+    // o primeiro), enquanto retries do mesmo item preservam o id e a idempotencia.
+    const id = uuidv4();
+    const payloadComId: HeatmapDados = { ...payloadLimpo, id_registro: id };
     const item: ItemFila = {
-      id: uuidv4(),
+      id,
       timestamp: Date.now(),
-      payload: payloadLimpo,
+      payload: payloadComId,
       tentativas: 0,
-      prioridade: derivarPrioridade(payloadLimpo),
+      prioridade: derivarPrioridade(payloadComId),
     };
     await this.storage.enfileirar(item);
     await this.aplicarLimite();
