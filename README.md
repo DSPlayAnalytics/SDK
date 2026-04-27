@@ -99,6 +99,58 @@ Quando `coletarPerformance` esta ligado (default), o SDK registra listeners de L
 
 Desligue passando `coletarPerformance: false` no `iniciarAnalytics`.
 
+## Planos e quotas
+
+A partir do modo comercial (proposto, ver `ark/docs/dashboard-cliente.md` sec. 18), o backend enforce limites por plano em **3 dimensoes**: eventos/mes, retencao, cardinalidade max de tags. O SDK **nao** tem conhecimento direto do plano — ele simplesmente envia, o backend aceita ou rejeita.
+
+| Plano | Eventos/mes | Retencao | Cardinalidade max | Backup |
+|---|---|---|---|---|
+| free | 10k | 7 dias | 1k tag values | nao |
+| pequeno | 100k | 30 dias | 5k | semanal |
+| medio | 1M | 90 dias | 50k | diario |
+| grande | 10M | 365 dias | 500k | diario + arquivo 12m |
+
+Quando a quota estoura, o backend retorna `analytics_error code=QUOTA_EXCEDIDA` no proximo batch. O SDK ja trata: pausa envios e tenta de novo apos a janela (definida no campo `retry_after_ms` da resposta). Eventos pendentes na fila offline aguardam.
+
+## Tags e contrato com o backend
+
+O payload base (`paginas[pageId][0]`) carrega **3 tags ja obrigatorias** que o SDK setа automaticamente:
+
+| Tag | Origem | Obrigatorio |
+|---|---|---|
+| `app_id` | `iniciarAnalytics({ appId })` | **Sim** — backend rejeita conexao sem |
+| `ambiente` | `iniciarAnalytics({ ambiente })` | **Sim** — `development\|test\|staging\|production` |
+| `page_type` | id passado em `new HeatmapUtils(_, _, pageId)` | **Sim** — sem isso o evento e descartado |
+
+Tags **derivadas server-side** (nao precisa enviar):
+
+- `device_type` (mobile/tablet/desktop, derivado do User-Agent)
+- `pais` (derivado do IP via GeoIP, opt-in do operador)
+- `referrer_dominio` (so o dominio, nao path)
+
+Tags **proibidas** — campos com cardinalidade alta que seriam tags candidatas mas detonam o InfluxDB. Se o consumidor passar via `enviarEvento`, viram **fields**, nao tags:
+
+- `user_id`, `session_id`, `email`, `request_id`, `url_completa`
+
+> Em `enviarEvento(nome, propriedades)`, todas as propriedades sao gravadas como **fields**, nao tags. Isso e proposital: fields aceitam alta cardinalidade sem custo. Use props pra correlacionar em queries (`where r._field == "plano"`), nao pra agregar dimensoes (que seria caso de tag).
+
+## Codigos de erro do backend
+
+O servidor responde via Socket.IO com `analytics_error { status, code, message }`. Tabela de codigos que o SDK pode receber:
+
+| `code` | HTTP equiv | Quando | O que o SDK faz | Acao do consumidor |
+|---|---|---|---|---|
+| `INVALID_SESSION` | 401 | Cookie expirou ou hijack detectado | Disconnect + reconnect | Nada — automatico |
+| `RATE_LIMIT` | 429 | Limite por sessao (default 10k batches) | Pausa envio, retry com backoff | Verificar `SESSION_REQUEST_LIMIT` no backend |
+| `RATE_LIMIT_EXCEDIDO` | 429 | Magic-link burst (auth, nao analytics) | n/a (so auth) | n/a |
+| `QUOTA_EXCEDIDA` | 429 | Plano estourou eventos/dia ou /mes | Pausa ate `retry_after_ms` | **Upgrade do plano** |
+| `EMPTY_PAYLOAD` | 400 | Batch chegou sem dados uteis | Sinaliza no log | Verificar lifecycle do `HeatmapUtils` |
+| `TAG_REJEITADA` (futuro) | 400 | Tag fora da whitelist ou faltando obrigatoria | Loga + descarta evento | **Bug no integrador** — corrigir o `appId`/`pageId` |
+| `CARDINALIDADE_EXCEDIDA` (futuro) | 429 | Bucket atingiu limite de tag values | Loga | **Bug** — provavelmente passou `user_id` como tag custom |
+| `INTERNAL_ERROR` | 500 | Falha do backend | Retry com backoff | Suporte |
+
+`SCHEMA_VERSION_MISMATCH` retornado em `connect`: SDK e backend desalinhados (versao SDK < `min_client_schema`). SDK precisa ser atualizado.
+
 ## Privacidade
 
 Nada de `innerText`, `textContent` ou `value` de input sai do dispositivo. A URL coletada e apenas o `pathname` — querystring fica de fora. O unico fingerprint e `user_agent` e um `device_type` derivado (`mobile | tablet | desktop`). O `mouse_move` tem amostragem agressiva de 5 pontos/segundo por default, justamente para limitar volume e granularidade. Em `enviarEvento`, objetos e arrays sao descartados para reduzir risco de PII estruturado. Qualquer dado fora dessa linha exige opt-in explicito do consumidor.
