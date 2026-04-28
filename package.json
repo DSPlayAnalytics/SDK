@@ -24,7 +24,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "smoke": "node scripts/smoke-bundle.mjs",
-    "lint": "tsc --noEmit"
+    "lint": "tsc --noEmit",
+    "prepare": "npm run build || true"
   },
   "dependencies": {
     "socket.io-client": "^4.8.3",
