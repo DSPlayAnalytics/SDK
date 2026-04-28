@@ -20,7 +20,7 @@ export default defineConfig({
     dts({
       outDir: 'dist',
       insertTypesEntry: true,
-      tsconfigPath: resolve(__dirname, 'tsconfig.json'),
+      tsconfigPath: resolve(__dirname, 'tsconfig.build.json'),
       include: ['src/**/*'],
       exclude: ['tests/**/*', 'examples/**/*'],
     }),

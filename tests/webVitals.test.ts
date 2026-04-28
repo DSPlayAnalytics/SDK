@@ -2,9 +2,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 type Cb = (metric: any) => void;
 
-const onLCPMock = vi.fn<[Cb], void>();
-const onCLSMock = vi.fn<[Cb], void>();
-const onINPMock = vi.fn<[Cb], void>();
+// vitest >=1.0 aceita apenas 0 ou 1 type args (a assinatura completa da funcao).
+const onLCPMock = vi.fn<(cb: Cb) => void>();
+const onCLSMock = vi.fn<(cb: Cb) => void>();
+const onINPMock = vi.fn<(cb: Cb) => void>();
 
 vi.mock('web-vitals', () => ({
   onLCP: onLCPMock,
