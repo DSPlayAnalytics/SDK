@@ -22,15 +22,24 @@ function encaminhar(metric: Metric) {
 
 /**
  * Registra os callbacks do web-vitals. Idempotente — chamar varias vezes nao adiciona listeners extras.
- * As metricas sao entregues pela lib em momentos especificos (LCP apos 1st paint, CLS no page lifecycle, etc.).
- * Quando uma metrica chega, o evento `web_vital` e empilhado no HeatmapUtils ativo.
+ *
+ * Por padrao, web-vitals v3+ so emite LCP/CLS/INP quando a pagina fica oculta
+ * (`pagehide`/visibility change), pra garantir valores finais estaveis. Isso
+ * funciona bem em prod onde o usuario eventualmente sai/troca aba, mas em dev
+ * deixa o dashboard zerado por longos periodos.
+ *
+ * `reportAllChanges: true` faz a lib emitir tambem updates intermediarios
+ * (cada novo LCP candidate, cada layout shift, cada interacao). Em prod isso
+ * gera 3-5x mais eventos por sessao — aceito como tradeoff por feedback
+ * em real-time. Pra contas de alto volume, desligar via env futuro.
  */
 export function iniciarWebVitals(): void {
   if (registrado) return;
   registrado = true;
-  onLCP(encaminhar);
-  onCLS(encaminhar);
-  onINP(encaminhar);
+  const opts = { reportAllChanges: true };
+  onLCP(encaminhar, opts);
+  onCLS(encaminhar, opts);
+  onINP(encaminhar, opts);
 }
 
 /**
