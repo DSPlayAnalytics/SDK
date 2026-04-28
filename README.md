@@ -1,26 +1,51 @@
-# SDK de Analytics
+# @dsplayground/analytics-sdk
+
+[![status](https://img.shields.io/badge/status-alpha-yellow)](#) [![schema](https://img.shields.io/badge/schema-1.1-blue)](#)
 
 SDK para coleta de eventos de navegacao, performance (Web Vitals) e eventos de negocio, com envio em tempo real via Socket.IO. A cada tick (default 5s) o SDK envia somente o que aconteceu desde a ultima emissao, entao queries agregadas no backend somam sem duplicar. Toda a coleta vive em `paginas[pageId][0].eventos` como uma lista unica `{ tipo, timestamp, dados }`.
 
 **Exemplo completo em JS puro**: [examples/vanilla.js](./examples/vanilla.js).
 
-## Build de biblioteca
+## Instalacao
 
-Para empacotar o SDK em bundles distribuiveis:
-
-```bash
-cd frontend
-npm run build:sdk
-```
-
-Saida em `frontend/dist/sdk/` com `index.js` (ESM, ~7 KB gzip), `index.cjs`, `index.d.ts` e source maps. Externals preservados (`react`, `react-dom`, `socket.io-client`, `uuid`, `web-vitals`) — quem consome resolve essas dependencias no proprio bundler.
-
-Smoke test do artefato:
+### Via npm (recomendado)
 
 ```bash
-cd frontend
-node scripts/smoke-sdk-bundle.mjs
+npm install @dsplayground/analytics-sdk
+# ou
+yarn add @dsplayground/analytics-sdk
 ```
+
+```ts
+import { iniciarAnalytics } from '@dsplayground/analytics-sdk';
+
+iniciarAnalytics({
+  websocketUrl: 'https://api.dsplayground.com.br',
+  publishableKey: 'pk_production_xxxxx',
+  appId: 'meu-site',
+  ambiente: 'production',
+});
+```
+
+### Via git URL (durante a fase alpha sem registry publicado)
+
+```json
+{
+  "dependencies": {
+    "@dsplayground/analytics-sdk": "git+https://github.com/danpqdan/dsplayground-analytics-sdk.git#v0.1.0"
+  }
+}
+```
+
+## Build local
+
+```bash
+npm install
+npm run build   # gera dist/{index.js, index.cjs, index.d.ts}
+npm run test    # 19 unit tests (Vitest + jsdom)
+```
+
+Externals preservados (`react`, `react-dom`, `socket.io-client`, `uuid`, `web-vitals`) — quem consome resolve essas dependencias no proprio bundler.
 
 ## Inicializacao
 
