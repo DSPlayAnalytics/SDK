@@ -4,7 +4,10 @@
 
 SDK para coleta de eventos de navegacao, performance (Web Vitals) e eventos de negocio, com envio em tempo real via Socket.IO. A cada tick (default 5s) o SDK envia somente o que aconteceu desde a ultima emissao, entao queries agregadas no backend somam sem duplicar. Toda a coleta vive em `paginas[pageId][0].eventos` como uma lista unica `{ tipo, timestamp, dados }`.
 
-**Exemplo completo em JS puro**: [examples/vanilla.js](./examples/vanilla.js).
+Exemplos completos:
+
+- [examples/standalone.html](./examples/standalone.html) — HTML estatico via `<script>` (UMD, sem bundler).
+- [examples/vanilla.js](./examples/vanilla.js) — projeto JS/TS sem framework de UI mas com bundler (ESM `import`).
 
 ## Instalacao
 
@@ -43,7 +46,7 @@ Se precisar evitar configurar `.npmrc` (ex: ambiente sem token):
 ```json
 {
   "dependencies": {
-    "@danpqdan/dsplayground-analytics-sdk": "git+https://github.com/danpqdan/dsplayground-analytics-sdk.git#v0.1.0"
+    "@danpqdan/dsplayground-analytics-sdk": "git+https://github.com/danpqdan/dsplayground-analytics-sdk.git#v0.2.0"
   }
 }
 ```
@@ -84,11 +87,13 @@ API completa exposta em `window.AnalyticsSDK`: `iniciarAnalytics`, `enviarEvento
 
 ```bash
 npm install
-npm run build   # gera dist/{index.js, index.cjs, index.d.ts} (minificado via esbuild)
+npm run build   # gera dist/{index.js, index.cjs, index.d.ts, sdk.umd.js} (minificado via esbuild)
 npm run test    # 85 unit tests (Vitest + jsdom, 18 arquivos)
-npm run smoke   # confere que dist/ tem ESM + CJS + .d.ts validos
+npm run smoke   # confere que dist/ tem ESM + CJS + .d.ts + UMD validos
 npm run lint    # tsc --noEmit
 ```
+
+Sub-builds disponiveis individualmente: `npm run build:lib` (ESM+CJS+.d.ts) e `npm run build:umd` (IIFE standalone).
 
 Externals preservados (`react`, `react-dom`, `socket.io-client`, `uuid`, `web-vitals`) — quem consome resolve essas dependencias no proprio bundler.
 

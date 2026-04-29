@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SDK Analytics - Exemplo Standalone</title>
+
+  <!--
+    Exemplo de uso vanilla puro (HTML estatico, sem bundler).
+    Carrega o SDK via tag <script> a partir do release no GitHub
+    (release publico = link funciona sem auth; quando o repo for
+    publico, o asset fica acessivel direto).
+
+    Use case: Webflow, Wix-like, blogs WordPress sem build, paginas
+    de marketing/landing — qualquer lugar em que voce so consegue
+    colar HTML+JS.
+
+    Bundle: ~80 KB minificado / ~25 KB gzip (socket.io-client,
+    web-vitals, uuid inline). Carrega async com `defer`.
+  -->
+  <script src="https://github.com/danpqdan/dsplayground-analytics-sdk/releases/download/v0.2.0/sdk.umd.js" defer></script>
+</head>
+<body>
+  <h1>Minha Landing Page</h1>
+  <p>Conteudo da pagina aqui.</p>
+
+  <a href="#sobre" data-analytics-id="link-sobre">Sobre</a>
+  <button data-analytics-id="cta-comprar">Comprar agora</button>
+
+  <form id="contato">
+    <input type="text" name="nome" placeholder="Seu nome">
+    <button type="submit" data-analytics-id="form-contato-submit">Enviar</button>
+  </form>
+
+  <script>
+    // Aguarda o SDK carregar (defer + load garantem ordem).
+    window.addEventListener('load', () => {
+      // ---------- 1. Inicializacao (uma vez no boot) ----------
+      // Em prod, publishableKey vem do backend (scripts/tenant_admin create-key)
+      // e identifica o site; eventos vao pro bucket dedicado do cliente.
+      AnalyticsSDK.iniciarAnalytics({
+        websocketUrl: 'https://api.dsplayground.com.br',
+        publishableKey: 'pk_production_xxxxx',  // troque pela sua key
+        appId: 'minha-landing',
+        ambiente: 'production',
+        debug: false,
+        intervaloEnvioMs: 5000,
+        coletarPerformance: true,
+        taxaAmostragemMouseMove: 5,
+      });
+
+      // ---------- 2. Coleta automatica por pagina ----------
+      const heatmap = new AnalyticsSDK.HeatmapUtils(
+        document.body,
+        '[data-analytics-id], a, button', // seletor de elementos rastreados em hover
+        window.location.pathname || '/',
+      );
+
+      heatmap.configurarColecaoTempoReal((dados) => {
+        AnalyticsSDK.WebSocketService.sendAnalyticsDataImmediate(dados, false);
+      }, 5000);
+
+      heatmap.iniciarColecaoTempoReal();
+      heatmap.iniciar();
+
+      // Garante page_exit e drena o residuo final ao sair.
+      window.addEventListener('beforeunload', () => {
+        heatmap.parar('aba_fechada');
+      });
+
+      // ---------- 3. Eventos de negocio (custom) ----------
+      document.querySelector('[data-analytics-id="cta-comprar"]')?.addEventListener('click', () => {
+        AnalyticsSDK.enviarEvento('checkout_iniciado', {
+          plano: 'pro',
+          preco: 99.9,
+          recorrente: true,
+        });
+      });
+
+      document.querySelector('form#contato')?.addEventListener('submit', (e) => {
+        AnalyticsSDK.enviarEvento('formulario_enviado', {
+          formulario_id: 'contato',
+          // Nao envie PII como email/telefone aqui; se precisar, hashear antes.
+        });
+      });
+    });
+  </script>
+</body>
+</html>

@@ -1,13 +1,14 @@
-// Exemplo de uso do SDK em JavaScript puro, sem React ou framework.
+// Exemplo ESM (com bundler) — para Vite, Webpack, esbuild, Rollup, Parcel.
+// Funciona em projetos JS/TS sem framework de UI (vanilla = sem React/Vue/etc),
+// mas com pipeline de build moderna que resolve `import` ESM.
+//
 // Pre-requisito: ter o pacote instalado via npm/yarn/pnpm.
 //
 //   # com .npmrc apontando pro GitHub Packages e NODE_AUTH_TOKEN exportado:
 //   npm install @danpqdan/dsplayground-analytics-sdk
 //
-// Em ambiente de browser bundlado (Vite, Webpack, esbuild, Rollup), basta
-// importar como abaixo. Para uso direto via <script> tag em HTML estatico,
-// ver "UMD/IIFE bundle" na sec. de instalacao do README — fora do escopo
-// deste exemplo.
+// Para uso TRULY vanilla (HTML estatico sem bundler, ex: Webflow/Wix-like),
+// ver examples/standalone.html — usa o bundle UMD via <script src="">.
 
 import {
   iniciarAnalytics,
