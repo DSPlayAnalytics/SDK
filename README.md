@@ -36,7 +36,9 @@ iniciarAnalytics({
 });
 ```
 
-### Via git URL (durante a fase alpha sem registry publicado)
+### Alternativa: git URL (sem registry)
+
+Se precisar evitar configurar `.npmrc` (ex: ambiente sem token):
 
 ```json
 {
@@ -46,12 +48,16 @@ iniciarAnalytics({
 }
 ```
 
+A desvantagem e que `npm install` precisa de credentials git pro repo privado e `prepare` script gera `dist/` on-the-fly (mais lento).
+
 ## Build local
 
 ```bash
 npm install
-npm run build   # gera dist/{index.js, index.cjs, index.d.ts}
-npm run test    # 19 unit tests (Vitest + jsdom)
+npm run build   # gera dist/{index.js, index.cjs, index.d.ts} (minificado via esbuild)
+npm run test    # 85 unit tests (Vitest + jsdom, 18 arquivos)
+npm run smoke   # confere que dist/ tem ESM + CJS + .d.ts validos
+npm run lint    # tsc --noEmit
 ```
 
 Externals preservados (`react`, `react-dom`, `socket.io-client`, `uuid`, `web-vitals`) — quem consome resolve essas dependencias no proprio bundler.
@@ -61,11 +67,12 @@ Externals preservados (`react`, `react-dom`, `socket.io-client`, `uuid`, `web-vi
 Chame `iniciarAnalytics` uma vez no boot da aplicacao, antes de qualquer outro uso do SDK. Qualquer chamada anterior a isso vira no-op.
 
 ```ts
-import { iniciarAnalytics } from './sdk';
+import { iniciarAnalytics } from '@danpqdan/dsplayground-analytics-sdk';
 
 iniciarAnalytics({
   websocketUrl: 'http://localhost:5000',
-  appId: 'portfolio-local',
+  publishableKey: 'pk_development_xxxxx',
+  appId: 'meu-site',
   ambiente: 'development',
   debug: true,
   intervaloEnvioMs: 5000,
@@ -82,7 +89,7 @@ A coleta de cada pagina precisa de um `HeatmapUtils` instanciado no ciclo de vid
 
 ```tsx
 import { useEffect } from 'react';
-import { HeatmapUtils, WebSocketService } from '../sdk';
+import { HeatmapUtils, WebSocketService } from '@danpqdan/dsplayground-analytics-sdk';
 
 export function useAnalyticsPagina(pageId: string, hoverSelector?: string) {
   useEffect(() => {
@@ -108,7 +115,7 @@ Para consumidores fora do React, o exemplo em [examples/vanilla.js](./examples/v
 Use `enviarEvento` em pontos-chave do funil. O evento entra na pagina ativa como tipo `custom`, junto com os demais:
 
 ```ts
-import { enviarEvento } from '../sdk';
+import { enviarEvento } from '@danpqdan/dsplayground-analytics-sdk';
 
 enviarEvento('checkout_iniciado', {
   plano: 'pro',
@@ -241,7 +248,7 @@ Antes de subir o SDK em producao, confirme:
 
 ## Catalogo de eventos
 
-O detalhamento de campos, regras de emissao e motivacao por tipo fica em [../../../docs/eventos-analytics-catalogo.md](../../../docs/eventos-analytics-catalogo.md).
+O detalhamento de campos, regras de emissao e motivacao por tipo fica em [docs/eventos-analytics-catalogo.md](./docs/eventos-analytics-catalogo.md).
 
 Os tipos emitidos sao:
 

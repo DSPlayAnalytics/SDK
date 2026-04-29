@@ -1,12 +1,30 @@
 // Exemplo de uso do SDK em JavaScript puro, sem React ou framework.
-// Quando o SDK for publicado como pacote, a unica mudanca e o import:
-//   import { iniciarAnalytics, HeatmapUtils, WebSocketService, enviarEvento } from '@seu-escopo/analytics-sdk';
+// Pre-requisito: ter o pacote instalado via npm/yarn/pnpm.
+//
+//   # com .npmrc apontando pro GitHub Packages e NODE_AUTH_TOKEN exportado:
+//   npm install @danpqdan/dsplayground-analytics-sdk
+//
+// Em ambiente de browser bundlado (Vite, Webpack, esbuild, Rollup), basta
+// importar como abaixo. Para uso direto via <script> tag em HTML estatico,
+// ver "UMD/IIFE bundle" na sec. de instalacao do README — fora do escopo
+// deste exemplo.
 
-import { iniciarAnalytics, HeatmapUtils, WebSocketService, enviarEvento } from '../index.ts';
+import {
+  iniciarAnalytics,
+  HeatmapUtils,
+  WebSocketService,
+  enviarEvento,
+} from '@danpqdan/dsplayground-analytics-sdk';
 
 // ---------- 1. Inicializacao (uma unica vez no boot) ----------
+//
+// `publishableKey` (opcional em dev sem auth, OBRIGATORIO em prod) vem do
+// backend via scripts/tenant_admin create-key — vinculada ao site_id do
+// cliente. SDK troca essa key por sdk_jwt de 5 min antes de cada conexao
+// Socket.IO; eventos sao roteados pro bucket dedicado do cliente.
 iniciarAnalytics({
-  websocketUrl: 'http://localhost:5000',
+  websocketUrl: 'https://api.dsplayground.com.br',
+  publishableKey: 'pk_production_xxxxx', // deixar vazio em dev local sem auth
   appId: 'minha-landing',
   ambiente: 'production',
   debug: false,
