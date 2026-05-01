@@ -345,3 +345,29 @@ const WebSocketService: {
 ```
 
 Tipos exportados: `AnalyticsConfig`, `Ambiente`, `HeatmapDados`, `PaginaDados`, `EventoNormalizado`, `TipoEvento`, `MarcoScroll`, `MotivoSaida`, `NomeWebVital`, `RatingWebVital`, `MapaPaginasDados`.
+
+## Contribuindo / desenvolvimento
+
+Pre-commit hooks rodam automaticamente apos `npm install` (via `husky`):
+
+| Camada | O que checa | Como pular |
+|---|---|---|
+| `lint-staged` | `tsc --noEmit` em arquivos staged | corrige erros TS |
+| `gitleaks protect` | secrets em arquivos staged (regras default + custom em `.gitleaks.toml`) | `git commit --no-verify` se ja conferiu |
+| `npm audit --audit-level=high` | CVE high+ em deps de prod | `npm audit fix` ou `--no-verify` |
+
+`gitleaks` precisa estar instalado localmente (`brew install gitleaks` /
+`scoop install gitleaks` / [releases](https://github.com/gitleaks/gitleaks#installing)).
+Sem ele, o pre-commit avisa e segue — **CI ainda roda gitleaks no PR**, entao
+nada vai pra `main` sem passar.
+
+Scripts uteis:
+
+```bash
+npm run lint           # tsc --noEmit
+npm test               # vitest run
+npm run audit:high     # mesma checagem do pre-commit
+npm run secrets:scan   # gitleaks full-history (mais pesado)
+npm run build          # ESM + CJS + UMD
+npm run smoke          # validar artefatos em dist/
+```
