@@ -8,6 +8,7 @@ Exemplos completos:
 
 - [examples/standalone.html](./examples/standalone.html) — HTML estatico via `<script>` (UMD, sem bundler).
 - [examples/vanilla.js](./examples/vanilla.js) — projeto JS/TS sem framework de UI mas com bundler (ESM `import`).
+- [examples/react.tsx](./examples/react.tsx) — SPA React com `react-router-dom` + hook `useAnalyticsPagina`.
 
 ## Instalacao
 
@@ -80,6 +81,62 @@ direto pra testes.
 ```
 
 API completa exposta em `window.AnalyticsSDK`: `iniciarAnalytics`, `enviarEvento`, `HeatmapUtils`, `WebSocketService`, `FilaAnalytics` e os helpers de Storage.
+
+## Embed em iframe / sub-frame
+
+Casos de uso: dashboard embutido no painel de outro produto, widget num
+super-app, demo do SDK numa pagina de marketing third-party. **A coleta
+de eventos via Socket.IO funciona normalmente em iframe** — o handshake
+WebSocket nao depende de cookies first-party. Mas alguns recursos
+adjacentes tem comportamento especifico de third-party context:
+
+### Content Security Policy (CSP)
+
+Se a pagina-host tem CSP rigida, libere os endpoints abaixo:
+
+```http
+Content-Security-Policy:
+  connect-src 'self' https://api.dsplayground.com.br wss://api.dsplayground.com.br;
+  script-src 'self' https://cdn.jsdelivr.net;
+```
+
+- `connect-src` cobre o handshake HTTP do `polling` transport e o
+  upgrade pro `wss://` (websocket). Sem `wss:` o SDK fica preso no
+  long-polling — funciona, mas com 3-5x mais round-trips.
+- `script-src https://cdn.jsdelivr.net` so e necessario se voce carrega
+  o bundle UMD via jsDelivr. Em build com bundler (npm) o codigo vai
+  pro proprio bundle e nao precisa de origem extra.
+- O SDK **nao injeta** `<script>` ou `<style>` dinamico — entao
+  `'unsafe-inline'` nao e necessario.
+
+### Cookies em third-party context
+
+Cookies `HttpOnly+Secure+SameSite=Strict` (como `cliente_session` do
+backend dsplayground) **nao viajam quando a pagina-host esta num
+dominio diferente do iframe**. Se sua aplicacao integrada usa o
+dashboard do cliente embutido, o usuario sera redirecionado pra tela
+de login. Workarounds:
+
+- **Top-level navigation:** abra o dashboard em nova aba/janela
+  (`<a target="_blank" rel="noopener">` ou `window.open`) — cookies
+  same-site funcionam pra origem propria.
+- **`SameSite=None; Secure`** no servidor: viabiliza cookies em
+  third-party iframe, mas requer HTTPS em ambos os lados e deixa o
+  cookie alvo de CSRF se nao houver `SameSite=Strict` na auth de
+  formulario. **Nao trocamos** `cliente_session` pra `None` por essa
+  razao.
+- **Iframe na mesma eTLD+1:** se o host e o dashboard compartilham
+  eTLD+1 (`app.dsplayground.com.br` dentro de
+  `dashboard.dsplayground.com.br`), o cookie funciona porque o
+  `Domain=dsplayground.com.br` cobre ambos. Esse e o padrao oficial.
+
+### Coleta em iframe
+
+`HeatmapUtils` so observa o documento que recebe como `root` (default:
+`document.body`). Eventos do **iframe pai** nao sao capturados — cada
+frame precisa do proprio SDK rodando, com `appId`/`pageId` que reflitam
+o contexto. Isso e proposital: cross-frame DOM access requer
+same-origin e quebraria sob CSP.
 
 ## Build local
 
