@@ -1,6 +1,6 @@
 {
   "name": "@danpqdan/dsplayground-analytics-sdk",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "description": "SDK de analytics em tempo real (Web Vitals, eventos de navegacao, custom events). Envia via Socket.IO autenticado por publishable_key + JWT.",
   "type": "module",
   "main": "./dist/index.cjs",
@@ -31,7 +31,7 @@
   },
   "dependencies": {
     "socket.io-client": "^4.8.3",
-    "uuid": "^13.0.0",
+    "uuid": "^14.0.0",
     "web-vitals": "^4.2.4"
   },
   "peerDependencies": {
@@ -39,8 +39,12 @@
     "react-dom": ">=18.0.0"
   },
   "peerDependenciesMeta": {
-    "react": { "optional": true },
-    "react-dom": { "optional": true }
+    "react": {
+      "optional": true
+    },
+    "react-dom": {
+      "optional": true
+    }
   },
   "devDependencies": {
     "@testing-library/jest-dom": "^6.6.3",

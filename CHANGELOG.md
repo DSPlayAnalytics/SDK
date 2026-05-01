@@ -4,6 +4,21 @@ Todas as mudancas significativas deste pacote sao registradas aqui. Segue [Keep 
 
 ## [Unreleased]
 
+## [0.3.2] - 2026-05-01
+
+### Security
+- Bump `uuid` `^13.0.0` → `^14.0.0` corrige
+  [GHSA-w5hq-g745-h8pq](https://github.com/advisories/GHSA-w5hq-g745-h8pq)
+  (moderate — buffer bounds check em `v3/v5/v6` quando `buf` e' provido).
+  SDK so usa `v4()` (nao afetada na pratica), mas `npm audit` agora retorna
+  zero. Pre-requisito pra abrir o repo publico — `npm audit` em CI publico
+  vai gerar PR/badge automatico.
+
+### Internal
+- Sem mudanca em API publica. ESM/CJS/UMD bundles inalterados em forma; so
+  o uuid embedado no UMD vem da v14 (sub-bytes diferentes mas mesmo
+  comportamento de `v4()`).
+
 ## [0.3.1] - 2026-05-01
 
 ### Fixed
