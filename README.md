@@ -347,7 +347,10 @@ Antes de subir o SDK em producao, confirme:
 
 ## Catalogo de eventos
 
-O detalhamento de campos, regras de emissao e motivacao por tipo fica em [docs/eventos-analytics-catalogo.md](./docs/eventos-analytics-catalogo.md).
+Dois documentos cobrem os eventos:
+
+- [docs/eventos-analytics-catalogo.md](./docs/eventos-analytics-catalogo.md) — motivacao por tipo (por que coletar, o que cada um responde).
+- [docs/schema-eventos.md](./docs/schema-eventos.md) — schema formal de wire (envelope, JSON Schema, shape exato de cada `dados`, regras de versionamento).
 
 Os tipos emitidos sao:
 
@@ -401,28 +404,10 @@ const WebSocketService: {
 
 Tipos exportados: `AnalyticsConfig`, `Ambiente`, `HeatmapDados`, `PaginaDados`, `EventoNormalizado`, `TipoEvento`, `MarcoScroll`, `MotivoSaida`, `NomeWebVital`, `RatingWebVital`, `MapaPaginasDados`.
 
-## Contribuindo / desenvolvimento
+## Contribuindo
 
-Pre-commit hooks rodam automaticamente apos `npm install` (via `husky`):
+Setup, TDD obrigatorio, pre-commit hooks, Conventional Commits em pt-BR,
+politica SemVer e fluxo de PR estao em [CONTRIBUTING.md](./CONTRIBUTING.md).
 
-| Camada | O que checa | Como pular |
-|---|---|---|
-| `lint-staged` | `tsc --noEmit` em arquivos staged | corrige erros TS |
-| `gitleaks protect` | secrets em arquivos staged (regras default + custom em `.gitleaks.toml`) | `git commit --no-verify` se ja conferiu |
-| `npm audit --audit-level=high` | CVE high+ em deps de prod | `npm audit fix` ou `--no-verify` |
-
-`gitleaks` precisa estar instalado localmente (`brew install gitleaks` /
-`scoop install gitleaks` / [releases](https://github.com/gitleaks/gitleaks#installing)).
-Sem ele, o pre-commit avisa e segue — **CI ainda roda gitleaks no PR**, entao
-nada vai pra `main` sem passar.
-
-Scripts uteis:
-
-```bash
-npm run lint           # tsc --noEmit
-npm test               # vitest run
-npm run audit:high     # mesma checagem do pre-commit
-npm run secrets:scan   # gitleaks full-history (mais pesado)
-npm run build          # ESM + CJS + UMD
-npm run smoke          # validar artefatos em dist/
-```
+Reporte de seguranca: **nao abra issue publica** — email pra
+`danieltisantos@gmail.com` (detalhes em CONTRIBUTING).
