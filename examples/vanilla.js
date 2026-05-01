@@ -62,6 +62,16 @@ function pararColeta(motivo = 'unmount') {
   }
 }
 
+// `enviarEvento` ANTES de `iniciarColeta` exercita o buffer pre-iniciar
+// (v0.3.1+). O evento fica enfileirado num buffer global (cap 100) e e
+// drenado pra primeira pagina ativa quando `heatmap.iniciar()` rodar.
+// Util pra eventos de boot tipo "app_carregado" que precisam disparar
+// imediatamente, antes de qualquer route mount.
+enviarEvento('app_carregado', {
+  rota_inicial: window.location.pathname || '/',
+  viewport_largura: window.innerWidth,
+});
+
 document.addEventListener('DOMContentLoaded', () => {
   iniciarColeta(window.location.pathname || '/');
 });

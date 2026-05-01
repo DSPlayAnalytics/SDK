@@ -11,20 +11,9 @@ Exemplos completos:
 
 ## Instalacao
 
-### Via GitHub Packages (registry privado)
-
-Este pacote e publicado em GitHub Packages enquanto esta em alpha (repo privado).
-Configure o `.npmrc` do projeto consumidor:
-
-```
-@danpqdan:registry=https://npm.pkg.github.com
-//npm.pkg.github.com/:_authToken=${NODE_AUTH_TOKEN}
-```
-
-E exporte um token GitHub com escopo `read:packages`:
+### Via npm (recomendado)
 
 ```bash
-export NODE_AUTH_TOKEN=ghp_xxx  # ou: gh auth token
 npm install @danpqdan/dsplayground-analytics-sdk
 ```
 
@@ -33,32 +22,41 @@ import { iniciarAnalytics } from '@danpqdan/dsplayground-analytics-sdk';
 
 iniciarAnalytics({
   websocketUrl: 'https://api.dsplayground.com.br',
-  publishableKey: 'pk_production_xxxxx',
+  publishableKey: 'pk_production_xxxxx',  // gere em https://dsplayground.com.br/cliente/configuracoes/
   appId: 'meu-site',
   ambiente: 'production',
 });
 ```
 
-### Alternativa: git URL (sem registry)
+> **Pacote ainda nao publicado em npmjs.org publico** (planejado).
+> Enquanto isso, instalar via GitHub Packages: configure `.npmrc` com
+> `@danpqdan:registry=https://npm.pkg.github.com` e exporte um token GitHub
+> com escopo `read:packages` em `NODE_AUTH_TOKEN`. Mais detalhes em
+> [docs.github.com/packages](https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-npm-registry).
 
-Se precisar evitar configurar `.npmrc` (ex: ambiente sem token):
+### Standalone via `<script>` (HTML estatico, sem bundler)
 
-```json
-{
-  "dependencies": {
-    "@danpqdan/dsplayground-analytics-sdk": "git+https://github.com/danpqdan/dsplayground-analytics-sdk.git#v0.2.0"
-  }
-}
-```
+Para Webflow, blogs WordPress, paginas de marketing — qualquer lugar onde
+voce so consegue colar HTML+JS. Bundle IIFE com todas as deps inline
+(~78 KB minificado, ~24 KB gzip).
 
-A desvantagem e que `npm install` precisa de credentials git pro repo privado e `prepare` script gera `dist/` on-the-fly (mais lento).
-
-### Standalone via `<script>` (sem build pipeline)
-
-Para sites HTML estaticos (Webflow, Wix-like, blogs, paginas de marketing), use o bundle IIFE empacotado em `dist/sdk.umd.js` (~80 KB minificado, ~25 KB gzip — todas as dependencias inline). Disponivel em release assets a partir de `v0.2.0`:
+**Opcao 1: jsDelivr CDN (recomendada)** — espelha GitHub Releases, com
+edge cache global e versionamento imutavel:
 
 ```html
-<script src="https://github.com/danpqdan/dsplayground-analytics-sdk/releases/download/v0.2.0/sdk.umd.js" defer></script>
+<script src="https://cdn.jsdelivr.net/gh/danpqdan/dsplayground-analytics-sdk@v0.3.2/dist/sdk.umd.js" defer></script>
+```
+
+**Opcao 2: GitHub Release direto** — funciona apos repo virar publico:
+
+```html
+<script src="https://github.com/danpqdan/dsplayground-analytics-sdk/releases/download/v0.3.2/sdk.umd.js" defer></script>
+```
+
+Ambos servem o mesmo arquivo. Use jsDelivr em prod (cache CDN) e release
+direto pra testes.
+
+```html
 <script>
   window.addEventListener('load', () => {
     AnalyticsSDK.iniciarAnalytics({
@@ -88,7 +86,7 @@ API completa exposta em `window.AnalyticsSDK`: `iniciarAnalytics`, `enviarEvento
 ```bash
 npm install
 npm run build   # gera dist/{index.js, index.cjs, index.d.ts, sdk.umd.js} (minificado via esbuild)
-npm run test    # 85 unit tests (Vitest + jsdom, 18 arquivos)
+npm run test    # 89 unit tests (Vitest + jsdom, 18 arquivos)
 npm run smoke   # confere que dist/ tem ESM + CJS + .d.ts + UMD validos
 npm run lint    # tsc --noEmit
 ```
