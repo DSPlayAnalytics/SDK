@@ -4,6 +4,30 @@ Todas as mudancas significativas deste pacote sao registradas aqui. Segue [Keep 
 
 ## [Unreleased]
 
+## [0.4.0-rc.1] - 2026-05-01
+
+### Added
+- `identify(userId, traits?)` — associa eventos subsequentes a um user; emite
+  evento interno `__identify`; retorna `false` se userId vazio/whitespace.
+- `group(groupId, traits?)` — agrupa user em organizacao (B2B); emite `__group`.
+- `reset()` — logout / "esquecer tudo" LGPD: apaga userId + groupId, regenera
+  anonId, emite `__reset`.
+- `UserStore` — persiste userId/groupId/anonId em localStorage com fallback
+  em memoria; resistente a `QuotaExceededError`; exportado como singleton
+  `userStore`.
+- `iniciarAnalytics` aceita `userId?` e `groupId?` para hidratacao SSR antes
+  da primeira conexao WebSocket.
+- Envelopes `analytics_data` passam a incluir `user_id` e `group_id` quando
+  definidos no `userStore` (campos omitidos se nao setados — sem `null` literal).
+- `schema_version` bumped de `1.1` → `1.2` (compativel com backend schema 1.2;
+  backend aceita clientes >= 1.0).
+
+### Security
+- Traits passam so no payload do evento, **nunca** persistem em storage local
+  (politica anti-PII documentada em README v0.4).
+- `sanitizarTraits` filtra tipos nao-primitivos (objetos, arrays, funcoes)
+  para prevenir envio acidental de DOM nodes ou closures.
+
 ## [0.3.2] - 2026-05-01
 
 ### Security
