@@ -18,6 +18,9 @@ export { iniciarAnalytics, type AnalyticsConfig, type Ambiente } from './iniciar
 
 export { enviarEvento } from './eventosCustomizados.ts';
 
+export { identify, group, reset } from './identify.ts';
+export { UserStore, criarUserStoreMemoria, userStore } from './identidade/userStore.ts';
+
 export {
   FilaAnalytics,
   StorageMemoria,

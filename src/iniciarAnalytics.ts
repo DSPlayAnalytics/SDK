@@ -1,5 +1,6 @@
 import WebSocketService from './WebSocketService.tsx';
 import { iniciarWebVitals } from './webVitals.ts';
+import { userStore } from './identidade/userStore.ts';
 
 export type Ambiente = 'development' | 'test' | 'staging' | 'production';
 
@@ -18,6 +19,10 @@ export interface AnalyticsConfig {
   publishableKey?: string;
   /** Base URL HTTP do backend (default: derivada de websocketUrl). Usado para chamar /auth/sdk-token. */
   backendBaseUrl?: string;
+  /** Hidratacao SSR: pre-seta userId no userStore antes da primeira conexao. */
+  userId?: string;
+  /** Hidratacao SSR: pre-seta groupId no userStore antes da primeira conexao. */
+  groupId?: string;
 }
 
 /**
@@ -27,6 +32,13 @@ export interface AnalyticsConfig {
 export function iniciarAnalytics(config: AnalyticsConfig): void {
   if (!config || !config.websocketUrl || !config.appId || !config.ambiente) {
     throw new Error('[iniciarAnalytics] websocketUrl, appId e ambiente sao obrigatorios');
+  }
+
+  if (config.userId && typeof config.userId === 'string' && config.userId.trim()) {
+    userStore.setUserId(config.userId.trim());
+  }
+  if (config.groupId && typeof config.groupId === 'string' && config.groupId.trim()) {
+    userStore.setGroupId(config.groupId.trim());
   }
 
   WebSocketService.configurar(config);
