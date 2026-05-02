@@ -4,6 +4,32 @@ Todas as mudancas significativas deste pacote sao registradas aqui. Segue [Keep 
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-05-01
+
+### Added
+- `identify(userId, traits?)` — associa eventos subsequentes a um user; emite
+  `__identify`; retorna `false` se userId vazio/whitespace.
+- `group(groupId, traits?)` — agrupa user em organização (B2B); emite `__group`.
+- `reset()` — logout / LGPD "esquecer tudo": apaga userId + groupId, regenera
+  anonId, emite `__reset`.
+- `UserStore` — persiste userId/groupId/anonId em localStorage com fallback em
+  memória; resistente a `QuotaExceededError`. Exportado como singleton `userStore`.
+- `iniciarAnalytics` aceita `userId?` e `groupId?` para hidratação SSR.
+- Envelopes `analytics_data` incluem `user_id`/`group_id` quando definidos;
+  campos omitidos quando não setados (sem `null` literal).
+- `trackPurchase(value, currency, metadata?)` → evento `__purchase`.
+- `trackSignup(plan, metadata?)` → evento `__signup`.
+- `trackConversion(type, value?, metadata?)` → evento `__conversion`.
+- Todos os helpers comerciais sanitizam metadata (apenas primitivos).
+- `schema_version` `1.1` → `1.2` (backend aceita >= 1.0).
+
+### Security
+- Traits e metadata dos helpers comerciais viajam apenas no payload do evento —
+  nunca persistem em storage local (política anti-PII).
+
+### Breaking changes
+- Nenhum. API existente preservada; novos campos são opt-in.
+
 ## [0.4.0-rc.2] - 2026-05-01
 
 ### Added
