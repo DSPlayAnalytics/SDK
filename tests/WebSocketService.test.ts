@@ -189,6 +189,72 @@ describe('WebSocketService', () => {
     expect(await modulo.WebSocketService.tamanhoFilaOffline()).toBe(2);
   });
 
+  it('envelope inclui user_id/group_id quando setados via identify/group', async () => {
+    const modulo = await import('../src');
+    modulo.userStore.reset(); // limpa estado entre testes
+    modulo.WebSocketService.configurar(configuracaoComStorageMemoria());
+
+    modulo.identify('u-42');
+    modulo.group('acme');
+
+    const envio = modulo.WebSocketService.sendAnalyticsData(criarDadosAnalytics());
+    await vi.advanceTimersByTimeAsync(0);
+    const socket = socketsCriados[0];
+    socket.trigger('connect');
+    await vi.advanceTimersByTimeAsync(0);
+    socket.trigger('analytics_received', { status: 'success' });
+    await envio;
+
+    expect(socket.emit).toHaveBeenCalledWith(
+      'analytics_data',
+      expect.objectContaining({
+        user_id: 'u-42',
+        group_id: 'acme',
+      }),
+    );
+  });
+
+  it('envelope omite user_id/group_id quando nao setados (nao manda null literal)', async () => {
+    const modulo = await import('../src');
+    modulo.userStore.reset();
+    modulo.WebSocketService.configurar(configuracaoComStorageMemoria());
+    // Sem identify/group antes do envio.
+
+    const envio = modulo.WebSocketService.sendAnalyticsData(criarDadosAnalytics());
+    await vi.advanceTimersByTimeAsync(0);
+    const socket = socketsCriados[0];
+    socket.trigger('connect');
+    await vi.advanceTimersByTimeAsync(0);
+    socket.trigger('analytics_received', { status: 'success' });
+    await envio;
+
+    const ultimoEnvelope = socket.emit.mock.calls.find((c) => c[0] === 'analytics_data')?.[1];
+    expect(ultimoEnvelope).toBeDefined();
+    expect(ultimoEnvelope).not.toHaveProperty('user_id');
+    expect(ultimoEnvelope).not.toHaveProperty('group_id');
+  });
+
+  it('reset() limpa user_id/group_id de envelopes subsequentes', async () => {
+    const modulo = await import('../src');
+    modulo.userStore.reset();
+    modulo.WebSocketService.configurar(configuracaoComStorageMemoria());
+
+    modulo.identify('u-pre');
+    modulo.reset();
+
+    const envio = modulo.WebSocketService.sendAnalyticsData(criarDadosAnalytics());
+    await vi.advanceTimersByTimeAsync(0);
+    const socket = socketsCriados[0];
+    socket.trigger('connect');
+    await vi.advanceTimersByTimeAsync(0);
+    socket.trigger('analytics_received', { status: 'success' });
+    await envio;
+
+    const envelope = socket.emit.mock.calls.find((c) => c[0] === 'analytics_data')?.[1];
+    expect(envelope).not.toHaveProperty('user_id');
+    expect(envelope).not.toHaveProperty('group_id');
+  });
+
   it('falha de storage no enfileirar: retorna false, emite analytics:enqueue_failed, nao vira unhandled rejection', async () => {
     const modulo = await import('../src');
 

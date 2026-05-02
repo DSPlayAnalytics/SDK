@@ -6,7 +6,7 @@
  * docs/plano-garantias-sdk-backend.md).
  */
 
-export const SDK_SCHEMA_VERSION = '1.1';
+export const SDK_SCHEMA_VERSION = '1.2';
 const REFRESH_MARGIN_SECONDS = 60; // renova 60s antes de expirar
 
 export type BackpressureHint = 'ok' | 'slow' | 'stop';
