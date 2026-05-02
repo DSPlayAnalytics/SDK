@@ -4,6 +4,18 @@ Todas as mudancas significativas deste pacote sao registradas aqui. Segue [Keep 
 
 ## [Unreleased]
 
+## [0.4.0-rc.2] - 2026-05-01
+
+### Added
+- `trackPurchase(value, currency, metadata?)` — registra compra/transação; emite
+  `__purchase` com `value` (>= 0, finito) e `currency` (ISO 4217, ex.: "BRL").
+- `trackSignup(plan, metadata?)` — registra cadastro; emite `__signup` com `plan`.
+- `trackConversion(type, value?, metadata?)` — conversão genérica; emite `__conversion`
+  com `type` e `value` opcionais. Retorna `false` se `value` for fornecido mas não-finito.
+- Todos os helpers sanitizam `metadata` (só primitivos, descarta objetos/arrays/funções).
+- Backend roteia eventos `__purchase`/`__signup`/`__conversion` para measurement
+  `conversion_events` no InfluxDB (requer backend-2, PR #XX em portifolio).
+
 ## [0.4.0-rc.1] - 2026-05-01
 
 ### Added
