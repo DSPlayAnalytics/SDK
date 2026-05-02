@@ -11,6 +11,7 @@ import {
   type StorageFila,
 } from './filaAnalytics.ts';
 import { AuthClient, SDK_SCHEMA_VERSION, type BackpressureHint } from './authClient.ts';
+import { userStore } from './identidade/userStore.ts';
 
 interface ConfigSdk {
   websocketUrl: string;
@@ -438,12 +439,21 @@ class WebSocketService {
         return;
       }
 
+      // Schema 1.2 (v0.4): identidade opcional injetada do UserStore.
+      // Campos so entram no envelope quando setados via identify/group —
+      // omissao mantem forward-compat com backend velho (que ignora) e
+      // evita mandar 'null' literal.
+      const userId = userStore.getUserId();
+      const groupId = userStore.getGroupId();
+
       // Aplica skew em timestamps se necessario.
       const payload = this._aplicarSkew({
         ...heatmapDados,
         app_id: this.appId,
         ambiente: this.ambiente,
         schema_version: SDK_SCHEMA_VERSION,
+        ...(userId ? { user_id: userId } : {}),
+        ...(groupId ? { group_id: groupId } : {}),
       } as unknown as Record<string, unknown>);
 
       const emitTimeout = setTimeout(() => resolve(null), TIMEOUT_ACK_MS);
