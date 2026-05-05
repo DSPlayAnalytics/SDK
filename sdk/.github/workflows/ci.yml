@@ -1,0 +1,76 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  secrets-scan:
+    name: Gitleaks (secrets scan)
+    runs-on: ubuntu-latest
+    permissions:
+      # Default GITHUB_TOKEN nao tem `pull-requests: read` em PRs de mesmo
+      # repo. gitleaks-action chama /repos/.../pulls/{n}/commits pra delta
+      # scan e bate 403 sem isso.
+      contents: read
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Full history pra scan reverter regressoes (commit que vazou
+          # secret e foi revertido depois — gitleaks ainda pega).
+          fetch-depth: 0
+
+      - name: Run gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          # Sem licenca, action roda em modo OSS (community rules + custom config).
+          GITLEAKS_CONFIG: .gitleaks.toml
+          # Obrigatorio desde gitleaks-action v2 — usa o auto-token do
+          # workflow pra postar comments em PRs com leaks (best-practice).
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  audit:
+    name: npm audit (high+ em prod deps)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install
+        run: npm ci
+
+      - name: npm audit (prod, high+)
+        run: npm audit --audit-level=high --omit=dev
+
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install
+        run: npm ci
+
+      - name: Lint (tsc --noEmit)
+        run: npm run lint
+
+      - name: Test
+        run: npm run test
+
+      - name: Build
+        run: npm run build
+
+      - name: Smoke test do bundle
+        run: npm run smoke
+        if: hashFiles('scripts/smoke-bundle.mjs') != ''

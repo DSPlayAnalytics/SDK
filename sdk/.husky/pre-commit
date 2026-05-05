@@ -1,0 +1,36 @@
+#!/usr/bin/env sh
+# Pre-commit hook do SDK. Falha = commit nao acontece.
+#
+# Camadas (ordem custo-crescente):
+#  1. lint-staged: tsc/eslint/prettier so em arquivos staged
+#  2. gitleaks:    scan de secrets em arquivos staged
+#  3. npm audit:   bloqueia commit se ha CVE high+ em deps de prod
+#
+# Pra pular em commit emergencial: `git commit --no-verify`. Use com
+# critério — bypassa todas as checagens.
+
+set -e
+
+echo "→ pre-commit (1/3): lint-staged"
+npx lint-staged
+
+echo "→ pre-commit (2/3): gitleaks (secrets scan)"
+if command -v gitleaks >/dev/null 2>&1; then
+  # protect: scan apenas mudancas staged. Mais rapido que detect full-history.
+  gitleaks protect --staged --redact -v --config .gitleaks.toml
+else
+  echo "  ⚠ gitleaks nao instalado — instale com:"
+  echo "    macOS:   brew install gitleaks"
+  echo "    Linux:   https://github.com/gitleaks/gitleaks#installing"
+  echo "    Windows: scoop install gitleaks  (ou choco)"
+  echo "  Pulando por enquanto. CI ainda vai rodar — corrija antes do PR."
+fi
+
+echo "→ pre-commit (3/3): npm audit (high+)"
+npm audit --audit-level=high --omit=dev || {
+  echo "  ✗ Vulnerabilidade high+ em deps de prod."
+  echo "    Resolva com: npm audit fix"
+  exit 1
+}
+
+echo "✓ pre-commit OK"
