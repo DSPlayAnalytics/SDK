@@ -1,0 +1,44 @@
+---
+# Parser para os logs estruturados do backend.
+# Formato esperado: `YYYY-MM-DD HH:MM:SS,ms - NIVEL - evento=<nome> chave=valor ...`
+#
+# Extrai evento, session_id, id_registro, app_id, ip e codigo de erro para
+# permitir que os cenarios correlacionem.
+
+onsuccess: next_stage
+name: portifolio/backend-analytics
+description: "Parser dos logs estruturados do backend portifolio"
+filter: "evt.Parsed.program == 'portifolio-backend'"
+pattern_syntax:
+  TIMESTAMP_BACKEND: '%{YEAR}-%{MONTHNUM}-%{MONTHDAY} %{TIME}'
+nodes:
+  - grok:
+      pattern: '%{TIMESTAMP_BACKEND:timestamp} - %{WORD:level} - evento=%{WORD:evento}%{GREEDYDATA:kv}'
+      apply_on: Line.Raw
+      statics:
+        - meta: log_type
+          value: backend-structured
+        - meta: evento
+          expression: evt.Parsed.evento
+        - meta: level
+          expression: evt.Parsed.level
+  - grok:
+      pattern: 'session_id=%{NOTSPACE:session_id}'
+      apply_on: kv
+      statics:
+        - meta: session_id
+          expression: evt.Parsed.session_id
+  - grok:
+      pattern: 'app_id=%{NOTSPACE:app_id}'
+      apply_on: kv
+      statics:
+        - meta: app_id
+          expression: evt.Parsed.app_id
+  - grok:
+      pattern: 'ip=%{IP:source_ip}'
+      apply_on: kv
+      statics:
+        - meta: source_ip
+          expression: evt.Parsed.source_ip
+        - target: evt.Meta.source_ip
+          expression: evt.Parsed.source_ip

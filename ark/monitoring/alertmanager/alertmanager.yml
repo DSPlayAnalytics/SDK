@@ -1,0 +1,56 @@
+# Config do Alertmanager — encaminha alertas pra Slack via Incoming Webhook.
+# Webhook URL vem da var de ambiente $SLACK_WEBHOOK_URL (escrita no
+# ark/monitoring/.env pelo Ansible role `monitoring`, lendo do vault
+# `slack_webhook_alerts`).
+#
+# Validacao da config: docker exec portifolio-alertmanager amtool check-config /etc/alertmanager/alertmanager.yml
+global:
+  resolve_timeout: 5m
+  slack_api_url_file: /etc/alertmanager/slack_webhook.url
+
+# Template padrao do Slack — visual com cor por severidade.
+templates:
+  - /etc/alertmanager/templates/*.tmpl
+
+route:
+  # Agrupa por nome de alerta + severidade. Notifica em batch quando
+  # vários containers caem ao mesmo tempo (deploy quebrado), evitando
+  # 10 mensagens em 5 segundos.
+  group_by: ['alertname', 'severity']
+  group_wait: 30s          # tempo de espera antes do primeiro envio do grupo
+  group_interval: 5m       # tempo entre envios subsequentes do mesmo grupo
+  repeat_interval: 4h      # re-notifica se ainda firing depois desse tempo
+  receiver: slack-default
+
+  # Sub-rotas: criticos vao com repeat mais agressivo.
+  routes:
+    - matchers:
+        - severity = critical
+      receiver: slack-critical
+      group_wait: 10s
+      repeat_interval: 1h
+
+receivers:
+  - name: slack-default
+    slack_configs:
+      - channel: '#alerts-prod'
+        send_resolved: true
+        title: '{{ template "slack.title" . }}'
+        text: '{{ template "slack.text" . }}'
+
+  - name: slack-critical
+    slack_configs:
+      - channel: '#alerts-prod'
+        send_resolved: true
+        title: '🚨 [CRITICAL] {{ template "slack.title" . }}'
+        text: '{{ template "slack.text" . }}'
+
+# Inhibitions: silencia alertas redundantes.
+# Se uma instancia esta down (InstanceDown), nao adianta alertar
+# alto-CPU/disk dela.
+inhibit_rules:
+  - source_matchers:
+      - alertname = InstanceDown
+    target_matchers:
+      - severity =~ "warning|critical"
+    equal: ['instance']

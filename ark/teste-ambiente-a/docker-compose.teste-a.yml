@@ -1,0 +1,17 @@
+services:
+  alvo:
+    # Rocky Linux 9 — espelha a distro de producao (RHEL 9 family).
+    # Ubuntu nao funciona porque role 'base' usa dnf/firewalld/glibc-langpack-pt.
+    image: geerlingguy/docker-rockylinux9-ansible:latest
+    container_name: ark-teste-a-alvo
+    entrypoint: ""
+    command: ["sleep", "infinity"]
+    restart: "no"
+    volumes:
+      - ../:/ark:ro
+    networks:
+      - ark-teste-a
+
+networks:
+  ark-teste-a:
+    driver: bridge

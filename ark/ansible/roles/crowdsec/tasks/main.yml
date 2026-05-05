@@ -1,0 +1,23 @@
+---
+# Role crowdsec — Rocky Linux 9.
+# Agente CrowdSec roda em container (compose `ark/crowdsec/docker-compose.crowdsec.yml`).
+# O bouncer de protecao (crowdsec-firewall-bouncer-nftables) ja vem instalado
+# por default quando o repo oficial CrowdSec e adicionado via install.crowdsec.net,
+# e bloqueia IPs em camada de nftables antes de chegar no nginx. nginx-bouncer
+# (pacote separado) seria redundante e nao agrega protecao adicional aqui.
+
+- name: Subir agente CrowdSec via Docker Compose
+  community.docker.docker_compose_v2:
+    project_src: "{{ repo_dir }}/ark/crowdsec"
+    files:
+      - docker-compose.crowdsec.yml
+    state: present
+  become_user: "{{ deploy_user }}"
+
+- name: Adicionar repo CrowdSec (script oficial idempotente — instala firewall-bouncer junto)
+  shell: |
+    set -e
+    curl -s https://install.crowdsec.net | bash
+  args:
+    creates: /etc/yum.repos.d/crowdsec_crowdsec.repo
+  when: habilitar_crowdsec_bouncer | default(true)

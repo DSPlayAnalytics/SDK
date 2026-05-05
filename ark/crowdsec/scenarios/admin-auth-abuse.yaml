@@ -1,0 +1,20 @@
+---
+# Detecta tentativa de forca bruta nos endpoints /admin/*.
+# 5 rejeicoes por token invalido do mesmo IP em 1 minuto -> ban.
+
+type: leaky
+name: portifolio/admin-auth-abuse
+description: "Tentativa repetida de token admin invalido"
+filter: |
+  evt.Parsed.request startsWith "/admin/"
+  && evt.Parsed.verb in ["GET", "DELETE"]
+  && evt.Meta.http_status == "401"
+groupby: evt.Meta.source_ip
+capacity: 5
+leakspeed: 12s
+blackhole: 10m
+labels:
+  service: portifolio-analytics
+  type: http
+  behavior: http-bf
+  remediation: true

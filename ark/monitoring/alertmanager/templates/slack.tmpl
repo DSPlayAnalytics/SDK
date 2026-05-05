@@ -1,0 +1,17 @@
+{{/* Templates Slack — formato compacto, links pra Prometheus. */}}
+
+{{ define "slack.title" -}}
+[{{ .Status | toUpper }}{{ if eq .Status "firing" }}:{{ .Alerts.Firing | len }}{{ end }}] {{ .CommonLabels.alertname }}
+{{- end }}
+
+{{ define "slack.text" -}}
+{{ range .Alerts -}}
+*Alerta:* {{ .Labels.alertname }} ({{ .Labels.severity }})
+{{ if .Labels.instance }}*Instance:* `{{ .Labels.instance }}`
+{{ end }}{{ if .Annotations.summary }}*Resumo:* {{ .Annotations.summary }}
+{{ end }}{{ if .Annotations.description }}*Detalhe:* {{ .Annotations.description }}
+{{ end }}*Inicio:* {{ .StartsAt.Format "2006-01-02 15:04:05 UTC" }}
+{{ if eq .Status "resolved" }}*Resolvido:* {{ .EndsAt.Format "2006-01-02 15:04:05 UTC" }}
+{{ end }}
+{{ end }}
+{{- end }}

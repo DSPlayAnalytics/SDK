@@ -1,0 +1,15 @@
+---
+# Ansible Galaxy collections necessarias pra rodar o playbook deste projeto.
+#
+# community.docker 5.x exige ansible-core >= 2.17. A VPS roda Ansible 2.15.13,
+# entao fixamos em 4.x — ultima linha que suporta 2.15. Se subir o ansible-core,
+# afrouxar o cap e revisar `roles/analytics-stack` (em 5.x `command:` e str e
+# `argv:` e lista; aqui ja usamos `argv:`, entao a migracao deve ser limpa).
+#
+# Instalar/atualizar com:
+#   ansible-galaxy collection install -r ark/ansible/requirements.yml
+collections:
+  - name: community.docker
+    version: ">=4.0.0,<5.0.0"
+  - name: ansible.posix
+    version: ">=1.5.0"

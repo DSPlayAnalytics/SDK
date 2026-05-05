@@ -1,0 +1,303 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": { "type": "grafana", "uid": "-- Grafana --" },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "description": "Engajamento — cliques, scrolls, hovers, exposicoes, toques. Bucket __BUCKET__. Read-only para Viewers.",
+  "editable": false,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "id": null,
+  "links": [
+    {
+      "title": "Configurações",
+      "url": "https://dsplayground.com.br/cliente/configuracoes/",
+      "type": "link",
+      "icon": "cog",
+      "tooltip": "Trocar email/senha, publishable key, plano, consumo",
+      "targetBlank": true,
+      "asDropdown": false,
+      "includeVars": false,
+      "keepTime": false,
+      "tags": []
+    },
+    {
+      "title": "Exportar dados",
+      "url": "https://dsplayground.com.br/cliente/exportar/",
+      "type": "link",
+      "icon": "cloud",
+      "tooltip": "Baixar arquivos arquivados (LGPD)",
+      "targetBlank": true,
+      "asDropdown": false,
+      "includeVars": false,
+      "keepTime": false,
+      "tags": []
+    },
+    {
+      "title": "Voltar ao site",
+      "url": "https://dsplayground.com.br/",
+      "type": "link",
+      "icon": "external link",
+      "tooltip": "Página inicial DS Playground",
+      "targetBlank": false,
+      "asDropdown": false,
+      "includeVars": false,
+      "keepTime": false,
+      "tags": []
+    }
+  ],
+  "panels": [
+    {
+      "title": "Cliques (24h)",
+      "type": "stat",
+      "gridPos": { "h": 5, "w": 5, "x": 0, "y": 0 },
+      "datasource": { "type": "influxdb", "uid": "__DATASOURCE_UID__" },
+      "targets": [
+        {
+          "refId": "A",
+          "query": "from(bucket: \"__BUCKET__\")\n  |> range(start: -24h)\n  |> filter(fn: (r) => r._measurement == \"page_analytics\" and r._field == \"cliques\")\n  |> filter(fn: (r) => r.device_type != \"bot\")\n  |> group()\n  |> sum()"
+        }
+      ],
+      "options": {
+        "reduceOptions": { "values": false, "calcs": ["lastNotNull"], "fields": "" },
+        "textMode": "value", "colorMode": "background",
+        "graphMode": "area", "justifyMode": "center", "orientation": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": { "mode": "thresholds" },
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "blue", "value": null }] }
+        }
+      }
+    },
+    {
+      "title": "Scrolls (24h)",
+      "type": "stat",
+      "gridPos": { "h": 5, "w": 5, "x": 5, "y": 0 },
+      "datasource": { "type": "influxdb", "uid": "__DATASOURCE_UID__" },
+      "description": "Eventos scroll_depth — tipicamente o SDK manda 1 por marco de profundidade (25/50/75/100%).",
+      "targets": [
+        {
+          "refId": "A",
+          "query": "from(bucket: \"__BUCKET__\")\n  |> range(start: -24h)\n  |> filter(fn: (r) => r._measurement == \"page_analytics\" and r._field == \"scrolls\")\n  |> filter(fn: (r) => r.device_type != \"bot\")\n  |> group()\n  |> sum()"
+        }
+      ],
+      "options": {
+        "reduceOptions": { "values": false, "calcs": ["lastNotNull"], "fields": "" },
+        "textMode": "value", "colorMode": "background",
+        "graphMode": "area", "justifyMode": "center", "orientation": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": { "mode": "thresholds" },
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "purple", "value": null }] }
+        }
+      }
+    },
+    {
+      "title": "Hovers (24h)",
+      "type": "stat",
+      "gridPos": { "h": 5, "w": 5, "x": 10, "y": 0 },
+      "datasource": { "type": "influxdb", "uid": "__DATASOURCE_UID__" },
+      "targets": [
+        {
+          "refId": "A",
+          "query": "from(bucket: \"__BUCKET__\")\n  |> range(start: -24h)\n  |> filter(fn: (r) => r._measurement == \"page_analytics\" and r._field == \"hovers\")\n  |> filter(fn: (r) => r.device_type != \"bot\")\n  |> group()\n  |> sum()"
+        }
+      ],
+      "options": {
+        "reduceOptions": { "values": false, "calcs": ["lastNotNull"], "fields": "" },
+        "textMode": "value", "colorMode": "background",
+        "graphMode": "area", "justifyMode": "center", "orientation": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": { "mode": "thresholds" },
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "orange", "value": null }] }
+        }
+      }
+    },
+    {
+      "title": "Exposicoes (24h)",
+      "type": "stat",
+      "gridPos": { "h": 5, "w": 5, "x": 15, "y": 0 },
+      "datasource": { "type": "influxdb", "uid": "__DATASOURCE_UID__" },
+      "description": "element_exposure: elementos que entraram no viewport. Bom proxy de impressao.",
+      "targets": [
+        {
+          "refId": "A",
+          "query": "from(bucket: \"__BUCKET__\")\n  |> range(start: -24h)\n  |> filter(fn: (r) => r._measurement == \"page_analytics\" and r._field == \"exposicoes\")\n  |> filter(fn: (r) => r.device_type != \"bot\")\n  |> group()\n  |> sum()"
+        }
+      ],
+      "options": {
+        "reduceOptions": { "values": false, "calcs": ["lastNotNull"], "fields": "" },
+        "textMode": "value", "colorMode": "background",
+        "graphMode": "area", "justifyMode": "center", "orientation": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": { "mode": "thresholds" },
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] }
+        }
+      }
+    },
+    {
+      "title": "Toques mobile (24h)",
+      "type": "stat",
+      "gridPos": { "h": 5, "w": 4, "x": 20, "y": 0 },
+      "datasource": { "type": "influxdb", "uid": "__DATASOURCE_UID__" },
+      "description": "Eventos touch — mobile/tablet. Em desktop deve ser 0.",
+      "targets": [
+        {
+          "refId": "A",
+          "query": "from(bucket: \"__BUCKET__\")\n  |> range(start: -24h)\n  |> filter(fn: (r) => r._measurement == \"page_analytics\" and r._field == \"toques\")\n  |> filter(fn: (r) => r.device_type != \"bot\")\n  |> group()\n  |> sum()"
+        }
+      ],
+      "options": {
+        "reduceOptions": { "values": false, "calcs": ["lastNotNull"], "fields": "" },
+        "textMode": "value", "colorMode": "background",
+        "graphMode": "area", "justifyMode": "center", "orientation": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": { "mode": "thresholds" },
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "yellow", "value": null }] }
+        }
+      }
+    },
+    {
+      "title": "Cliques timeline por page_type",
+      "type": "timeseries",
+      "gridPos": { "h": 9, "w": 12, "x": 0, "y": 5 },
+      "datasource": { "type": "influxdb", "uid": "__DATASOURCE_UID__" },
+      "description": "Soma de cliques por page_type em janelas auto-escala.",
+      "targets": [
+        {
+          "refId": "A",
+          "query": "from(bucket: \"__BUCKET__\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"page_analytics\" and r._field == \"cliques\")\n  |> filter(fn: (r) => r.device_type != \"bot\")\n  |> group(columns: [\"page_type\"])\n  |> aggregateWindow(every: v.windowPeriod, fn: sum, createEmpty: false)"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "displayName": "${__field.labels.page_type}",
+          "unit": "short",
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "drawStyle": "bars",
+            "lineInterpolation": "linear",
+            "fillOpacity": 70,
+            "showPoints": "never",
+            "stacking": { "mode": "normal", "group": "A" }
+          }
+        }
+      }
+    },
+    {
+      "title": "Engajamento por device_type (24h)",
+      "type": "piechart",
+      "gridPos": { "h": 9, "w": 12, "x": 12, "y": 5 },
+      "datasource": { "type": "influxdb", "uid": "__DATASOURCE_UID__" },
+      "description": "Cliques + hovers + scrolls + toques agrupados por device_type. Mostra de onde vem o engajamento.",
+      "targets": [
+        {
+          "refId": "A",
+          "query": "from(bucket: \"__BUCKET__\")\n  |> range(start: -24h)\n  |> filter(fn: (r) => r._measurement == \"page_analytics\")\n  |> filter(fn: (r) => r._field == \"cliques\" or r._field == \"hovers\" or r._field == \"scrolls\" or r._field == \"toques\")\n  |> filter(fn: (r) => r.device_type != \"bot\")\n  |> group(columns: [\"device_type\"])\n  |> sum()"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "values": ["value", "percent"]
+        },
+        "pieType": "donut",
+        "reduceOptions": { "values": false, "calcs": ["lastNotNull"], "fields": "" }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "displayName": "${__field.labels.device_type}",
+          "color": { "mode": "palette-classic" },
+          "unit": "short"
+        }
+      }
+    },
+    {
+      "title": "Top 10 paginas mais engajadas (cliques + scrolls + hovers, 24h)",
+      "type": "bargauge",
+      "gridPos": { "h": 9, "w": 12, "x": 0, "y": 14 },
+      "datasource": { "type": "influxdb", "uid": "__DATASOURCE_UID__" },
+      "description": "Combina cliques, scrolls e hovers como score de engajamento por pagina.",
+      "targets": [
+        {
+          "refId": "A",
+          "query": "from(bucket: \"__BUCKET__\")\n  |> range(start: -24h)\n  |> filter(fn: (r) => r._measurement == \"page_analytics\")\n  |> filter(fn: (r) => r._field == \"cliques\" or r._field == \"scrolls\" or r._field == \"hovers\")\n  |> filter(fn: (r) => r.device_type != \"bot\")\n  |> group(columns: [\"page_type\"])\n  |> sum()\n  |> sort(columns: [\"_value\"], desc: true)\n  |> limit(n: 10)"
+        }
+      ],
+      "options": {
+        "displayMode": "gradient",
+        "orientation": "horizontal",
+        "showUnfilled": true,
+        "valueMode": "color",
+        "reduceOptions": { "values": false, "calcs": ["lastNotNull"], "fields": "" }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "displayName": "${__field.labels.page_type}",
+          "color": { "mode": "continuous-GrYlRd" },
+          "unit": "short"
+        }
+      }
+    },
+    {
+      "title": "Permanencia media na pagina (24h)",
+      "type": "bargauge",
+      "gridPos": { "h": 9, "w": 12, "x": 12, "y": 14 },
+      "datasource": { "type": "influxdb", "uid": "__DATASOURCE_UID__" },
+      "description": "Soma de permanencia_segundos por page_type. Cada batch contribui ~5s, entao isto eh tempo total agregado de TODAS as sessoes na pagina.",
+      "targets": [
+        {
+          "refId": "A",
+          "query": "from(bucket: \"__BUCKET__\")\n  |> range(start: -24h)\n  |> filter(fn: (r) => r._measurement == \"page_analytics\" and r._field == \"permanencia_segundos\")\n  |> filter(fn: (r) => r.device_type != \"bot\")\n  |> group(columns: [\"page_type\"])\n  |> sum()\n  |> sort(columns: [\"_value\"], desc: true)\n  |> limit(n: 10)"
+        }
+      ],
+      "options": {
+        "displayMode": "gradient",
+        "orientation": "horizontal",
+        "showUnfilled": true,
+        "valueMode": "color",
+        "reduceOptions": { "values": false, "calcs": ["lastNotNull"], "fields": "" }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "displayName": "${__field.labels.page_type}",
+          "color": { "mode": "continuous-BlPu" },
+          "unit": "s"
+        }
+      }
+    }
+  ],
+  "refresh": "30s",
+  "schemaVersion": 39,
+  "tags": ["portifolio", "cliente", "engajamento"],
+  "templating": { "list": [] },
+  "time": { "from": "now-24h", "to": "now" },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "Engajamento",
+  "uid": "portifolio-engajamento",
+  "version": 1
+}

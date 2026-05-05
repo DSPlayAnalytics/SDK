@@ -1,0 +1,315 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": { "type": "grafana", "uid": "-- Grafana --" },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "description": "Event Explorer — explora qualquer evento custom enviado pelo SDK. Cliente escolhe o evento ($evento) e como segmentar ($breakdown) sem precisar saber Flux. Equivalente ao Data Explorer do New Relic. Bucket __BUCKET__.",
+  "editable": false,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "id": null,
+  "links": [
+    {
+      "title": "Configurações",
+      "url": "https://dsplayground.com.br/cliente/configuracoes/",
+      "type": "link",
+      "icon": "cog",
+      "tooltip": "Trocar email/senha, publishable key, plano, consumo",
+      "targetBlank": true,
+      "asDropdown": false,
+      "includeVars": false,
+      "keepTime": false,
+      "tags": []
+    },
+    {
+      "title": "Exportar dados",
+      "url": "https://dsplayground.com.br/cliente/exportar/",
+      "type": "link",
+      "icon": "cloud",
+      "tooltip": "Baixar arquivos arquivados (LGPD)",
+      "targetBlank": true,
+      "asDropdown": false,
+      "includeVars": false,
+      "keepTime": false,
+      "tags": []
+    },
+    {
+      "title": "Voltar ao site",
+      "url": "https://dsplayground.com.br/",
+      "type": "link",
+      "icon": "external link",
+      "tooltip": "Página inicial DS Playground",
+      "targetBlank": false,
+      "asDropdown": false,
+      "includeVars": false,
+      "keepTime": false,
+      "tags": []
+    }
+  ],
+  "templating": {
+    "list": [
+      {
+        "name": "evento",
+        "label": "Evento",
+        "type": "query",
+        "datasource": { "type": "influxdb", "uid": "__DATASOURCE_UID__" },
+        "query": "import \"influxdata/influxdb/schema\"\nschema.tagValues(\n  bucket: \"__BUCKET__\",\n  tag: \"nome\",\n  predicate: (r) => r._measurement == \"custom_events\",\n  start: -7d,\n)",
+        "refresh": 2,
+        "regex": "",
+        "sort": 1,
+        "multi": false,
+        "includeAll": false,
+        "hide": 0,
+        "current": {}
+      },
+      {
+        "name": "breakdown",
+        "label": "Segmentar por",
+        "type": "custom",
+        "query": "page_type,device_type,pais,referrer_dominio,rating",
+        "options": [
+          { "text": "page_type", "value": "page_type", "selected": true },
+          { "text": "device_type", "value": "device_type", "selected": false },
+          { "text": "pais", "value": "pais", "selected": false },
+          { "text": "referrer_dominio", "value": "referrer_dominio", "selected": false },
+          { "text": "rating", "value": "rating", "selected": false }
+        ],
+        "current": { "text": "page_type", "value": "page_type" },
+        "multi": false,
+        "includeAll": false,
+        "hide": 0
+      }
+    ]
+  },
+  "panels": [
+    {
+      "title": "Total ocorrencias de $evento (24h)",
+      "type": "stat",
+      "gridPos": { "h": 5, "w": 6, "x": 0, "y": 0 },
+      "datasource": { "type": "influxdb", "uid": "__DATASOURCE_UID__" },
+      "description": "Soma de ocorrencias do evento selecionado nas ultimas 24h.",
+      "targets": [
+        {
+          "refId": "A",
+          "query": "from(bucket: \"__BUCKET__\")\n  |> range(start: -24h)\n  |> filter(fn: (r) => r._measurement == \"custom_events\" and r._field == \"ocorrencias\" and r.nome == \"${evento}\")\n  |> group()\n  |> sum()"
+        }
+      ],
+      "options": {
+        "reduceOptions": { "values": false, "calcs": ["lastNotNull"], "fields": "" },
+        "textMode": "value",
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "orientation": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [{ "color": "blue", "value": null }]
+          }
+        }
+      }
+    },
+    {
+      "title": "Sessoes unicas com $evento (24h)",
+      "type": "stat",
+      "gridPos": { "h": 5, "w": 6, "x": 6, "y": 0 },
+      "datasource": { "type": "influxdb", "uid": "__DATASOURCE_UID__" },
+      "description": "Numero de session_id distintos que dispararam o evento. Ajuda a separar volume bruto de alcance.",
+      "targets": [
+        {
+          "refId": "A",
+          "query": "from(bucket: \"__BUCKET__\")\n  |> range(start: -24h)\n  |> filter(fn: (r) => r._measurement == \"custom_events\" and r._field == \"ocorrencias\" and r.nome == \"${evento}\")\n  |> keep(columns: [\"session_id\"])\n  |> distinct(column: \"session_id\")\n  |> count()"
+        }
+      ],
+      "options": {
+        "reduceOptions": { "values": false, "calcs": ["lastNotNull"], "fields": "" },
+        "textMode": "value",
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "orientation": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [{ "color": "purple", "value": null }]
+          }
+        }
+      }
+    },
+    {
+      "title": "Paginas distintas com $evento (24h)",
+      "type": "stat",
+      "gridPos": { "h": 5, "w": 6, "x": 12, "y": 0 },
+      "datasource": { "type": "influxdb", "uid": "__DATASOURCE_UID__" },
+      "targets": [
+        {
+          "refId": "A",
+          "query": "from(bucket: \"__BUCKET__\")\n  |> range(start: -24h)\n  |> filter(fn: (r) => r._measurement == \"custom_events\" and r._field == \"ocorrencias\" and r.nome == \"${evento}\")\n  |> keep(columns: [\"page_type\"])\n  |> distinct(column: \"page_type\")\n  |> count()"
+        }
+      ],
+      "options": {
+        "reduceOptions": { "values": false, "calcs": ["lastNotNull"], "fields": "" },
+        "textMode": "value",
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "orientation": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [{ "color": "orange", "value": null }]
+          }
+        }
+      }
+    },
+    {
+      "title": "Eventos/min em pico (24h)",
+      "type": "stat",
+      "gridPos": { "h": 5, "w": 6, "x": 18, "y": 0 },
+      "datasource": { "type": "influxdb", "uid": "__DATASOURCE_UID__" },
+      "description": "Maior soma de ocorrencias em uma janela de 1 minuto. Util pra entender pico vs baseline.",
+      "targets": [
+        {
+          "refId": "A",
+          "query": "from(bucket: \"__BUCKET__\")\n  |> range(start: -24h)\n  |> filter(fn: (r) => r._measurement == \"custom_events\" and r._field == \"ocorrencias\" and r.nome == \"${evento}\")\n  |> group()\n  |> aggregateWindow(every: 1m, fn: sum, createEmpty: false)\n  |> max()"
+        }
+      ],
+      "options": {
+        "reduceOptions": { "values": false, "calcs": ["lastNotNull"], "fields": "" },
+        "textMode": "value",
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "orientation": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [{ "color": "red", "value": null }]
+          }
+        }
+      }
+    },
+    {
+      "title": "$evento timeline (soma por $breakdown)",
+      "type": "timeseries",
+      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 5 },
+      "datasource": { "type": "influxdb", "uid": "__DATASOURCE_UID__" },
+      "description": "Cliente trocou $breakdown? Series novas aparecem automatico. Janela auto-escala com timeRange.",
+      "targets": [
+        {
+          "refId": "A",
+          "query": "from(bucket: \"__BUCKET__\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"custom_events\" and r._field == \"ocorrencias\" and r.nome == \"${evento}\")\n  |> group(columns: [\"${breakdown}\"])\n  |> aggregateWindow(every: v.windowPeriod, fn: sum, createEmpty: false)"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "displayName": "${__field.labels.${breakdown}}",
+          "unit": "short",
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "drawStyle": "bars",
+            "lineInterpolation": "linear",
+            "fillOpacity": 70,
+            "showPoints": "never",
+            "stacking": { "mode": "normal", "group": "A" }
+          }
+        }
+      }
+    },
+    {
+      "title": "Top 10 valores de $breakdown para $evento (24h)",
+      "type": "bargauge",
+      "gridPos": { "h": 10, "w": 12, "x": 0, "y": 15 },
+      "datasource": { "type": "influxdb", "uid": "__DATASOURCE_UID__" },
+      "description": "Quem mais dispara esse evento? Util pra encontrar gargalos ou destaques.",
+      "targets": [
+        {
+          "refId": "A",
+          "query": "from(bucket: \"__BUCKET__\")\n  |> range(start: -24h)\n  |> filter(fn: (r) => r._measurement == \"custom_events\" and r._field == \"ocorrencias\" and r.nome == \"${evento}\")\n  |> group(columns: [\"${breakdown}\"])\n  |> sum()\n  |> sort(columns: [\"_value\"], desc: true)\n  |> limit(n: 10)"
+        }
+      ],
+      "options": {
+        "displayMode": "gradient",
+        "orientation": "horizontal",
+        "showUnfilled": true,
+        "valueMode": "color",
+        "reduceOptions": { "values": false, "calcs": ["lastNotNull"], "fields": "" }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "displayName": "${__field.labels.${breakdown}}",
+          "color": { "mode": "continuous-BlPu" },
+          "unit": "short"
+        }
+      }
+    },
+    {
+      "title": "Amostras recentes de $evento",
+      "type": "table",
+      "gridPos": { "h": 10, "w": 12, "x": 12, "y": 15 },
+      "datasource": { "type": "influxdb", "uid": "__DATASOURCE_UID__" },
+      "description": "Ultimos 50 hits (com tags). Util pra debug e validar que evento esta chegando como esperado.",
+      "targets": [
+        {
+          "refId": "A",
+          "query": "from(bucket: \"__BUCKET__\")\n  |> range(start: -24h)\n  |> filter(fn: (r) => r._measurement == \"custom_events\" and r._field == \"ocorrencias\" and r.nome == \"${evento}\")\n  |> keep(columns: [\"_time\", \"page_type\", \"device_type\", \"pais\", \"referrer_dominio\", \"session_id\"])\n  |> sort(columns: [\"_time\"], desc: true)\n  |> limit(n: 50)"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "cellOptions": { "type": "auto" }
+          }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "_time" },
+            "properties": [
+              { "id": "displayName", "value": "Quando" },
+              { "id": "custom.width", "value": 180 }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "footer": { "show": false }
+      }
+    }
+  ],
+  "refresh": "30s",
+  "schemaVersion": 39,
+  "tags": ["portifolio", "cliente", "event-explorer"],
+  "time": { "from": "now-24h", "to": "now" },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "Event Explorer",
+  "uid": "portifolio-event-explorer",
+  "version": 1
+}
