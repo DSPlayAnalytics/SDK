@@ -153,8 +153,8 @@ src/
 |---|---|---|
 | `/cliente/cadastro` | Criação de conta (email, senha, nome do site, slug) | Público |
 | `/cliente/login` | Login com email + senha | Público |
-| `/cliente/esqueci-senha` | Solicita magic link de recuperação | Público |
-| `/cliente/redefinir-senha` | Confirma nova senha via token | Público (token) |
+| `/cliente/esqueci-senha` | Solicita link de redefinição de senha por email | Público |
+| `/cliente/redefinir-senha` | Cria nova senha via token (`?t=`) — nunca loga diretamente | Público (token) |
 | `/cliente/onboarding` | Wizard pós-cadastro em 3 passos | Cookie |
 | `/cliente/painel` | Dashboard com Grafana embedado + live counter (30s) | Cookie |
 | `/cliente/configuracoes` | 7 abas: publishable keys, quota, plano, email, senha, billing, exportar | Cookie |
@@ -223,8 +223,8 @@ interface ApiOptions {
 cadastrar(payload, opts)              → Result<CadastroOk, CadastroErrorCode>
 login(payload, opts)                  → Result<LoginOk, LoginErrorCode>
 solicitarMagicLink(payload, opts)     → Result<MagicLinkOk, MagicLinkErrorCode>
-solicitarRecuperarSenha(payload, opts)
-confirmarRecuperarSenha(payload, opts)→ Result<RecuperarSenhaOk, RecuperarSenhaErrorCode>
+solicitarRecuperarSenha(payload, opts)→ Result<MagicLinkOk, RecuperarSenhaErrorCode>
+confirmarRecuperarSenha(payload, opts)→ Result<ConfirmarRecuperarSenhaOk, ConfirmarRecuperarSenhaErrorCode>
 alterarSenha(payload, opts)           → Result<AlterarOk, AlterarSenhaErrorCode>
 alterarEmail(payload, opts)           → Result<AlterarOk, AlterarEmailErrorCode>
 obterConfiguracoes(opts)              → Result<ConfiguracoesOk, ConfiguracoesErrorCode>
