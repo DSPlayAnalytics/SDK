@@ -1,4 +1,4 @@
-import { HeatmapUtils, WebSocketService } from '@danpqdan/dsplayground-analytics-sdk';
+import { HeatmapUtils, WebSocketService } from '@dsplayground-analytics/sdk';
 import { DEBUG_ENABLED } from '../config.js';
 
 // Controle global de página ativa para evitar coleta simultânea

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useHeatmap } from '../hooks/useHeatmap.tsx';
-import { WebSocketService } from '@danpqdan/dsplayground-analytics-sdk';
+import { WebSocketService } from '@dsplayground-analytics/sdk';
 import '../styles/debug.css';
 
 /**

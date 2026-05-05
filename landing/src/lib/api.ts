@@ -58,12 +58,27 @@ export type MagicLinkErrorCode =
   | 'REDE'
   | 'INESPERADO';
 
+export type RecuperarSenhaErrorCode =
+  | 'RATE_LIMIT_EXCEDIDO'
+  | 'REDE'
+  | 'INESPERADO';
+
+export type ConfirmarRecuperarSenhaErrorCode =
+  | 'TOKEN_INVALIDO'
+  | 'SENHA_CURTA'
+  | 'REDE'
+  | 'INESPERADO';
+
 export interface SolicitarMagicLinkPayload {
   email: string;
 }
 
 export interface MagicLinkOk {
   ok: boolean;
+}
+
+export interface ConfirmarRecuperarSenhaOk {
+  user: UserDto;
 }
 
 export type AlterarSenhaErrorCode =
@@ -300,6 +315,38 @@ async function getJson<TOk, TErr extends string>(
     message: `erro ${resp.status}`,
     status: resp.status,
   };
+}
+
+/**
+ * Solicita link de redefinição de senha por email (tipo='reset').
+ * O backend responde 200 anti-enum — mesma resposta pra email válido ou fantasma.
+ * O link enviado redireciona para /cliente/redefinir-senha?t=<token>, NÃO loga.
+ */
+export function solicitarRecuperarSenha(
+  payload: SolicitarMagicLinkPayload,
+  opts: ApiOptions,
+): Promise<Result<MagicLinkOk, RecuperarSenhaErrorCode>> {
+  return postJson<MagicLinkOk, RecuperarSenhaErrorCode>(
+    `${opts.apiUrl}/cliente/auth/recuperar-senha/solicitar`,
+    payload,
+    opts.fetchImpl ?? fetch,
+  );
+}
+
+/**
+ * Confirma redefinição de senha via token do link.
+ * Consome o token, troca a senha e abre sessão (Set-Cookie).
+ * Codigos: TOKEN_INVALIDO (expirado/usado), SENHA_CURTA (<8 chars).
+ */
+export function confirmarRecuperarSenha(
+  payload: { token: string; nova_senha: string },
+  opts: ApiOptions,
+): Promise<Result<ConfirmarRecuperarSenhaOk, ConfirmarRecuperarSenhaErrorCode>> {
+  return postJson<ConfirmarRecuperarSenhaOk, ConfirmarRecuperarSenhaErrorCode>(
+    `${opts.apiUrl}/cliente/auth/recuperar-senha/confirmar`,
+    payload,
+    opts.fetchImpl ?? fetch,
+  );
 }
 
 /**

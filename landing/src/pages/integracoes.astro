@@ -73,10 +73,10 @@ const restEndpoints = [
           <Card>
             <p class="text-sm text-slate-300">Pacote npm. Inicialize uma vez no entrypoint.</p>
             <pre class="mt-4 overflow-x-auto rounded-lg bg-slate-950 p-4 text-xs text-slate-200"><code class="font-mono">{`# 1) instalar
-npm i @danpqdan/dsplayground-analytics-sdk
+npm i @dsplayground-analytics/sdk
 
 # 2) src/main.tsx (ou index.tsx)
-import { iniciarAnalytics } from '@danpqdan/dsplayground-analytics-sdk';
+import { iniciarAnalytics } from '@dsplayground-analytics/sdk';
 
 iniciarAnalytics({
   publishableKey: '${PLACEHOLDER}',
@@ -91,7 +91,7 @@ iniciarAnalytics({
             <pre class="mt-4 overflow-x-auto rounded-lg bg-slate-950 p-4 text-xs text-slate-200"><code class="font-mono">{`// app/providers.tsx
 'use client';
 import { useEffect } from 'react';
-import { iniciarAnalytics } from '@danpqdan/dsplayground-analytics-sdk';
+import { iniciarAnalytics } from '@dsplayground-analytics/sdk';
 
 export function AnalyticsProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
@@ -118,7 +118,7 @@ export function AnalyticsProvider({ children }: { children: React.ReactNode }) {
   <body>
     <slot />
     <script>
-      import { iniciarAnalytics } from '@danpqdan/dsplayground-analytics-sdk';
+      import { iniciarAnalytics } from '@dsplayground-analytics/sdk';
       iniciarAnalytics({
         publishableKey: '${PLACEHOLDER}',
         websocketUrl: 'https://api.dsplayground.com.br',
@@ -165,7 +165,7 @@ export function AnalyticsProvider({ children }: { children: React.ReactNode }) {
     <h2 class="text-2xl font-bold tracking-tight text-white sm:text-3xl">Disparar evento customizado</h2>
     <p class="mt-3 text-slate-300">Depois do <code class="rounded bg-slate-800 px-1 py-0.5 font-mono text-xs">iniciarAnalytics()</code>, qualquer ação importante vira evento.</p>
     <Card class="mt-6">
-      <pre class="overflow-x-auto rounded-lg bg-slate-950 p-4 text-xs text-slate-200"><code class="font-mono">{`import { enviarEvento } from '@danpqdan/dsplayground-analytics-sdk';
+      <pre class="overflow-x-auto rounded-lg bg-slate-950 p-4 text-xs text-slate-200"><code class="font-mono">{`import { enviarEvento } from '@dsplayground-analytics/sdk';
 
 // Venda concluída
 enviarEvento('venda_concluida', {

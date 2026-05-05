@@ -38,6 +38,20 @@ import Section from '~/components/ui/Section.astro';
     import { resolverDestinoPosLogin } from '~/lib/redirect';
     import { API_URL, POS_LOGIN_URL } from '~/config';
 
+    // Redireciona imediatamente se já há sessão ativa.
+    (async () => {
+      try {
+        const resp = await fetch(`${API_URL}/cliente/auth/me`, { credentials: 'include' });
+        if (resp.ok) {
+          const destino = resolverDestinoPosLogin(
+            new URL(window.location.href).searchParams,
+            POS_LOGIN_URL,
+          );
+          window.location.replace(destino);
+        }
+      } catch { /* sem rede — deixa o form aparecer normalmente */ }
+    })();
+
     const form = document.getElementById('form-login') as HTMLFormElement | null;
     const erroBox = document.getElementById('erro')!;
     const submitBtn = document.getElementById('submit') as HTMLButtonElement | null;

@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import {
   alterarEmail, alterarSenha,
-  cadastrar, listarExports, login,
-  obterConfiguracoes, solicitarMagicLink,
+  cadastrar, confirmarRecuperarSenha, listarExports, login,
+  obterConfiguracoes, solicitarMagicLink, solicitarRecuperarSenha,
   urlDashboard, urlDownloadExport,
 } from './api';
 
@@ -293,6 +293,118 @@ describe('solicitarMagicLink()', () => {
   test('falha de rede vira REDE', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => { throw new Error('offline'); }));
     const r = await solicitarMagicLink({ email: 'd@x.com' }, { apiUrl: API_URL });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.code).toBe('REDE');
+  });
+});
+
+describe('solicitarRecuperarSenha()', () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  test('POST /cliente/auth/recuperar-senha/solicitar retorna ok', async () => {
+    vi.stubGlobal('fetch', fetchMock(200, { status: 'success', ok: true }));
+
+    const r = await solicitarRecuperarSenha({ email: 'd@x.com' }, { apiUrl: API_URL });
+
+    expect(r.ok).toBe(true);
+    expect(fetch).toHaveBeenCalledWith(
+      `${API_URL}/cliente/auth/recuperar-senha/solicitar`,
+      expect.objectContaining({
+        method: 'POST',
+        credentials: 'include',
+        body: JSON.stringify({ email: 'd@x.com' }),
+      }),
+    );
+  });
+
+  test('200 mesmo pra email-fantasma (anti-enum)', async () => {
+    vi.stubGlobal('fetch', fetchMock(200, { status: 'success', ok: true }));
+    const r = await solicitarRecuperarSenha({ email: 'fantasma@x.com' }, { apiUrl: API_URL });
+    expect(r.ok).toBe(true);
+  });
+
+  test('429 vira RATE_LIMIT_EXCEDIDO', async () => {
+    vi.stubGlobal('fetch', fetchMock(429, {
+      status: 'error', code: 'RATE_LIMIT_EXCEDIDO',
+      message: 'muitas solicitacoes — tente novamente em 15min',
+    }));
+    const r = await solicitarRecuperarSenha({ email: 'd@x.com' }, { apiUrl: API_URL });
+    expect(r.ok).toBe(false);
+    if (!r.ok) {
+      expect(r.code).toBe('RATE_LIMIT_EXCEDIDO');
+      expect(r.status).toBe(429);
+    }
+  });
+
+  test('falha de rede vira REDE', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => { throw new Error('offline'); }));
+    const r = await solicitarRecuperarSenha({ email: 'd@x.com' }, { apiUrl: API_URL });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.code).toBe('REDE');
+  });
+});
+
+describe('confirmarRecuperarSenha()', () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  test('POST /cliente/auth/recuperar-senha/confirmar com token válido retorna user', async () => {
+    vi.stubGlobal('fetch', fetchMock(200, {
+      status: 'success',
+      user: { id: 'u1', site_id: 's1', email: 'd@x.com', papel: 'admin' },
+    }));
+
+    const r = await confirmarRecuperarSenha(
+      { token: 'tok_abc123', nova_senha: 'nova-senha-123' },
+      { apiUrl: API_URL },
+    );
+
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.user.email).toBe('d@x.com');
+    expect(fetch).toHaveBeenCalledWith(
+      `${API_URL}/cliente/auth/recuperar-senha/confirmar`,
+      expect.objectContaining({
+        method: 'POST',
+        credentials: 'include',
+        body: JSON.stringify({ token: 'tok_abc123', nova_senha: 'nova-senha-123' }),
+      }),
+    );
+  });
+
+  test('400 TOKEN_INVALIDO (expirado ou já usado)', async () => {
+    vi.stubGlobal('fetch', fetchMock(400, {
+      status: 'error', code: 'TOKEN_INVALIDO',
+      message: 'link expirado, ja utilizado ou senha muito curta',
+    }));
+    const r = await confirmarRecuperarSenha(
+      { token: 'tok_expirado', nova_senha: 'senha-123' },
+      { apiUrl: API_URL },
+    );
+    expect(r.ok).toBe(false);
+    if (!r.ok) {
+      expect(r.code).toBe('TOKEN_INVALIDO');
+      expect(r.status).toBe(400);
+    }
+  });
+
+  test('400 SENHA_CURTA', async () => {
+    vi.stubGlobal('fetch', fetchMock(400, {
+      status: 'error', code: 'SENHA_CURTA',
+      message: 'nova_senha precisa ter pelo menos 8 caracteres',
+    }));
+    const r = await confirmarRecuperarSenha(
+      { token: 'tok_ok', nova_senha: 'abc' },
+      { apiUrl: API_URL },
+    );
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.code).toBe('SENHA_CURTA');
+  });
+
+  test('falha de rede vira REDE', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => { throw new Error('offline'); }));
+    const r = await confirmarRecuperarSenha(
+      { token: 'tok_ok', nova_senha: 'senha-valida-123' },
+      { apiUrl: API_URL },
+    );
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.code).toBe('REDE');
   });

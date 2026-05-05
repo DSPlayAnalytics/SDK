@@ -8,7 +8,6 @@ on:
 
 permissions:
   contents: read
-  packages: read  # npm ci precisa baixar @danpqdan/* do GitHub Packages
 
 jobs:
   test:
@@ -21,8 +20,6 @@ jobs:
           node-version: '22'
           cache: npm
       - name: Install
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_AUTH_TOKEN }}
         run: npm ci
       - run: npm run check
       - run: npm run test
@@ -44,5 +41,3 @@ jobs:
             PUBLIC_SITE_URL=https://ci-dummy.example.com
             PUBLIC_API_URL=http://ci-dummy:5000
             PUBLIC_DEBUG=false
-          secrets: |
-            NODE_AUTH_TOKEN=${{ secrets.NPM_AUTH_TOKEN }}

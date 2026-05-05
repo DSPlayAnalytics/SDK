@@ -23,6 +23,7 @@ import Integracoes from '~/pages/integracoes.astro';
 import Onboarding from '~/pages/cliente/onboarding.astro';
 import Painel from '~/pages/cliente/painel.astro';
 import Precos from '~/pages/precos.astro';
+import RedefinirSenha from '~/pages/cliente/redefinir-senha.astro';
 import Recursos from '~/pages/recursos.astro';
 import Seguranca from '~/pages/seguranca.astro';
 import Sobre from '~/pages/sobre.astro';
@@ -508,10 +509,10 @@ describe('integracoes.astro', () => {
 });
 
 describe('cliente/esqueci-senha.astro', () => {
-  test('título "Recuperar acesso" e descrição do magic-link', async () => {
+  test('título "Esqueci minha senha" e descrição de redefinição', async () => {
     const html = await render(EsqueciSenha);
-    expect(html).toContain('Recuperar acesso');
-    expect(html).toContain('link mágico');
+    expect(html).toContain('Esqueci minha senha');
+    expect(html).toContain('link para criar');
   });
 
   test('input email com label associada (a11y)', async () => {
@@ -547,6 +548,46 @@ describe('cliente/esqueci-senha.astro', () => {
     const html = await render(EsqueciSenha);
     const alertCount = (html.match(/role="alert"/g) || []).length;
     expect(alertCount).toBeGreaterThanOrEqual(2);
+  });
+});
+
+describe('cliente/redefinir-senha.astro', () => {
+  test('título "Redefinir senha" e description corretos', async () => {
+    const html = await render(RedefinirSenha);
+    expect(html).toContain('Redefinir senha');
+    expect(html).toContain('nova senha');
+  });
+
+  test('formulário tem campos nova_senha e confirmar_senha', async () => {
+    const html = await render(RedefinirSenha);
+    expect(html).toMatch(/<input[^>]*id="nova_senha"[^>]*type="password"/);
+    expect(html).toMatch(/<input[^>]*id="confirmar_senha"[^>]*type="password"/);
+  });
+
+  test('botão de submit tem data-cta="form-redefinir-senha"', async () => {
+    const html = await render(RedefinirSenha);
+    expect(html).toContain('data-cta="form-redefinir-senha"');
+  });
+
+  test('estado token inválido presente no markup (inicialmente hidden)', async () => {
+    const html = await render(RedefinirSenha);
+    expect(html).toContain('estado-token-invalido');
+    expect(html).toContain('Link expirado');
+  });
+
+  test('link "Pedir novo link" aponta pra /cliente/esqueci-senha', async () => {
+    const html = await render(RedefinirSenha);
+    expect(html).toMatch(/href="\/cliente\/esqueci-senha"/);
+  });
+
+  test('caixa de erro tem role=alert (a11y)', async () => {
+    const html = await render(RedefinirSenha);
+    expect(html).toMatch(/role="alert"/);
+  });
+
+  test('marcado noindex (área logada/token)', async () => {
+    const html = await render(RedefinirSenha);
+    expect(html).toContain('noindex');
   });
 });
 
