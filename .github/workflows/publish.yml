@@ -39,9 +39,9 @@ jobs:
 
       - name: Publish no npmjs.com
         run: |
-          printf '//registry.npmjs.org/:_authToken=%s\n@danpqdan:registry=https://registry.npmjs.org\n' \
-            "$NODE_AUTH_TOKEN" > "$RUNNER_TEMP/.npmrc-npmjs"
-          NPM_CONFIG_USERCONFIG="$RUNNER_TEMP/.npmrc-npmjs" npm publish --access public
+          printf '@danpqdan:registry=https://registry.npmjs.org\n//registry.npmjs.org/:_authToken=%s\n' \
+            "$NODE_AUTH_TOKEN" > .npmrc
+          npm publish --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
