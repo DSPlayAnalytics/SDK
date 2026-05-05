@@ -37,6 +37,13 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.PACKAGES_TOKEN }}
 
+      - name: Publish no npmjs.com
+        run: |
+          npm config set registry https://registry.npmjs.org
+          npm publish --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
       - name: Criar GitHub Release com bundle UMD anexado
         # Anexa dist/sdk.umd.js como asset do release pra uso direto via
         # <script src="https://.../releases/download/v0.X.Y/sdk.umd.js">.
