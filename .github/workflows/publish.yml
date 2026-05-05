@@ -9,7 +9,7 @@ jobs:
   publish:
     runs-on: ubuntu-latest
     permissions:
-      contents: write   # gh release create/upload precisa write
+      contents: write
       packages: write
     steps:
       - uses: actions/checkout@v4
@@ -18,9 +18,8 @@ jobs:
         with:
           node-version: '20'
           cache: 'npm'
-          # GitHub Packages — token automatico via permissions: packages: write.
-          registry-url: 'https://npm.pkg.github.com'
-          scope: '@danpqdan'
+          registry-url: 'https://registry.npmjs.org'
+          scope: '@dsplayground-analytics'
 
       - name: Install
         run: npm ci
@@ -30,30 +29,16 @@ jobs:
           npm run test
           npm run build
 
-      - name: Publish no GitHub Packages
-        # PACKAGES_TOKEN = PAT de danpqdan com write:packages
-        # (GITHUB_TOKEN da org DSPlayAnalytics nao tem permissao no namespace @danpqdan)
-        run: npm publish
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.PACKAGES_TOKEN }}
-
       - name: Publish no npmjs.com
-        run: |
-          printf '@danpqdan:registry=https://registry.npmjs.org\n//registry.npmjs.org/:_authToken=%s\n' \
-            "$NODE_AUTH_TOKEN" > .npmrc
-          npm publish --access public
+        run: npm publish --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Criar GitHub Release com bundle UMD anexado
-        # Anexa dist/sdk.umd.js como asset do release pra uso direto via
-        # <script src="https://.../releases/download/v0.X.Y/sdk.umd.js">.
-        # Re-roda em re-tag idempotente: --clobber sobrescreve assets.
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           tag="${GITHUB_REF##*/}"
-          # Cria release se nao existir; ignora erro se ja existe
           gh release view "$tag" >/dev/null 2>&1 \
             || gh release create "$tag" --title "$tag" --notes "Ver CHANGELOG.md"
           gh release upload "$tag" dist/sdk.umd.js dist/sdk.umd.js.map --clobber
