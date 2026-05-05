@@ -1,0 +1,31 @@
+---
+# Valores de teste — todos fakes mas com shape real para o playbook validar.
+deploy_user: deploy
+repo_url: file:///ark
+repo_dir: /opt/portifolio
+repo_branch: HEAD
+
+flask_secret_key: teste-nao-usar-em-prod
+cors_origins:
+  - http://localhost:3000
+
+influxdb_url: http://localhost:8086
+influxdb_token: teste-token-nao-real
+influxdb_org: zen
+influxdb_bucket: portifolio_test
+influxdb_enabled: true
+influxdb_retencao_dias: 7
+
+admin_api_token: teste-admin-token
+
+grafana_admin_user: admin
+grafana_admin_password: teste-grafana
+
+ssh_port: 22
+ufw_allow_ports: [22, 80, 443]
+habilitar_crowdsec: false
+habilitar_monitoring: false
+
+# Marca para o playbook saber que esta em ambiente de teste em container —
+# tasks que nao funcionam sem host real podem condicionar em `ambiente_teste`.
+ambiente_teste: true

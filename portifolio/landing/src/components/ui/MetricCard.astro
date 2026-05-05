@@ -1,0 +1,105 @@
+---
+/**
+ * MetricCard — KPI tile com label, valor formatado, delta opcional
+ * (com cor por direcao) e sparkline SVG opcional.
+ *
+ * Uso:
+ *   <MetricCard
+ *     label="Eventos hoje"
+ *     value="12.847"
+ *     delta={{ value: 18, direction: 'up', label: 'vs ontem' }}
+ *     sparkline={[12, 15, 11, 18, 22, 19, 24]}
+ *   />
+ *
+ * Padrao escolhido: passar `value` ja formatado (string) — assim o
+ * caller decide unidade ("12.847" vs "R$ 12,84" vs "2:14"). Mantem o
+ * componente burro e reusavel.
+ *
+ * Sparkline: array de numeros >=2 — desenha line chart compacto. Sem
+ * eixo, sem grid: contexto e' o delta. Se nao bater, usar ChartCard.
+ */
+type DeltaDirection = 'up' | 'down' | 'flat';
+
+interface Delta {
+  value: number;       // valor numerico (ja em %, ja com sinal)
+  direction: DeltaDirection;
+  label?: string;      // ex: "vs ontem"
+}
+
+interface Props {
+  label: string;
+  value: string;
+  delta?: Delta;
+  sparkline?: number[];
+  hint?: string;       // tooltip text (so titulo nativo do span por enquanto)
+  class?: string;
+}
+
+const { label, value, delta, sparkline, hint, class: extraClass } = Astro.props;
+
+// Delta colors: up=success, down=danger, flat=warning. Se up significa
+// algo ruim (latencia subiu), o caller flippa: passa direction='down'
+// com value positivo. Mantemos a semantica: cor reflete "bom/ruim?".
+const deltaColor: Record<DeltaDirection, string> = {
+  up:   'text-success-300',
+  down: 'text-danger-300',
+  flat: 'text-warning-300',
+};
+
+const deltaArrow: Record<DeltaDirection, string> = {
+  up:   '↑',
+  down: '↓',
+  flat: '→',
+};
+
+// Sparkline: normalizar em [0, 1] sobre min/max, desenhar polyline
+// num viewBox fixo. Width/height responsive via class na <svg>.
+function sparklinePath(pts: number[]): string {
+  if (pts.length < 2) return '';
+  const min = Math.min(...pts);
+  const max = Math.max(...pts);
+  const range = max - min || 1; // evita /0 quando flat
+  const w = 100;
+  const h = 30;
+  const stepX = w / (pts.length - 1);
+  return pts
+    .map((p, i) => {
+      const x = i * stepX;
+      const y = h - ((p - min) / range) * h;
+      return `${i === 0 ? 'M' : 'L'} ${x.toFixed(2)} ${y.toFixed(2)}`;
+    })
+    .join(' ');
+}
+
+const path = sparkline ? sparklinePath(sparkline) : '';
+---
+<article
+  class:list={[
+    'rounded-xl border border-slate-800 bg-slate-900/60 p-5 shadow-elev-1 backdrop-blur',
+    extraClass,
+  ]}
+  data-metric-card
+  title={hint}
+>
+  <p class="text-xs font-medium uppercase tracking-wide text-slate-400">{label}</p>
+  <p class="mt-2 text-3xl font-bold text-white tabular-nums">{value}</p>
+
+  {delta && (
+    <p class:list={['mt-1 flex items-center gap-1 text-xs font-medium', deltaColor[delta.direction]]}>
+      <span aria-hidden="true">{deltaArrow[delta.direction]}</span>
+      <span>{delta.value > 0 ? '+' : ''}{delta.value}%</span>
+      {delta.label && <span class="text-slate-500">{delta.label}</span>}
+    </p>
+  )}
+
+  {sparkline && sparkline.length >= 2 && (
+    <svg
+      viewBox="0 0 100 30"
+      preserveAspectRatio="none"
+      class="mt-3 h-8 w-full text-brand-400"
+      aria-hidden="true"
+    >
+      <path d={path} fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round" />
+    </svg>
+  )}
+</article>

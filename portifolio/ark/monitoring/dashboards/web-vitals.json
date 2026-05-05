@@ -1,0 +1,345 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": { "type": "grafana", "uid": "-- Grafana --" },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "description": "Web Vitals (LCP, INP, CLS) por pagina e device_type. Provisionado pelo backend/scripts/provisionar_cliente.py — bucket __BUCKET__ substituido no import. Read-only para Viewers (hardening Grafana sprint 1).",
+  "editable": false,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "id": null,
+  "links": [
+    {
+      "title": "Configurações",
+      "url": "https://dsplayground.com.br/cliente/configuracoes/",
+      "type": "link",
+      "icon": "cog",
+      "tooltip": "Trocar email/senha, publishable key, plano, consumo",
+      "targetBlank": true,
+      "asDropdown": false,
+      "includeVars": false,
+      "keepTime": false,
+      "tags": []
+    },
+    {
+      "title": "Exportar dados",
+      "url": "https://dsplayground.com.br/cliente/exportar/",
+      "type": "link",
+      "icon": "cloud",
+      "tooltip": "Baixar arquivos arquivados (LGPD)",
+      "targetBlank": true,
+      "asDropdown": false,
+      "includeVars": false,
+      "keepTime": false,
+      "tags": []
+    },
+    {
+      "title": "Voltar ao site",
+      "url": "https://dsplayground.com.br/",
+      "type": "link",
+      "icon": "external link",
+      "tooltip": "Página inicial DS Playground",
+      "targetBlank": false,
+      "asDropdown": false,
+      "includeVars": false,
+      "keepTime": false,
+      "tags": []
+    }
+  ],
+  "panels": [
+    {
+      "title": "LCP p75 (24h)",
+      "type": "stat",
+      "gridPos": { "h": 6, "w": 8, "x": 0, "y": 0 },
+      "datasource": { "type": "influxdb", "uid": "__DATASOURCE_UID__" },
+      "description": "Largest Contentful Paint percentil 75. Bom: <2.5s; Precisa melhorar: 2.5-4s; Ruim: >4s. (Core Web Vitals).",
+      "targets": [
+        {
+          "refId": "A",
+          "query": "from(bucket: \"__BUCKET__\")\n  |> range(start: -24h)\n  |> filter(fn: (r) => r._measurement == \"web_vitals\" and r._field == \"valor\" and r.nome == \"LCP\")\n  |> group()\n  |> quantile(q: 0.75)"
+        }
+      ],
+      "options": {
+        "reduceOptions": { "values": false, "calcs": ["lastNotNull"], "fields": "" },
+        "textMode": "value",
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "orientation": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 2500 },
+              { "color": "red", "value": 4000 }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "title": "INP p75 (24h)",
+      "type": "stat",
+      "gridPos": { "h": 6, "w": 8, "x": 8, "y": 0 },
+      "datasource": { "type": "influxdb", "uid": "__DATASOURCE_UID__" },
+      "description": "Interaction to Next Paint percentil 75. Bom: <200ms; Precisa melhorar: 200-500ms; Ruim: >500ms.",
+      "targets": [
+        {
+          "refId": "A",
+          "query": "from(bucket: \"__BUCKET__\")\n  |> range(start: -24h)\n  |> filter(fn: (r) => r._measurement == \"web_vitals\" and r._field == \"valor\" and r.nome == \"INP\")\n  |> group()\n  |> quantile(q: 0.75)"
+        }
+      ],
+      "options": {
+        "reduceOptions": { "values": false, "calcs": ["lastNotNull"], "fields": "" },
+        "textMode": "value",
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "orientation": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 200 },
+              { "color": "red", "value": 500 }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "title": "CLS p75 (24h)",
+      "type": "stat",
+      "gridPos": { "h": 6, "w": 8, "x": 16, "y": 0 },
+      "datasource": { "type": "influxdb", "uid": "__DATASOURCE_UID__" },
+      "description": "Cumulative Layout Shift percentil 75. Bom: <0.1; Precisa melhorar: 0.1-0.25; Ruim: >0.25.",
+      "targets": [
+        {
+          "refId": "A",
+          "query": "from(bucket: \"__BUCKET__\")\n  |> range(start: -24h)\n  |> filter(fn: (r) => r._measurement == \"web_vitals\" and r._field == \"valor\" and r.nome == \"CLS\")\n  |> group()\n  |> quantile(q: 0.75)"
+        }
+      ],
+      "options": {
+        "reduceOptions": { "values": false, "calcs": ["lastNotNull"], "fields": "" },
+        "textMode": "value",
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "orientation": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "decimals": 3,
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 0.1 },
+              { "color": "red", "value": 0.25 }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "title": "LCP media por device_type",
+      "type": "timeseries",
+      "gridPos": { "h": 9, "w": 12, "x": 0, "y": 6 },
+      "datasource": { "type": "influxdb", "uid": "__DATASOURCE_UID__" },
+      "description": "Series por mobile/tablet/desktop. Bots filtrados.",
+      "targets": [
+        {
+          "refId": "A",
+          "query": "from(bucket: \"__BUCKET__\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"web_vitals\" and r._field == \"valor\" and r.nome == \"LCP\")\n  |> filter(fn: (r) => r.device_type != \"bot\")\n  |> group(columns: [\"device_type\"])\n  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "displayName": "${__field.labels.device_type}",
+          "unit": "ms",
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "fillOpacity": 12,
+            "showPoints": "always",
+            "pointSize": 6,
+            "spanNulls": true
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 2500 },
+              { "color": "red", "value": 4000 }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "title": "INP timeline media por device_type",
+      "type": "timeseries",
+      "gridPos": { "h": 9, "w": 12, "x": 12, "y": 6 },
+      "datasource": { "type": "influxdb", "uid": "__DATASOURCE_UID__" },
+      "targets": [
+        {
+          "refId": "A",
+          "query": "from(bucket: \"__BUCKET__\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"web_vitals\" and r._field == \"valor\" and r.nome == \"INP\")\n  |> filter(fn: (r) => r.device_type != \"bot\")\n  |> group(columns: [\"device_type\"])\n  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "displayName": "${__field.labels.device_type}",
+          "unit": "ms",
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "fillOpacity": 12,
+            "showPoints": "always",
+            "pointSize": 6,
+            "spanNulls": true
+          }
+        }
+      }
+    },
+    {
+      "title": "Score Card por metrica (24h) — Bom vs Precisa melhorar vs Ruim",
+      "type": "barchart",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 15 },
+      "datasource": { "type": "influxdb", "uid": "__DATASOURCE_UID__" },
+      "description": "Cada barra e uma metrica (LCP/INP/CLS). Altura = total de eventos. Cores = rating (verde=bom, amarelo=precisa melhorar, vermelho=ruim). Misturar ratings entre metricas perde sentido — Bom de LCP (<2.5s) e diferente de Bom de INP (<200ms).",
+      "targets": [
+        {
+          "refId": "A",
+          "query": "from(bucket: \"__BUCKET__\")\n  |> range(start: -24h)\n  |> filter(fn: (r) => r._measurement == \"web_vitals\" and r._field == \"valor\")\n  |> filter(fn: (r) => r.device_type != \"bot\")\n  |> group(columns: [\"nome\", \"rating\"])\n  |> count()\n  |> group()\n  |> pivot(rowKey: [\"nome\"], columnKey: [\"rating\"], valueColumn: \"_value\")\n  |> drop(columns: [\"_start\", \"_stop\", \"_field\", \"_measurement\"])"
+        }
+      ],
+      "options": {
+        "orientation": "vertical",
+        "xField": "nome",
+        "stacking": "normal",
+        "showValue": "auto",
+        "barWidth": 0.7,
+        "groupWidth": 0.6,
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": { "mode": "multi", "sort": "none" },
+        "xTickLabelRotation": 0,
+        "xTickLabelSpacing": 0
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "unit": "short",
+          "custom": {
+            "lineWidth": 1,
+            "fillOpacity": 80,
+            "axisPlacement": "auto",
+            "axisLabel": "Eventos"
+          }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "good" },
+            "properties": [
+              { "id": "color", "value": { "mode": "fixed", "fixedColor": "green" } },
+              { "id": "displayName", "value": "Bom" }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "needs-improvement" },
+            "properties": [
+              { "id": "color", "value": { "mode": "fixed", "fixedColor": "yellow" } },
+              { "id": "displayName", "value": "Precisa melhorar" }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "poor" },
+            "properties": [
+              { "id": "color", "value": { "mode": "fixed", "fixedColor": "red" } },
+              { "id": "displayName", "value": "Ruim" }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "nome" },
+            "properties": [
+              { "id": "displayName", "value": "Metrica" }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "title": "Top 10 paginas mais lentas (LCP p75, 24h)",
+      "type": "bargauge",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 15 },
+      "datasource": { "type": "influxdb", "uid": "__DATASOURCE_UID__" },
+      "targets": [
+        {
+          "refId": "A",
+          "query": "from(bucket: \"__BUCKET__\")\n  |> range(start: -24h)\n  |> filter(fn: (r) => r._measurement == \"web_vitals\" and r._field == \"valor\" and r.nome == \"LCP\")\n  |> filter(fn: (r) => r.device_type != \"bot\")\n  |> group(columns: [\"page_type\"])\n  |> quantile(q: 0.75)\n  |> sort(columns: [\"_value\"], desc: true)\n  |> limit(n: 10)"
+        }
+      ],
+      "options": {
+        "displayMode": "gradient",
+        "orientation": "horizontal",
+        "showUnfilled": true,
+        "valueMode": "color",
+        "reduceOptions": { "values": false, "calcs": ["lastNotNull"], "fields": "" }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "displayName": "${__field.labels.page_type}",
+          "color": { "mode": "thresholds" },
+          "unit": "ms",
+          "min": 0,
+          "max": 5000,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 2500 },
+              { "color": "red", "value": 4000 }
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "refresh": "30s",
+  "schemaVersion": 39,
+  "tags": ["portifolio", "cliente", "web-vitals"],
+  "templating": { "list": [] },
+  "time": { "from": "now-24h", "to": "now" },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "Web Vitals",
+  "uid": "portifolio-web-vitals",
+  "version": 1
+}

@@ -1,0 +1,88 @@
+---
+- name: Criar diretorio para stack de monitoring
+  file:
+    path: "{{ repo_dir }}/ark/monitoring"
+    state: directory
+    owner: "{{ deploy_user }}"
+    group: analytics
+    mode: "0750"
+
+- name: Criar .env do Grafana
+  copy:
+    content: |
+      GF_ADMIN_USER={{ grafana_admin_user }}
+      GF_ADMIN_PASSWORD={{ grafana_admin_password }}
+      INFLUXDB_TOKEN={{ influxdb_token }}
+    dest: "{{ repo_dir }}/ark/monitoring/.env"
+    owner: "{{ deploy_user }}"
+    group: analytics
+    mode: "0640"
+
+- name: Criar arquivo slack_webhook.url do Alertmanager
+  # Bind-mounted como /etc/alertmanager/slack_webhook.url no container.
+  # Alertmanager lê via `slack_api_url_file` no alertmanager.yml.
+  # Mode 0644 porque o container roda como nobody (UID 65534) — 0640
+  # com group=analytics (GID 10001 do host) nao seria legivel ja que
+  # `analytics` nao existe dentro do container. URL Slack tem blast
+  # radius limitado (so posta no canal, nao expoe segredo critico).
+  copy:
+    content: "{{ slack_webhook_alerts | default('') }}"
+    dest: "{{ repo_dir }}/ark/monitoring/alertmanager/slack_webhook.url"
+    owner: "{{ deploy_user }}"
+    group: analytics
+    mode: "0644"
+
+- name: Subir Prometheus + Grafana + node-exporter
+  community.docker.docker_compose_v2:
+    project_src: "{{ repo_dir }}/ark/monitoring"
+    files:
+      - docker-compose.monitoring.yml
+    state: present
+  become_user: "{{ deploy_user }}"
+
+# ---- Rotacao de senha do admin do Grafana ----
+#
+# `GF_SECURITY_ADMIN_PASSWORD` (env do compose) so e' aplicada no setup
+# inicial — quando o volume monitoring_grafana-data e' criado. Em volume
+# existente (re-deploy normal), o user admin mantem a senha antiga. Quando
+# o vault rotaciona `grafana_admin_password`, o backend (.env) e o GF
+# divergem; backend tenta GET /api/orgs com creds novas, Grafana responde
+# 401 com `password-auth.failed`. Mesmo padrao do bug Postgres
+# (incidente 2026-05-01) — ver `ark/docs/servidor-producao.md`.
+#
+# Fix idempotente: `grafana-cli admin reset-admin-password` muda a senha
+# do user admin direto no DB do Grafana, sem precisar da senha atual
+# (CLI usa flat-file authority dentro do container). Senha NUNCA aparece
+# em `ps` no host (passa via stdin do `docker exec -i` quando suportado,
+# ou via env var no exec quando o CLI obriga argumento).
+
+- name: Aguardar Grafana pronto pra aceitar admin commands
+  when: not ansible_check_mode
+  ansible.builtin.shell: |
+    docker exec portifolio-grafana wget -q -O /dev/null --tries=1 http://localhost:3000/api/health
+  register: gf_ready
+  retries: 15
+  delay: 4
+  until: gf_ready.rc == 0
+  changed_when: false
+  failed_when: gf_ready.rc != 0 and gf_ready.attempts | default(1) >= 15
+
+- name: Rotacionar senha do admin Grafana pra refletir vault atual (idempotente)
+  # `grafana-cli admin reset-admin-password <senha>` so aceita arg posicional.
+  # Pra evitar a senha aparecer em `ps`, passamos via env var dentro do
+  # container e o CLI le da arg expandida pelo shell — nao da pra evitar
+  # totalmente em ps DO container, mas ps DO host nao mostra a senha
+  # (so o cmd `docker exec -e GF_PW=*** ...` que e' opaco). Trade-off
+  # aceitavel: ps do container so e' visivel pra root no host (que ja
+  # tem acesso a tudo).
+  when:
+    - not ansible_check_mode
+    - gf_ready.rc | default(1) == 0
+  ansible.builtin.shell: |
+    docker exec -e GF_PW="${GF_PW_VALUE}" portifolio-grafana \
+      sh -c 'grafana-cli admin reset-admin-password "$GF_PW"'
+  environment:
+    GF_PW_VALUE: "{{ grafana_admin_password }}"
+  no_log: true
+  changed_when: false
+  become_user: "{{ deploy_user }}"

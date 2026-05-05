@@ -1,0 +1,157 @@
+---
+/**
+ * Changelog publico — sinal de produto vivo. Listamos releases por mes
+ * com feat/fix/breaking destacados. Mantido manualmente; quando virar
+ * pesado, gerar de git log via Astro content collection ou script.
+ *
+ * Convencoes:
+ *   - tipo: 'feat' (verde), 'fix' (laranja), 'breaking' (vermelho), 'chore' (cinza)
+ *   - cada item tem 1 frase clara — sem jargao desnecessario
+ *   - datas em pt-BR (DD MMM YYYY)
+ */
+import Base from '~/layouts/Base.astro';
+import Badge from '~/components/ui/Badge.astro';
+import Card from '~/components/ui/Card.astro';
+import Button from '~/components/ui/Button.astro';
+
+type Tipo = 'feat' | 'fix' | 'breaking' | 'chore';
+
+interface Item {
+  tipo: Tipo;
+  texto: string;
+}
+
+interface Release {
+  versao: string;
+  data: string;       // ISO: YYYY-MM-DD
+  destaque?: boolean;
+  itens: Item[];
+}
+
+const releases: Release[] = [
+  {
+    versao: 'Maio 2026 — semana 1',
+    data: '2026-05-01',
+    destaque: true,
+    itens: [
+      { tipo: 'feat', texto: 'Novo painel /cliente/painel com KPIs em tempo real (eventos hoje, quota, cardinalidade, plano).' },
+      { tipo: 'feat', texto: 'Onboarding guiado em 3 passos pra novos cadastros (key → snippet → primeiro evento).' },
+      { tipo: 'feat', texto: 'Configurações em abas (Visão geral, Chaves, Plano, Embeds, Faturamento, Time, Perfil).' },
+      { tipo: 'feat', texto: 'Páginas marketing /recursos, /seguranca, /sobre, /integracoes.' },
+      { tipo: 'feat', texto: 'SDK 0.4: trackConversion / trackSignup pra eventos de conversão estruturados.' },
+      { tipo: 'feat', texto: 'Embed iframe Fase 1 dogfood (widget Chart.js em embed.dsplayground.com.br).' },
+      { tipo: 'feat', texto: 'Breadcrumbs em /cliente/* + JSON-LD BreadcrumbList.' },
+      { tipo: 'feat', texto: 'PWA basics: manifest.json, theme-color, apple-touch-icon.' },
+      { tipo: 'feat', texto: '404/500 com personalidade.' },
+      { tipo: 'fix',  texto: 'Sandbox do iframe embed agora permite allow-same-origin pra carregar /assets.' },
+      { tipo: 'chore', texto: 'Cobertura de testes: 241 specs Vitest verdes (+161 vs abril).' },
+    ],
+  },
+  {
+    versao: 'Abril 2026 — semana 4',
+    data: '2026-04-29',
+    itens: [
+      { tipo: 'feat', texto: 'Cadastro multi-tenant com slug + plano Free/Pro/Business.' },
+      { tipo: 'feat', texto: 'Magic link pra recuperar acesso (link que entra sem senha, vale 15min).' },
+      { tipo: 'feat', texto: 'Exportação CSV/LP do dia via /cliente/exportar (R2 signed URL).' },
+      { tipo: 'feat', texto: 'Auth proxy pro Grafana — cookie cliente_session funciona cross-subdomain.' },
+      { tipo: 'fix',  texto: 'Rotação de POSTGRES_PASSWORD agora altera role no cluster (não só no compose).' },
+    ],
+  },
+  {
+    versao: 'Abril 2026 — semana 3',
+    data: '2026-04-22',
+    itens: [
+      { tipo: 'feat', texto: 'Backend rodando em gunicorn + eventlet (WebSocket estável).' },
+      { tipo: 'feat', texto: 'CrowdSec na borda: detecção comportamental + bouncer nginx.' },
+      { tipo: 'feat', texto: 'Cloudflare Origin Cert wildcard (até 2041) — TLS sem dependência do Let\'s Encrypt.' },
+      { tipo: 'chore', texto: 'Vault Ansible criptografando todos os segredos.' },
+    ],
+  },
+];
+
+const tipoLabel: Record<Tipo, string> = {
+  feat:     'novo',
+  fix:      'fix',
+  breaking: 'quebra',
+  chore:    'manutenção',
+};
+
+const tipoVariant: Record<Tipo, 'success' | 'warning' | 'danger' | 'neutral'> = {
+  feat:     'success',
+  fix:      'warning',
+  breaking: 'danger',
+  chore:    'neutral',
+};
+
+function fmtData(iso: string): string {
+  const [y, m, d] = iso.split('-').map(Number);
+  const meses = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
+  return `${String(d).padStart(2, '0')} ${meses[m - 1]} ${y}`;
+}
+---
+<Base
+  title="Changelog"
+  description="O que mudou recentemente no dsplayground — features, correções, manutenção. Atualizado a cada release."
+>
+  <section class="relative overflow-hidden">
+    <div class="absolute inset-0 -z-10 bg-gradient-to-b from-brand-950 via-slate-950 to-slate-950"></div>
+    <div class="mx-auto max-w-3xl px-4 py-20 text-center sm:px-6 sm:py-24">
+      <Badge variant="info" dot>Atualizações</Badge>
+      <h1 class="mt-6 text-display-sm sm:text-display-md text-white">
+        O que <span class="bg-gradient-to-r from-brand-300 to-brand-500 bg-clip-text text-transparent">mudou</span> recentemente.
+      </h1>
+      <p class="mx-auto mt-6 max-w-2xl text-lg text-slate-300">
+        Atualizamos o produto em ondas. Aqui você acompanha o que entrou, o que foi corrigido e o que tá vindo.
+      </p>
+    </div>
+  </section>
+
+  <section class="mx-auto max-w-3xl px-4 pb-16 sm:px-6">
+    <ol class="space-y-8" aria-label="Histórico de releases">
+      {releases.map((release) => (
+        <li>
+          <article
+            data-versao={release.versao}
+            class:list={[
+              'rounded-2xl border bg-slate-900/60 p-6 shadow-elev-1 backdrop-blur',
+              release.destaque ? 'border-brand-400 ring-1 ring-brand-500/30' : 'border-slate-800',
+            ]}
+          >
+            <header class="flex flex-wrap items-baseline justify-between gap-3">
+              <h2 class="text-lg font-semibold text-white">{release.versao}</h2>
+              <time
+                datetime={release.data}
+                class="text-xs uppercase tracking-wide text-slate-500"
+              >{fmtData(release.data)}</time>
+            </header>
+            <ul class="mt-5 space-y-3">
+              {release.itens.map((item) => (
+                <li class="flex items-start gap-3">
+                  <Badge variant={tipoVariant[item.tipo]} class="mt-0.5 flex-shrink-0">
+                    {tipoLabel[item.tipo]}
+                  </Badge>
+                  <p class="text-sm text-slate-200">{item.texto}</p>
+                </li>
+              ))}
+            </ul>
+          </article>
+        </li>
+      ))}
+    </ol>
+
+  </section>
+
+  <!-- CTA -->
+  <section class="mx-auto max-w-6xl px-4 py-16 sm:px-6">
+    <Card>
+      <div class="flex flex-col items-start gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h2 class="text-2xl font-bold text-white sm:text-3xl">Sugestão de feature?</h2>
+          <p class="mt-1 text-slate-300">A gente prioriza pelo que cliente piloto pede. Mande sua ideia.</p>
+        </div>
+        <Button href="mailto:contato@dsplayground.com.br?subject=Sugest%C3%A3o%20de%20feature" variant="secondary" data-cta="changelog-sugerir">Mandar sugestão</Button>
+      </div>
+    </Card>
+  </section>
+</Base>

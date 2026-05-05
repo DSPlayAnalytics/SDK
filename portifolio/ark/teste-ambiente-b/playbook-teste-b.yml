@@ -1,0 +1,86 @@
+---
+# Playbook de teste para Ambiente B (Vagrant + VirtualBox / VM Ubuntu real).
+# Diferente do A, NAO pula firewall — UFW e fail2ban funcionam em VM real.
+# `analytics-stack` aplica de verdade: docker compose up + retencao no InfluxDB.
+#
+# Vars inline (em vez de vars_files) porque na precedencia do Ansible vars_files
+# vence play vars — entao mantemos tudo no mesmo lugar para evitar surpresa.
+
+- name: Ambiente B — VM Ubuntu real
+  hosts: analytics
+  connection: local
+  become: true
+  gather_facts: true
+
+  vars:
+    deploy_user: deploy
+    repo_url: file:///portifolio
+    repo_dir: /opt/portifolio
+    repo_branch: HEAD
+    ambiente: development
+    flask_secret_key: teste-nao-usar-em-prod
+    cors_origins:
+      - http://localhost:3000
+    influxdb_url: http://influxdb:8086
+    influxdb_token: teste-token-nao-real
+    influxdb_org: zen
+    influxdb_bucket: portifolio_test
+    influxdb_enabled: true
+    influxdb_retencao_dias: 7
+    admin_api_token: teste-admin-token
+    grafana_admin_user: admin
+    grafana_admin_password: teste-grafana
+    ssh_port: 22
+    ufw_allow_ports: [22, 80, 443]
+    habilitar_crowdsec: false
+    habilitar_monitoring: false
+    dominio: alvo.localhost
+    letsencrypt_email: teste@example.com
+
+  pre_tasks:
+    - name: Modo teste em VM Multipass — asserts de producao desabilitados
+      debug:
+        msg: "Iniciando provisionamento de teste em VM real."
+
+    - name: Sincronizar repo do mount Vagrant (substitui o git clone do role analytics-stack)
+      ansible.posix.synchronize:
+        src: /portifolio/
+        dest: "{{ repo_dir }}/"
+        delete: false
+        rsync_opts:
+          - "--exclude=.git"
+          - "--exclude=node_modules"
+          - "--exclude=__pycache__"
+      delegate_to: localhost
+
+    - name: Garantir openssl para gerar cert mock do nginx
+      apt:
+        name: openssl
+        state: present
+        update_cache: false
+
+    - name: Criar diretorio do cert mock
+      file:
+        path: "/etc/letsencrypt/live/{{ dominio }}"
+        state: directory
+        recurse: true
+
+    - name: Gerar cert self-signed (substitui certbot skipped por --skip-tags tls)
+      command: >
+        openssl req -x509 -newkey rsa:2048 -nodes
+        -keyout /etc/letsencrypt/live/{{ dominio }}/privkey.pem
+        -out /etc/letsencrypt/live/{{ dominio }}/fullchain.pem
+        -days 1 -subj "/CN={{ dominio }}"
+      args:
+        creates: "/etc/letsencrypt/live/{{ dominio }}/fullchain.pem"
+
+  roles:
+    - role: base
+      tags: [base, hardening]
+    - role: docker
+      tags: [docker]
+    - role: analytics-stack
+      tags: [app, analytics-stack]
+    - role: nginx
+      tags: [nginx]
+    # monitoring e crowdsec ficam pra runs separados via --tags

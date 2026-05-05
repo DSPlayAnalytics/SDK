@@ -1,0 +1,164 @@
+---
+# Copie para all.yml e substitua pelos valores reais.
+# Em producao: ansible-vault encrypt group_vars/all.yml
+#
+# Nada em all.example.yml deve ser segredo real.
+
+deploy_user: deploy
+repo_url: https://github.com/danpqdan/portifolio.git
+repo_dir: /opt/portifolio
+repo_branch: main
+
+# === Aplicacao ===
+flask_secret_key: trocar-em-producao
+cors_origins:
+  - https://dsplayground.com.br             # apex (CF Pages — landing comercial)
+  - https://app.dsplayground.com.br         # subdominio do dashboard logado
+  - https://portifolio.dsplayground.com.br  # portfolio pessoal
+
+# Cookie cliente_session — Domain compartilhado entre apex/app/api (same-site).
+# Sem isso, cookie setado por api.X nao chega ao app.X. Em dev local pode
+# ficar vazio (host-only).
+cookie_domain: dsplayground.com.br
+
+# Magic-link e redirect pos-login. Hoje magic-link em prod ainda nao envia
+# email real (P1 — RESEND_API_KEY pendente), mas a URL precisa estar correta
+# pro dia que ligar.
+dashboard_base_url: https://api.dsplayground.com.br
+dashboard_redirect: https://app.dsplayground.com.br/cliente/metricas
+
+# Grafana root URL — usado em links internos (export, share). Hardcoded
+# antes apontava pro apex; agora tem que ser app.X.
+grafana_root_url: https://app.dsplayground.com.br/cliente/metricas/
+
+# === InfluxDB ===
+influxdb_url: http://influxdb:8086
+influxdb_token: trocar-token-real
+influxdb_init_password: trocar-em-producao   # senha admin do InfluxDB (root compose .env)
+influxdb_org: zen
+influxdb_bucket: portifolio_prod
+influxdb_enabled: true
+influxdb_retencao_dias: 90
+
+# === Postgres (banco relacional de tenants do SDK) ===
+postgres_db: portifolio_auth
+postgres_user: portifolio
+# Gerar com: python -c "import secrets; print(secrets.token_urlsafe(32))"
+# Minimo 16 chars. Ansible falha em producao se ficar vazio ou com exemplo.
+postgres_password: trocar-em-producao
+
+# === JWT do SDK (multi-tenant) ===
+jwt_audience: api.dsplayground.com.br
+sdk_token_ttl_seconds: 300
+sdk_token_rate_limit_per_key: 5
+# Bloqueia sockets sem `publishable_key` -> JWT exchange. Default `true` desde
+# 2026-05-01 (todos os consumers em prod ja mandam publishable_key — landing CF
+# Pages, portifolio Vite, frontend admin). Manter `false` so em dev local sem
+# auth-aware SDK ou durante migracao de consumer legado.
+sdk_auth_required: true
+
+# === Admin LGPD ===
+admin_api_token: ""  # gerar com `python -c "import secrets; print(secrets.token_urlsafe(32))"`
+
+# === Email transacional (Resend) ===
+# Sem RESEND_API_KEY, magic-link cai no stdout do container — `docker logs
+# portifolio-backend | grep evento=email_stdout` pra ver. OK pra dev,
+# inviavel pra prod (ninguem ve o link).
+#
+# Setup:
+#   1. resend.com → cria conta (free 3k emails/mes)
+#   2. Add Domain → digita `dsplayground.com.br` → CF DNS records (4 SPF/DKIM/DMARC)
+#   3. Aguarda verificacao (5min em geral)
+#   4. API Keys → cria sending key, escopo dominio
+#   5. Cole abaixo
+#
+# EMAIL_FROM precisa ter dominio verificado.
+resend_api_key: ""
+email_from: "no-reply@dsplayground.com.br"
+
+# === Archiver Cloudflare R2 ===
+# Sidecar `analytics-archiver` exporta janelas pre-expiracao do InfluxDB
+# pra R2 (S3-compatible). Free tier R2: 10 GB storage + 1M Class A ops/mes
+# — cobre ate ~55 clientes plano medio antes de comecar a cobrar.
+#
+# Setup:
+#   1. CF dashboard → R2 → Add subscription (gratis enquanto < 10 GB).
+#   2. Create bucket `dsplayground-analytics-archive` (jurisdiction EU).
+#   3. R2 → Manage API tokens → Create Token (Read+Write no bucket).
+#   4. Cole abaixo. account_id e o subdominio do endpoint
+#      (https://<account_id>.r2.cloudflarestorage.com).
+r2_account_id: ""
+r2_access_key_id: ""
+r2_secret_access_key: ""
+r2_bucket: "dsplayground-analytics-archive"
+# false = nao roda backfill no boot do container; true = roda 1x antes do cron.
+archiver_run_on_start: "false"
+
+# === Stripe billing (preencher via ansible-vault edit) ===
+stripe_api_key: ""
+stripe_price_ids: "{}"
+stripe_webhook_secret: ""
+
+# === Landing comercial (apex dsplayground.com.br) ===
+# PAT GitHub com `read:packages` — baixa @danpqdan/dsplayground-analytics-sdk
+# do GitHub Packages durante o build do container `landing`. Exposto so durante
+# o RUN via BuildKit secret; NAO persiste em layer da imagem.
+# Gerar com: gh auth token  (ou criar PAT classico em github.com/settings/tokens)
+node_auth_token: ""
+
+# Dogfood: publishable key da propria landing. Gere com:
+#   docker compose exec backend python scripts/tenant_admin.py create-key \
+#       --slug dsplayground-landing --nome "DS Playground - Landing" \
+#       --ambiente production
+# e cole o pk_production_... aqui. Vazio = eventos da landing caem no bucket
+# default (so faz sentido em staging/dev).
+landing_publishable_key: ""
+
+# Build args do landing — defaults validos pra prod. Sobrescrever em staging.
+landing_site_url: "https://dsplayground.com.br"
+landing_api_url: "https://api.dsplayground.com.br"
+landing_debug: "false"
+
+# Publishable key do site `portifolio` (portfolio pessoal Vite, em portifolio.X).
+# Gerada por scripts/provisionar_cliente.py --slug portifolio. Sem isso, eventos
+# do SDK do portfolio caem no bucket default em vez de cliente_portifolio.
+# Capturar com:
+#   docker exec portifolio-postgres psql -U portifolio -d portifolio_auth -t -c \
+#     "SELECT valor FROM publishable_keys k JOIN sites s ON s.id=k.site_id \
+#      WHERE s.slug='portifolio' AND revogado_em IS NULL;"
+vite_publishable_key: ""
+
+# === Tunables do backend (analytics temporal) ===
+# Opcionais: o template aplica defaults via jinja `default()` se nao definidos.
+# temporal_realtime_interval: "5000"    # ms entre pushes de metricas em tempo real
+# temporal_regular_interval: "15000"    # ms entre coletas regulares
+# temporal_cache_size: "1000"           # qtde de sessoes em cache
+# temporal_cleanup_interval: "300"      # segundos entre limpezas de cache
+
+# === Monitoring ===
+grafana_admin_user: admin
+grafana_admin_password: trocar-em-producao
+
+# Slack Incoming Webhook usado pelo Alertmanager pra postar alertas
+# em #alerts-prod. Setup:
+#   1. https://api.slack.com/apps → Create New App → From scratch
+#   2. Features → Incoming Webhooks → Activate ON
+#   3. Add New Webhook to Workspace → escolhe canal #alerts-prod
+#   4. Copia a URL (formato https://hooks.slack.com/services/T.../B.../...)
+#   5. Cola aqui (vault encriptado).
+# Vazio = Alertmanager nao envia notificacoes (containers sobem, mas
+# alertas firing nao chegam em ninguem).
+slack_webhook_alerts: ""
+
+# === SSH / Firewall (Rocky 9 usa firewalld, nao UFW) ===
+# A porta SSH veio definida pelo provedor (HostGator: 22022).
+# Se mudar, atualize tambem aqui e no inventory.
+ssh_port: 22022
+firewalld_allow_ports:
+  - 22022
+  - 80
+  - 443
+
+habilitar_crowdsec: true
+habilitar_crowdsec_bouncer: true
+habilitar_monitoring: true

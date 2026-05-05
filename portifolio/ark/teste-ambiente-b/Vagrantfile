@@ -1,0 +1,37 @@
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+#
+# Ambiente B — VM Ubuntu 22.04 LTS via Vagrant + VirtualBox.
+# Provisiona via Ansible local (rodando dentro da VM, nao via SSH do host).
+#
+# Uso:
+#   vagrant up
+#   vagrant ssh -c "sudo ansible-playbook -i /portifolio/ark/teste-ambiente-a/inventory-localhost.ini /vagrant/playbook-teste-b.yml --skip-tags tls"
+#   vagrant destroy -f
+
+Vagrant.configure("2") do |config|
+  config.vm.box = "bento/ubuntu-22.04"
+  config.vm.hostname = "ark-teste-b"
+
+  config.vm.provider "virtualbox" do |vb|
+    vb.name   = "ark-teste-b"
+    vb.memory = 2048
+    vb.cpus   = 2
+    vb.gui    = false
+  end
+
+  # Monta o repo inteiro readonly em /portifolio
+  config.vm.synced_folder "../../", "/portifolio",
+    type: "virtualbox",
+    mount_options: ["ro"]
+
+  # Provisionamento: instala dependencias minimas pra rodar Ansible local
+  config.vm.provision "shell", inline: <<-SHELL
+    set -e
+    apt-get update -qq
+    DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
+      ansible python3-docker openssl curl
+    ansible-galaxy collection install community.docker --force
+    echo "[VM pronta] Ansible $(ansible --version | head -n1)"
+  SHELL
+end

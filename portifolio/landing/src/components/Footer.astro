@@ -1,0 +1,45 @@
+---
+import { SITE_NAME } from '~/config';
+const ano = new Date().getFullYear();
+---
+<footer class="mt-24 border-t border-slate-800/80">
+  <div class="mx-auto max-w-6xl px-4 py-12 sm:px-6">
+    <div class="grid gap-10 lg:grid-cols-[2fr_3fr]">
+      <div>
+        <a href="/" class="flex items-center gap-2 font-semibold tracking-tight">
+          <span class="grid size-7 place-items-center rounded-md bg-brand-500 text-white">DS</span>
+          <span class="text-slate-100">{SITE_NAME}</span>
+        </a>
+        <p class="mt-3 max-w-sm text-sm text-slate-400">Análise de sites feita no Brasil. Multi-tenant, sem cookie de tracking, dentro da LGPD.</p>
+        <p class="mt-6 text-xs text-slate-500">© {ano} {SITE_NAME}. Todos os direitos reservados.</p>
+      </div>
+      <div class="grid gap-8 sm:grid-cols-3">
+        <div>
+          <h3 class="text-xs font-semibold uppercase tracking-wide text-slate-300">Produto</h3>
+          <ul class="mt-3 space-y-2 text-sm text-slate-400">
+            <li><a href="/recursos" class="hover:text-white">Recursos</a></li>
+            <li><a href="/integracoes" class="hover:text-white">Integrações</a></li>
+            <li><a href="/precos" class="hover:text-white">Preços</a></li>
+            <li><a href="/seguranca" class="hover:text-white">Segurança & LGPD</a></li>
+          </ul>
+        </div>
+        <div>
+          <h3 class="text-xs font-semibold uppercase tracking-wide text-slate-300">Empresa</h3>
+          <ul class="mt-3 space-y-2 text-sm text-slate-400">
+            <li><a href="/sobre" class="hover:text-white">Sobre</a></li>
+            <li><a href="/changelog" class="hover:text-white">Changelog</a></li>
+            <li><a href="/status" class="hover:text-white">Status</a></li>
+            <li><a href="https://github.com/danpqdan" rel="noopener" class="hover:text-white">GitHub</a></li>
+          </ul>
+        </div>
+        <div>
+          <h3 class="text-xs font-semibold uppercase tracking-wide text-slate-300">Acesso</h3>
+          <ul class="mt-3 space-y-2 text-sm text-slate-400">
+            <li><a href="/cliente/login" class="hover:text-white">Entrar</a></li>
+            <li><a href="/cliente/cadastro" class="hover:text-white">Criar conta</a></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+</footer>

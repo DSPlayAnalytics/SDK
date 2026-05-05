@@ -1,0 +1,138 @@
+---
+# Role base — Rocky Linux 9 (RHEL 9 family).
+# Pacotes basicos, firewalld, fail2ban, usuario deploy com sudo NOPASSWD,
+# grupo analytics GID 10001 compartilhado com containers.
+
+- name: Garantir EPEL habilitado (necessario p/ fail2ban, certbot)
+  dnf:
+    name: epel-release
+    state: present
+
+- name: Garantir pacotes basicos
+  dnf:
+    name:
+      - curl
+      - git
+      - rsync
+      - firewalld
+      - fail2ban
+      - fail2ban-firewalld
+      - python3
+      - python3-pip
+      - python3-firewall
+      - ca-certificates
+      - gnupg2
+      - glibc-langpack-pt
+      - openssl
+      - policycoreutils-python-utils
+      - tar
+    state: present
+    update_cache: true
+    # Rocky 9 minimal vem com curl-minimal por default; sem allowerasing dnf
+    # falha com "conflicts with curl provided by curl". allowerasing permite
+    # swap silencioso de curl-minimal por curl. Inofensivo em hosts que ja
+    # tem curl full (no-op).
+    allowerasing: true
+
+- name: Configurar locale pt_BR.UTF-8
+  # localectl exige systemd como PID 1; em container de teste sem systemd,
+  # falha com "Failed to connect to bus". Em prod (VPS Rocky completo) roda
+  # normal. Tag `systemd` permite skip via --skip-tags em teste-ambiente-a.
+  command: localectl set-locale LANG=pt_BR.UTF-8
+  changed_when: false
+  tags: [systemd]
+
+- name: Firewalld — ativar servico
+  service:
+    name: firewalld
+    state: started
+    enabled: true
+  tags: [firewall]
+
+- name: Firewalld — permitir portas declaradas
+  ansible.posix.firewalld:
+    port: "{{ item }}/tcp"
+    permanent: true
+    immediate: true
+    state: enabled
+  loop: "{{ firewalld_allow_ports | default([22022, 80, 443]) }}"
+  tags: [firewall]
+
+# O servico `ssh` default escuta 22. Se o SSH real nao estiver em 22
+# (nosso caso: 22022), desabilitar para reduzir exposicao.
+- name: Firewalld — remover servico ssh default se a porta 22 nao for usada
+  ansible.posix.firewalld:
+    service: ssh
+    permanent: true
+    immediate: true
+    state: disabled
+  when: 22 not in (firewalld_allow_ports | default([22022, 80, 443]))
+  tags: [firewall]
+
+- name: fail2ban — garantir jail SSH ativa
+  copy:
+    dest: /etc/fail2ban/jail.d/sshd.local
+    mode: "0644"
+    content: |
+      [sshd]
+      enabled = true
+      port    = {{ ssh_port | default(22022) }}
+      backend = systemd
+  notify: restart fail2ban
+  tags: [firewall]
+
+- name: fail2ban — habilitar servico
+  service:
+    name: fail2ban
+    state: started
+    enabled: true
+  tags: [firewall]
+
+# Grupo compartilhado entre host e containers. GID fixa 10001 casa com
+# os groupadd dos Dockerfiles do backend e frontend.
+- name: Grupo analytics (GID 10001) para compartilhar com containers
+  group:
+    name: analytics
+    gid: 10001
+    state: present
+
+- name: Criar usuario de deploy
+  user:
+    name: "{{ deploy_user }}"
+    shell: /bin/bash
+    groups: "wheel,analytics"
+    append: true
+    create_home: true
+
+- name: Permitir sudo NOPASSWD para deploy (idempotencia do Ansible)
+  copy:
+    dest: /etc/sudoers.d/90-deploy
+    mode: "0440"
+    content: "{{ deploy_user }} ALL=(ALL) NOPASSWD:ALL\n"
+    validate: "visudo -cf %s"
+
+# Bootstrap de chave SSH: na 1a execucao rodamos como root.
+# Propagar root's authorized_keys para o deploy, depois o operador
+# troca o inventario para ansible_user=deploy.
+- name: Ler authorized_keys de root (bootstrap)
+  slurp:
+    src: /root/.ssh/authorized_keys
+  register: root_authorized_keys
+  failed_when: false
+
+- name: Criar diretorio .ssh de deploy
+  file:
+    path: "/home/{{ deploy_user }}/.ssh"
+    state: directory
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_user }}"
+    mode: "0700"
+
+- name: Instalar authorized_keys em deploy (copiando de root)
+  copy:
+    content: "{{ root_authorized_keys.content | b64decode }}"
+    dest: "/home/{{ deploy_user }}/.ssh/authorized_keys"
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_user }}"
+    mode: "0600"
+  when: root_authorized_keys.content is defined

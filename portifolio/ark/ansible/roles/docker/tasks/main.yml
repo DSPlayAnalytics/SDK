@@ -1,0 +1,45 @@
+---
+# Role docker — Rocky Linux 9.
+# Remove podman/buildah (conflito com docker-ce), adiciona repo oficial
+# docker-ce da CentOS (compativel com Rocky), instala engine + compose plugin.
+
+- name: Remover podman/buildah (conflitam com docker-ce em Rocky)
+  dnf:
+    name:
+      - podman
+      - buildah
+      - runc
+    state: absent
+
+- name: Instalar dnf-plugins-core
+  dnf:
+    name: dnf-plugins-core
+    state: present
+
+- name: Adicionar repositorio docker-ce (CentOS/Rocky)
+  get_url:
+    url: https://download.docker.com/linux/centos/docker-ce.repo
+    dest: /etc/yum.repos.d/docker-ce.repo
+    mode: "0644"
+
+- name: Instalar Docker Engine + Compose plugin
+  dnf:
+    name:
+      - docker-ce
+      - docker-ce-cli
+      - containerd.io
+      - docker-buildx-plugin
+      - docker-compose-plugin
+    state: present
+
+- name: Garantir servico docker ativo
+  service:
+    name: docker
+    state: started
+    enabled: true
+
+- name: Adicionar usuario de deploy ao grupo docker
+  user:
+    name: "{{ deploy_user }}"
+    groups: docker
+    append: true

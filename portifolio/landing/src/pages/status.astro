@@ -1,0 +1,220 @@
+---
+/**
+ * Status — pagina publica de health check. Listamos cada servico e
+ * pingamos os health endpoints client-side (CORS-friendly).
+ *
+ * Importante: GET /health/app retorna JSON sem auth, e' built-in do
+ * Flask backend. Outros servicos (Grafana, InfluxDB) ficam atrás de
+ * auth e nao podem ser pingados sem cookie — pra eles linkamos pro
+ * Grafana (se quiser ver detalhe, abra app.X).
+ *
+ * No futuro: gerar JSON estatico via cron + servir em /status/api.json
+ * (CF Pages ja suporta), com historico ultimos 90 dias.
+ */
+import Base from '~/layouts/Base.astro';
+import Badge from '~/components/ui/Badge.astro';
+import Card from '~/components/ui/Card.astro';
+import Button from '~/components/ui/Button.astro';
+
+interface Servico {
+  id: string;
+  nome: string;
+  descricao: string;
+  // healthUrl indefinido = nao verificavel client-side; mostra "interno"
+  healthUrl?: string;
+  // Pra servicos atras de auth, link pro detalhe
+  detalheHref?: string;
+}
+
+const servicos: Servico[] = [
+  {
+    id: 'api',
+    nome: 'API',
+    descricao: 'Coleta de eventos e endpoints REST. Verificado por GET /health/app.',
+    healthUrl: '/health/app',
+  },
+  {
+    id: 'web',
+    nome: 'Web (apex)',
+    descricao: 'Landing publico em dsplayground.com.br. Esta pagina ja confirma se carregou.',
+  },
+  {
+    id: 'embed',
+    nome: 'Embed (widget)',
+    descricao: 'Widget React em embed.dsplayground.com.br/widget/:siteId/:graficoId.',
+    detalheHref: 'https://embed.dsplayground.com.br',
+  },
+  {
+    id: 'grafana',
+    nome: 'Painel (Grafana)',
+    descricao: 'Dashboards analiticos em app.dsplayground.com.br. Auth via cookie.',
+    detalheHref: 'https://app.dsplayground.com.br',
+  },
+  {
+    id: 'influxdb',
+    nome: 'InfluxDB',
+    descricao: 'Series temporais. Health interno (nao exposto publicamente). Visivel via Grafana.',
+    detalheHref: 'https://app.dsplayground.com.br',
+  },
+  {
+    id: 'postgres',
+    nome: 'Postgres',
+    descricao: 'Auth multi-tenant + quotas. Health interno. /cliente/auth/configuracoes valida indireto.',
+  },
+];
+---
+<Base
+  title="Status"
+  description="Health check em tempo real do dsplayground. Web, API, embed widget, painel Grafana."
+>
+  <section class="relative overflow-hidden">
+    <div class="absolute inset-0 -z-10 bg-gradient-to-b from-brand-950 via-slate-950 to-slate-950"></div>
+    <div class="mx-auto max-w-3xl px-4 py-20 text-center sm:px-6 sm:py-24">
+      <Badge variant="success" dot>
+        <span id="status-overall-label">verificando</span>
+      </Badge>
+      <h1 class="mt-6 text-display-sm sm:text-display-md text-white">
+        Tudo rodando, <span class="bg-gradient-to-r from-brand-300 to-brand-500 bg-clip-text text-transparent">a gente espera.</span>
+      </h1>
+      <p class="mx-auto mt-6 max-w-2xl text-lg text-slate-300">
+        Health check em tempo real. Atualiza a cada visita. Se algo aqui estiver vermelho, abrimos issue automaticamente.
+      </p>
+    </div>
+  </section>
+
+  <section class="mx-auto max-w-4xl px-4 pb-16 sm:px-6">
+    <ul class="space-y-3" aria-label="Status dos serviços">
+      {servicos.map((s) => (
+        <li>
+          <Card class="flex flex-wrap items-start justify-between gap-4">
+            <div class="flex-1 min-w-0">
+              <div class="flex items-center gap-3">
+                <h2 class="text-base font-semibold text-white">{s.nome}</h2>
+                <span
+                  class="js-status-pill inline-flex items-center gap-1.5 rounded-full bg-slate-800 px-2 py-0.5 text-xs font-medium text-slate-300 ring-1 ring-inset ring-slate-700"
+                  data-svc-id={s.id}
+                  data-svc-health={s.healthUrl ?? ''}
+                >
+                  <span class="js-status-dot h-1.5 w-1.5 rounded-full bg-slate-500" aria-hidden="true"></span>
+                  <span class="js-status-text">verificando…</span>
+                </span>
+              </div>
+              <p class="mt-2 text-sm text-slate-400">{s.descricao}</p>
+            </div>
+            {s.detalheHref && (
+              <a
+                href={s.detalheHref}
+                rel="noopener"
+                class="text-xs font-medium text-brand-300 hover:text-brand-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 rounded"
+                data-cta={`status-${s.id}-detalhe`}
+              >Ver detalhe →</a>
+            )}
+          </Card>
+        </li>
+      ))}
+    </ul>
+
+    <p class="mt-8 text-center text-xs text-slate-500">
+      Última verificação: <time id="status-ultima-verificacao">—</time>
+    </p>
+
+    <Card class="mt-12">
+      <div class="flex flex-col items-start gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h2 class="text-lg font-semibold text-white">Algo errado?</h2>
+          <p class="mt-1 text-sm text-slate-400">
+            Mande um email descrevendo o que voce viu — a gente responde rapido.
+          </p>
+        </div>
+        <Button href="mailto:contato@dsplayground.com.br?subject=Incidente%20no%20servico" variant="secondary" data-cta="status-reportar">Reportar incidente</Button>
+      </div>
+    </Card>
+  </section>
+
+  <script>
+    import { API_URL } from '~/config';
+
+    const pills = Array.from(document.querySelectorAll<HTMLElement>('.js-status-pill'));
+    const overallLabel = document.getElementById('status-overall-label');
+    const ultimaEl = document.getElementById('status-ultima-verificacao');
+
+    type Estado = 'ok' | 'erro' | 'desconhecido';
+
+    function setPill(pill: HTMLElement, estado: Estado, texto: string) {
+      const dot = pill.querySelector<HTMLElement>('.js-status-dot');
+      const lbl = pill.querySelector<HTMLElement>('.js-status-text');
+      if (!dot || !lbl) return;
+
+      pill.className = 'js-status-pill inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset';
+      dot.className = 'js-status-dot h-1.5 w-1.5 rounded-full';
+
+      if (estado === 'ok') {
+        pill.classList.add('bg-success-500/15', 'text-success-200', 'ring-success-500/30');
+        dot.classList.add('bg-success-400');
+      } else if (estado === 'erro') {
+        pill.classList.add('bg-danger-500/15', 'text-danger-200', 'ring-danger-500/30');
+        dot.classList.add('bg-danger-400');
+      } else {
+        pill.classList.add('bg-slate-800', 'text-slate-300', 'ring-slate-700');
+        dot.classList.add('bg-slate-500');
+      }
+      lbl.textContent = texto;
+    }
+
+    async function ping(pill: HTMLElement) {
+      const id = pill.dataset.svcId ?? '';
+      const path = pill.dataset.svcHealth;
+
+      // Web: a propria pagina ja prova que carregou
+      if (id === 'web') {
+        setPill(pill, 'ok', 'operacional');
+        return true;
+      }
+
+      // Servicos sem healthUrl publico
+      if (!path) {
+        setPill(pill, 'desconhecido', 'interno');
+        return null;
+      }
+
+      try {
+        const ctrl = new AbortController();
+        const timeout = setTimeout(() => ctrl.abort(), 5000);
+        const resp = await fetch(`${API_URL}${path}`, { signal: ctrl.signal });
+        clearTimeout(timeout);
+        if (resp.ok) {
+          setPill(pill, 'ok', 'operacional');
+          return true;
+        }
+        setPill(pill, 'erro', `erro ${resp.status}`);
+        return false;
+      } catch {
+        setPill(pill, 'erro', 'sem resposta');
+        return false;
+      }
+    }
+
+    async function verificarTudo() {
+      const resultados = await Promise.all(pills.map((p) => ping(p)));
+      const verificaveis = resultados.filter((r) => r !== null) as boolean[];
+      const todoOk = verificaveis.length > 0 && verificaveis.every((r) => r);
+      const algumErro = verificaveis.some((r) => r === false);
+
+      if (overallLabel) {
+        if (algumErro) overallLabel.textContent = 'incidente em andamento';
+        else if (todoOk) overallLabel.textContent = 'tudo operacional';
+        else overallLabel.textContent = 'parcialmente verificado';
+      }
+      if (ultimaEl) {
+        const agora = new Date();
+        ultimaEl.textContent = agora.toLocaleString('pt-BR', {
+          day: '2-digit', month: '2-digit', year: 'numeric',
+          hour: '2-digit', minute: '2-digit',
+        });
+        ultimaEl.setAttribute('datetime', agora.toISOString());
+      }
+    }
+
+    verificarTudo();
+  </script>
+</Base>

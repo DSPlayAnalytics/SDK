@@ -1,0 +1,36 @@
+[Unit]
+Description=Agent smoke test - dsplayground monitor defensivo
+Documentation=file:/opt/portifolio/ark/scripts/agent-smoke-prompt.md
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=deploy
+Group=analytics
+WorkingDirectory=/opt/portifolio
+ExecStart=/opt/portifolio/ark/scripts/agent-smoke.sh
+
+# Saida vai pro journal do systemd. Quando OK, sai com 0 e imprime "OK".
+# Quando falha, sai com 1 e o journal tem o relatorio markdown.
+StandardOutput=journal
+StandardError=journal
+TimeoutStartSec=120
+
+# Hardening — script e read-only por contrato, mas vamos defender em camadas.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ReadOnlyPaths=/opt/portifolio
+ReadWritePaths=/var/lib/agent-smoke /tmp /var/log
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+RestrictNamespaces=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+
+[Install]
+WantedBy=multi-user.target

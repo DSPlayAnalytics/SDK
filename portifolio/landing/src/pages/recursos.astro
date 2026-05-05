@@ -1,0 +1,147 @@
+---
+import Base from '~/layouts/Base.astro';
+import Badge from '~/components/ui/Badge.astro';
+import Card from '~/components/ui/Card.astro';
+import Button from '~/components/ui/Button.astro';
+
+interface Recurso {
+  icon: string;
+  title: string;
+  descricao: string;
+}
+
+interface Grupo {
+  id: string;
+  badge: string;
+  titulo: string;
+  subtitulo: string;
+  recursos: Recurso[];
+}
+
+const grupos: Grupo[] = [
+  {
+    id: 'coleta',
+    badge: 'Coleta',
+    titulo: 'Capture só o que importa',
+    subtitulo: 'Sem rastreamento abusivo, sem cookies de terceiros. Você decide o que vira evento.',
+    recursos: [
+      { icon: '📡', title: 'WebSocket em tempo real',     descricao: 'Eventos chegam no painel em segundos, não em horas.' },
+      { icon: '🎯', title: 'Eventos customizados',         descricao: 'Vendas, formulários, vídeos, scrolls — qualquer ação que você quiser medir.' },
+      { icon: '📱', title: 'Heatmap automatizado',         descricao: 'Cliques, scroll depth e tempo em cada parte da página, sem configurar nada.' },
+      { icon: '🪶', title: 'SDK leve',                     descricao: 'Bundle pequeno, defer por padrão. Não atrapalha o LCP do seu site.' },
+      { icon: '🔧', title: 'Multi-plataforma',             descricao: 'WordPress, Shopify, React, Next, Astro, HTML puro. Cole uma linha.' },
+      { icon: '🔄', title: 'Buffer offline',               descricao: 'Eventos pré-iniciar() ou sem rede ficam guardados e sobem quando der.' },
+    ],
+  },
+  {
+    id: 'painel',
+    badge: 'Painel',
+    titulo: 'Entenda em 5 minutos',
+    subtitulo: 'Painel pronto desde o primeiro dia. Sem precisar configurar gráfico, sem aprender ferramenta nova.',
+    recursos: [
+      { icon: '📊', title: 'Métricas chave prontas',       descricao: 'Visitas, conversões, tempo médio, top páginas. Sem precisar montar dashboard.' },
+      { icon: '🌗', title: 'Dark mode bem-feito',          descricao: 'Painel pensado pra trabalhar de noite sem queimar a vista.' },
+      { icon: '🔍', title: 'Filtros que importam',         descricao: 'Por período, por dispositivo, por página. Aplica em segundos.' },
+      { icon: '⚡', title: 'Live view',                     descricao: 'Quem está no seu site agora, em qual página, vindo de onde.' },
+      { icon: '📥', title: 'Exportar CSV a qualquer hora', descricao: 'Sem trava de fornecedor. Saia com tudo se quiser ir embora.' },
+      { icon: '🖼️', title: 'Embed no seu site',            descricao: 'Cole um iframe e mostre seu gráfico no próprio site (Pro+).' },
+    ],
+  },
+  {
+    id: 'controle',
+    badge: 'Controle',
+    titulo: 'Você é o cliente, não o produto',
+    subtitulo: 'Privacidade não é detalhe — é fundação. Tudo isolado, tudo seu.',
+    recursos: [
+      { icon: '🔒', title: 'Multi-tenant isolado',         descricao: 'Cada conta com bucket próprio no InfluxDB. Nada se mistura entre clientes.' },
+      { icon: '🇧🇷', title: 'Dados no Brasil',              descricao: 'Servidor brasileiro. Reduz latência e simplifica adequação à LGPD.' },
+      { icon: '🛡️', title: 'Sem cookie de rastreamento',   descricao: 'Não usamos cookie de tracking — então você não precisa de banner.' },
+      { icon: '🚫', title: 'Zero terceiros',               descricao: 'Não vendemos, não compartilhamos, não passamos pra Google ou Meta.' },
+      { icon: '🔑', title: 'Publishable keys revogáveis',  descricao: 'Comprometeu? Gera nova, revoga a antiga. Em segundos.' },
+      { icon: '📋', title: 'Auditoria de admin',           descricao: 'Operações administrativas têm log dedicado pra rastreamento.' },
+    ],
+  },
+];
+
+const ctaFaq = [
+  { p: 'Tem SDK pra mobile?',          r: 'Hoje só web (WebSocket). Mobile nativo está no roadmap; iOS/Android via React Native funciona usando o pacote npm.' },
+  { p: 'Posso self-hostar?',           r: 'No plano Business sim — a gente entrega o stack pra rodar dentro da sua infra (Docker compose + roles Ansible).' },
+  { p: 'Aceita coletar dados sensíveis?', r: 'Aceita, mas reforça: pra LGPD, evite enviar PII (CPF, e-mail, ID pessoal) como tag. Use IDs anônimos.' },
+];
+---
+<Base
+  title="Recursos"
+  description="Tempo real, multi-tenant, sem cookie de rastreamento, painel pronto. Tudo que cabe num analytics que respeita seu visitante."
+>
+  <section class="relative overflow-hidden">
+    <div class="absolute inset-0 -z-10 bg-gradient-to-b from-brand-950 via-slate-950 to-slate-950"></div>
+    <div class="mx-auto max-w-4xl px-4 py-20 text-center sm:px-6 sm:py-24">
+      <Badge variant="brand" dot>Recursos</Badge>
+      <h1 class="mt-6 text-display-sm sm:text-display-md text-white">
+        Pequeno. Rápido. <span class="bg-gradient-to-r from-brand-300 to-brand-500 bg-clip-text text-transparent">Brasileiro.</span>
+      </h1>
+      <p class="mx-auto mt-6 max-w-2xl text-lg text-slate-300">
+        Cada recurso aqui foi escolhido com uma régua: ele resolve um problema real do time pequeno que precisa entender o site sem virar especialista em ferramenta de tracking.
+      </p>
+    </div>
+  </section>
+
+  {grupos.map((grupo, i) => (
+    <section
+      id={grupo.id}
+      class:list={[
+        'mx-auto max-w-6xl px-4 py-16 sm:px-6',
+        i % 2 === 1 && 'border-t border-slate-800/40',
+      ]}
+    >
+      <div class="grid gap-10 lg:grid-cols-[280px_1fr]">
+        <div>
+          <Badge variant="info">{grupo.badge}</Badge>
+          <h2 class="mt-4 text-2xl font-bold tracking-tight text-white sm:text-3xl">{grupo.titulo}</h2>
+          <p class="mt-3 text-sm text-slate-300">{grupo.subtitulo}</p>
+        </div>
+        <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          {grupo.recursos.map((r) => (
+            <Card>
+              <span class="text-2xl" aria-hidden="true">{r.icon}</span>
+              <h3 class="mt-3 text-base font-semibold text-white">{r.title}</h3>
+              <p class="mt-2 text-sm text-slate-300">{r.descricao}</p>
+            </Card>
+          ))}
+        </div>
+      </div>
+    </section>
+  ))}
+
+  <!-- FAQ -->
+  <section class="mx-auto max-w-3xl px-4 py-16 sm:px-6">
+    <h2 class="text-2xl font-bold tracking-tight text-white sm:text-3xl">Perguntas comuns sobre recursos</h2>
+    <div class="mt-8 divide-y divide-slate-800 rounded-xl border border-slate-800 bg-slate-900/40">
+      {ctaFaq.map((item) => (
+        <details class="group">
+          <summary class="flex cursor-pointer items-center justify-between gap-4 px-5 py-4 text-base font-medium text-white hover:bg-slate-900/60 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400">
+            <span>{item.p}</span>
+            <span class="text-slate-400 transition group-open:rotate-180" aria-hidden="true">⌄</span>
+          </summary>
+          <p class="px-5 pb-4 text-sm text-slate-300">{item.r}</p>
+        </details>
+      ))}
+    </div>
+  </section>
+
+  <!-- CTA FINAL -->
+  <section class="mx-auto max-w-6xl px-4 py-16 sm:px-6">
+    <Card>
+      <div class="flex flex-col items-start gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h2 class="text-2xl font-bold text-white sm:text-3xl">Tudo isso, grátis até 100 mil visitas/dia</h2>
+          <p class="mt-1 text-slate-300">Crie sua conta e veja funcionando hoje.</p>
+        </div>
+        <div class="flex gap-2">
+          <Button href="/cliente/cadastro" variant="primary" data-cta="recursos-cadastro">Criar conta grátis</Button>
+          <Button href="/precos" variant="secondary" data-cta="recursos-precos">Ver planos</Button>
+        </div>
+      </div>
+    </Card>
+  </section>
+</Base>

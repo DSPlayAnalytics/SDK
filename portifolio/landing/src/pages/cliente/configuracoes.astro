@@ -1,0 +1,736 @@
+---
+/**
+ * Configurações — área do cliente, organizada em tabs:
+ *   1. Visão geral — site info + 3 KPIs (quota, cardinalidade, plano)
+ *   2. Chaves de API — listagem das publishable keys com copy + tooltip
+ *   3. Plano & uso — quota detalhada (eventos/dia, /minuto, retenção)
+ *      + link upgrade
+ *   4. Perfil & segurança — trocar email/senha
+ *
+ * Auth: cookie cliente_session. 401 → redirect login. Mantida API
+ * existente — sem mudança de contrato backend.
+ *
+ * Tabs com hashSync: deep link /cliente/configuracoes#chaves abre direto
+ * na aba certa (link compartilhável dentro do dashboard).
+ */
+import Base from '~/layouts/Base.astro';
+import Breadcrumbs from '~/components/ui/Breadcrumbs.astro';
+import Tabs from '~/components/ui/Tabs.astro';
+import Card from '~/components/ui/Card.astro';
+import MetricCard from '~/components/ui/MetricCard.astro';
+import EmptyState from '~/components/ui/EmptyState.astro';
+
+const tabs = [
+  { id: 'visao',       label: 'Visão geral' },
+  { id: 'chaves',      label: 'Chaves de API' },
+  { id: 'plano',       label: 'Plano & uso' },
+  { id: 'embeds',      label: 'Embeds' },
+  { id: 'faturamento', label: 'Faturamento' },
+  { id: 'time',        label: 'Time' },
+  { id: 'perfil',      label: 'Perfil & segurança' },
+];
+---
+<Base
+  title="Configurações"
+  description="Sua publishable key, plano, consumo do dia e perfil."
+  noindex={true}
+>
+  <section class="mx-auto max-w-5xl px-4 py-10 sm:px-6">
+    <Breadcrumbs
+      items={[
+        { href: '/cliente/painel', label: 'Painel' },
+        { label: 'Configurações' },
+      ]}
+      class="mb-4"
+    />
+    <header class="flex flex-wrap items-end justify-between gap-4">
+      <div>
+        <h1 class="text-3xl font-bold text-white">Configurações</h1>
+        <p
+          id="config-subheader"
+          class="mt-1 text-sm text-slate-400"
+        >Carregando suas configurações…</p>
+      </div>
+      <a
+        href="/cliente/painel"
+        data-cta="config-painel"
+        class="inline-flex items-center rounded-lg border border-slate-700 px-4 py-2 text-sm font-medium text-slate-100 transition hover:border-brand-400 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400"
+      >Ir para o painel</a>
+    </header>
+
+    <!-- Skeleton inicial -->
+    <div id="config-loading" class="mt-8 space-y-4" aria-busy="true">
+      <div class="h-10 w-full animate-pulse rounded bg-slate-900/40"></div>
+      <div class="h-32 w-full animate-pulse rounded-xl border border-slate-800 bg-slate-900/40"></div>
+    </div>
+
+    <!-- Erro irrecuperavel (rede / 5xx / parse) -->
+    <div id="config-erro" class="mt-8 hidden">
+      <EmptyState
+        variant="danger"
+        icon="⚠️"
+        title="Não foi possível carregar"
+        description="Verifique sua conexão ou tente fazer login de novo."
+        action={{ href: '/cliente/login', label: 'Ir pro login', 'data-cta': 'config-erro-login' }}
+      />
+    </div>
+
+    <!-- Conteudo: hidden ate hydration -->
+    <div id="config-conteudo" class="mt-8 hidden">
+      <Tabs tabs={tabs} hashSync ariaLabel="Configurações do site">
+        <!-- ABA 1: VISAO GERAL -->
+        <Fragment slot="visao">
+          <div class="space-y-6">
+            <Card>
+              <h2 class="text-lg font-semibold text-white">Seu site</h2>
+              <dl class="mt-4 grid gap-3 sm:grid-cols-2">
+                <div>
+                  <dt class="text-xs uppercase tracking-wide text-slate-500">Apelido (slug)</dt>
+                  <dd id="site-slug" class="mt-1 font-mono text-sm text-slate-100">—</dd>
+                </div>
+                <div>
+                  <dt class="text-xs uppercase tracking-wide text-slate-500">Nome</dt>
+                  <dd id="site-nome" class="mt-1 text-sm text-slate-100">—</dd>
+                </div>
+                <div>
+                  <dt class="text-xs uppercase tracking-wide text-slate-500">Plano</dt>
+                  <dd id="site-plano-cell" class="mt-1 text-sm text-slate-100">—</dd>
+                </div>
+                <div>
+                  <dt class="text-xs uppercase tracking-wide text-slate-500">Ambiente</dt>
+                  <dd id="site-ambiente-cell" class="mt-1 text-sm text-slate-100">—</dd>
+                </div>
+              </dl>
+            </Card>
+
+            <div class="grid gap-4 sm:grid-cols-3">
+              <MetricCard
+                label="Eventos hoje"
+                value="—"
+                class="js-card-eventos-hoje"
+                hint="Volume bruto desde a meia-noite"
+              />
+              <MetricCard
+                label="Quota do dia"
+                value="—"
+                class="js-card-quota-pct"
+                hint="Quanto da quota diária você usou"
+              />
+              <MetricCard
+                label="Cardinalidade tags"
+                value="—"
+                class="js-card-cardinalidade-pct"
+                hint="Valores únicos de tags. Limite alto pode bloquear eventos."
+              />
+            </div>
+          </div>
+        </Fragment>
+
+        <!-- ABA 2: CHAVES DE API -->
+        <Fragment slot="chaves">
+          <Card>
+            <div class="flex items-start justify-between gap-4">
+              <div>
+                <h2 class="text-lg font-semibold text-white">Publishable keys</h2>
+                <p class="mt-1 text-sm text-slate-400">
+                  Cole essa key em <code class="rounded bg-slate-800 px-1 py-0.5 font-mono text-xs">publishableKey</code>
+                  ao chamar <code class="rounded bg-slate-800 px-1 py-0.5 font-mono text-xs">iniciarAnalytics()</code>
+                  no SDK. Trate como senha — sai pro browser, mas restringe quem pode emitir tokens em nome do seu site.
+                </p>
+              </div>
+            </div>
+
+            <ul id="keys-lista" class="mt-6 space-y-3"></ul>
+
+            <div id="keys-empty" class="mt-6 hidden">
+              <EmptyState
+                icon="🔑"
+                title="Nenhuma key ativa"
+                description="Sua conta ainda não tem publishable keys ativas — entre em contato pra geração inicial."
+              />
+            </div>
+          </Card>
+        </Fragment>
+
+        <!-- ABA 3: PLANO & USO -->
+        <Fragment slot="plano">
+          <div class="space-y-6">
+            <Card>
+              <h2 class="text-lg font-semibold text-white">Limites do seu plano</h2>
+              <p class="mt-1 text-sm text-slate-400">Definidos pelo plano ativo. Pra subir, troque de plano.</p>
+              <dl class="mt-4 grid gap-3 sm:grid-cols-2">
+                <div>
+                  <dt class="text-xs uppercase tracking-wide text-slate-500">Limite por dia</dt>
+                  <dd id="quota-dia" class="mt-1 text-2xl font-bold text-white tabular-nums">—</dd>
+                </div>
+                <div>
+                  <dt class="text-xs uppercase tracking-wide text-slate-500">Limite por minuto</dt>
+                  <dd id="quota-minuto" class="mt-1 text-2xl font-bold text-white tabular-nums">—</dd>
+                </div>
+                <div>
+                  <dt class="text-xs uppercase tracking-wide text-slate-500">Retenção</dt>
+                  <dd id="quota-retencao" class="mt-1 text-2xl font-bold text-white tabular-nums">—</dd>
+                </div>
+                <div>
+                  <dt class="text-xs uppercase tracking-wide text-slate-500">Emissão JWT/min</dt>
+                  <dd id="quota-jwt" class="mt-1 text-2xl font-bold text-white tabular-nums">—</dd>
+                </div>
+              </dl>
+              <a
+                href="/precos"
+                data-cta="config-upgrade"
+                class="mt-6 inline-flex items-center rounded-lg bg-brand-500 px-5 py-2.5 text-sm font-semibold text-white shadow-elev-1 transition hover:bg-brand-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-300"
+              >Comparar planos</a>
+            </Card>
+
+            <Card>
+              <h2 class="text-lg font-semibold text-white">Cardinalidade de tags</h2>
+              <p class="mt-1 text-sm text-slate-400">
+                Quantos valores únicos suas tags têm. Eventos são bloqueados ao
+                atingir o limite — usar IDs como tag (user_id, request_id) é o
+                jeito mais comum de explodir.
+              </p>
+              <div class="mt-4">
+                <div class="flex items-baseline justify-between text-sm">
+                  <span id="cardinalidade-texto" class="text-slate-100 tabular-nums">—</span>
+                  <span id="cardinalidade-pct" class="text-xs text-slate-400">—</span>
+                </div>
+                <div class="mt-2 h-2 overflow-hidden rounded-full bg-slate-800">
+                  <div
+                    id="cardinalidade-bar"
+                    class="h-full rounded-full bg-success-500 transition-all"
+                    style="width: 0%"
+                    role="progressbar"
+                    aria-valuemin="0"
+                    aria-valuemax="100"
+                    aria-valuenow="0"
+                  ></div>
+                </div>
+                <p id="cardinalidade-aviso" class="mt-2 hidden text-sm"></p>
+              </div>
+            </Card>
+          </div>
+        </Fragment>
+
+        <!-- ABA 4: EMBEDS (placeholder Fase 2) -->
+        <Fragment slot="embeds">
+          <Card>
+            <h2 class="text-lg font-semibold text-white">Embeds de gráfico</h2>
+            <p class="mt-1 text-sm text-slate-400">
+              Pegue um <code class="rounded bg-slate-800 px-1 py-0.5 font-mono text-xs">&lt;iframe&gt;</code>
+              pronto pra mostrar seus gráficos no seu próprio site. Cada
+              embed roda em <code class="rounded bg-slate-800 px-1 py-0.5 font-mono text-xs">embed.dsplayground.com.br</code>
+              autenticado por JWT curto, sem expor sua publishable key.
+            </p>
+            <div class="mt-6">
+              <EmptyState
+                variant="warning"
+                icon="🖼️"
+                title="Em breve no plano Pro"
+                description="Self-service de embed (gerar iframe + gerenciar domínios autorizados) chega na próxima onda. Hoje rodamos a Fase 1 dogfood internamente. Se você quer ser piloto, fale com a gente."
+                action={{ href: '/precos#pro', label: 'Ver plano Pro', 'data-cta': 'config-embeds-pro' }}
+              />
+            </div>
+          </Card>
+        </Fragment>
+
+        <!-- ABA 5: FATURAMENTO -->
+        <Fragment slot="faturamento">
+          <div class="space-y-6">
+            <Card>
+              <h2 class="text-lg font-semibold text-white">Plano atual</h2>
+              <div id="fat-plano-atual" class="mt-4">
+                <div class="h-6 w-48 animate-pulse rounded bg-slate-800"></div>
+              </div>
+            </Card>
+
+            <Card>
+              <h2 class="text-lg font-semibold text-white">Comparar planos</h2>
+              <p class="mt-1 text-sm text-slate-400">Escolha o plano certo para o volume do seu site.</p>
+              <div id="fat-planos-loading" class="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                {[1,2,3,4].map(() => (
+                  <div class="h-48 animate-pulse rounded-xl border border-slate-800 bg-slate-900/40"></div>
+                ))}
+              </div>
+              <div id="fat-planos-grid" class="mt-6 hidden grid gap-4 sm:grid-cols-2 lg:grid-cols-4"></div>
+              <div id="fat-planos-erro" class="mt-6 hidden">
+                <EmptyState
+                  variant="danger"
+                  icon="⚠️"
+                  title="Não foi possível carregar os planos"
+                  description="Verifique sua conexão e tente recarregar."
+                />
+              </div>
+            </Card>
+          </div>
+        </Fragment>
+
+        <!-- ABA 6: TIME (placeholder Fase 3) -->
+        <Fragment slot="time">
+          <Card>
+            <h2 class="text-lg font-semibold text-white">Time</h2>
+            <p class="mt-1 text-sm text-slate-400">
+              Convide membros pra ver/editar o painel da sua conta. Papéis
+              previstos: <strong class="text-slate-200">Owner</strong> (controle total),
+              <strong class="text-slate-200">Editor</strong> (configura) e
+              <strong class="text-slate-200">Viewer</strong> (só leitura).
+            </p>
+            <div class="mt-6">
+              <EmptyState
+                icon="👥"
+                title="Convite de time vem na Fase 3"
+                description="Hoje cada conta tem um único usuário. Convites com papéis e auditoria por membro chegam quando virarmos GA. Se sua empresa precisa antes, fala com a gente — caso a caso a gente flexibiliza."
+              />
+            </div>
+          </Card>
+        </Fragment>
+
+        <!-- ABA 7: PERFIL & SEGURANCA -->
+        <Fragment slot="perfil">
+          <div class="grid gap-6 md:grid-cols-2">
+            <Card>
+              <h2 class="text-lg font-semibold text-white">Trocar email</h2>
+              <p
+                id="perfil-email-atual"
+                class="mt-1 text-sm text-slate-400"
+              >Email atual: —</p>
+              <form id="form-email" class="mt-4 space-y-3" novalidate>
+                <div>
+                  <label for="senha-atual-email" class="input-label">Senha atual</label>
+                  <input id="senha-atual-email" name="senha_atual" type="password" autocomplete="current-password" required class="input-field" />
+                </div>
+                <div>
+                  <label for="novo-email" class="input-label">Novo email</label>
+                  <input id="novo-email" name="novo_email" type="email" autocomplete="email" required class="input-field" />
+                </div>
+                <div id="erro-email" role="alert" class="hidden rounded-md border border-danger-500/40 bg-danger-500/10 px-3 py-2 text-sm text-danger-200"></div>
+                <button id="submit-email" type="submit" class="btn-secondary text-sm" data-cta="trocar-email">Atualizar email</button>
+              </form>
+            </Card>
+
+            <Card>
+              <h2 class="text-lg font-semibold text-white">Trocar senha</h2>
+              <p class="mt-1 text-sm text-slate-400">Mínimo 8 caracteres. Usar gerenciador de senha é a forma mais segura.</p>
+              <form id="form-senha" class="mt-4 space-y-3" novalidate>
+                <div>
+                  <label for="senha-atual" class="input-label">Senha atual</label>
+                  <input id="senha-atual" name="senha_atual" type="password" autocomplete="current-password" required class="input-field" />
+                </div>
+                <div>
+                  <label for="nova-senha" class="input-label">Nova senha</label>
+                  <input id="nova-senha" name="nova_senha" type="password" autocomplete="new-password" required minlength="8" class="input-field" placeholder="pelo menos 8 caracteres" />
+                </div>
+                <div id="erro-senha" role="alert" class="hidden rounded-md border border-danger-500/40 bg-danger-500/10 px-3 py-2 text-sm text-danger-200"></div>
+                <button id="submit-senha" type="submit" class="btn-secondary text-sm" data-cta="trocar-senha">Atualizar senha</button>
+              </form>
+            </Card>
+          </div>
+        </Fragment>
+      </Tabs>
+    </div>
+  </section>
+
+  <script>
+    import { alterarEmail, alterarSenha, obterConfiguracoes } from '~/lib/api';
+    import { API_URL } from '~/config';
+    import { showToast } from '~/lib/toast';
+
+    const elLoading = document.getElementById('config-loading')!;
+    const elErro = document.getElementById('config-erro')!;
+    const elConteudo = document.getElementById('config-conteudo')!;
+    const elSubheader = document.getElementById('config-subheader')!;
+
+    function fmtNumero(n: number): string {
+      return new Intl.NumberFormat('pt-BR').format(n);
+    }
+
+    function pct(parte: number, todo: number): number {
+      if (todo <= 0) return 0;
+      return Math.min(100, (parte / todo) * 100);
+    }
+
+    function classeQuota(percentual: number): string {
+      if (percentual >= 95) return 'text-danger-300';
+      if (percentual >= 80) return 'text-warning-300';
+      return 'text-success-300';
+    }
+
+    function setMetricCard(klass: string, value: string, deltaHTML?: string) {
+      const card = document.querySelector(`.${klass}`);
+      if (!card) return;
+      const valueEl = card.querySelector('p.text-3xl');
+      if (valueEl) valueEl.textContent = value;
+      if (deltaHTML !== undefined) {
+        const oldDelta = card.querySelector('p.flex.items-center');
+        if (oldDelta) oldDelta.remove();
+        if (deltaHTML) {
+          const wrapper = document.createElement('div');
+          wrapper.innerHTML = deltaHTML;
+          if (valueEl?.parentNode) {
+            valueEl.parentNode.insertBefore(wrapper.firstChild!, valueEl.nextSibling);
+          }
+        }
+      }
+    }
+
+    function renderKeys(keys: { key_id: string; valor: string; nome: string | null; ambiente: string }[]) {
+      const ul = document.getElementById('keys-lista')!;
+      const empty = document.getElementById('keys-empty')!;
+      ul.innerHTML = '';
+
+      if (keys.length === 0) {
+        empty.classList.remove('hidden');
+        return;
+      }
+      empty.classList.add('hidden');
+
+      for (const k of keys) {
+        const li = document.createElement('li');
+        li.className = 'rounded-lg border border-slate-700/60 bg-slate-900/40 p-4';
+
+        const linha1 = document.createElement('div');
+        linha1.className = 'flex items-center justify-between gap-2';
+
+        const labelBox = document.createElement('div');
+        labelBox.className = 'flex items-center gap-2';
+        const nome = document.createElement('span');
+        nome.className = 'text-sm font-medium text-slate-100';
+        nome.textContent = k.nome ?? 'sem nome';
+        const ambBadge = document.createElement('span');
+        ambBadge.className = 'inline-flex items-center gap-1.5 rounded-full font-medium ring-1 ring-inset text-xs px-2 py-0.5 ' + (
+          k.ambiente === 'production'
+            ? 'bg-success-500/15 text-success-200 ring-success-500/30'
+            : 'bg-slate-800 text-slate-200 ring-slate-700'
+        );
+        ambBadge.textContent = k.ambiente;
+        labelBox.append(nome, ambBadge);
+
+        const btnCopiar = document.createElement('button');
+        btnCopiar.type = 'button';
+        btnCopiar.className = 'btn-secondary text-xs';
+        btnCopiar.setAttribute('data-cta', 'copiar-publishable-key');
+        btnCopiar.textContent = 'Copiar';
+        btnCopiar.addEventListener('click', async () => {
+          const sdk = (window as any).__dsplayground;
+          try {
+            await navigator.clipboard.writeText(k.valor);
+            showToast('Key copiada — cole no SDK', { variant: 'success' });
+            sdk?.enviarEvento?.('publishable_key_copiada', {
+              ambiente: k.ambiente,
+              key_id: k.key_id,
+            });
+          } catch {
+            showToast('Não consegui acessar a área de transferência', { variant: 'error' });
+            sdk?.enviarEvento?.('publishable_key_copia_falhou', {
+              ambiente: k.ambiente,
+            });
+          }
+        });
+        linha1.append(labelBox, btnCopiar);
+
+        const valorBox = document.createElement('code');
+        valorBox.className = 'mt-3 block break-all rounded bg-slate-950 px-3 py-2 font-mono text-xs text-slate-200';
+        valorBox.textContent = k.valor;
+
+        li.append(linha1, valorBox);
+        ul.append(li);
+      }
+    }
+
+    function renderCardinalidade(atual: number, limite: number) {
+      const texto = document.getElementById('cardinalidade-texto')!;
+      const pctEl = document.getElementById('cardinalidade-pct')!;
+      const bar = document.getElementById('cardinalidade-bar')!;
+      const aviso = document.getElementById('cardinalidade-aviso')!;
+
+      texto.textContent = `${fmtNumero(atual)} / ${fmtNumero(limite)} valores`;
+
+      if (limite <= 0) {
+        pctEl.textContent = 'tracker indisponível';
+        bar.style.width = '0%';
+        bar.setAttribute('aria-valuenow', '0');
+        aviso.classList.add('hidden');
+        return;
+      }
+
+      const percentual = Math.min(100, (atual / limite) * 100);
+      pctEl.textContent = `${percentual.toFixed(1)}%`;
+      bar.style.width = `${percentual}%`;
+      bar.setAttribute('aria-valuenow', String(Math.round(percentual)));
+
+      bar.classList.remove('bg-success-500', 'bg-warning-500', 'bg-danger-500');
+      aviso.classList.remove('text-warning-300', 'text-danger-300');
+
+      if (percentual >= 95) {
+        bar.classList.add('bg-danger-500');
+        aviso.textContent = 'Crítico — eventos podem começar a ser bloqueados em breve.';
+        aviso.classList.add('text-danger-300');
+        aviso.classList.remove('hidden');
+      } else if (percentual >= 80) {
+        bar.classList.add('bg-warning-500');
+        aviso.textContent = 'Atenção — você está perto do limite. Revise tags com muitos valores únicos.';
+        aviso.classList.add('text-warning-300');
+        aviso.classList.remove('hidden');
+      } else {
+        bar.classList.add('bg-success-500');
+        aviso.classList.add('hidden');
+      }
+    }
+
+    async function carregar() {
+      const r = await obterConfiguracoes({ apiUrl: API_URL });
+
+      if (!r.ok) {
+        elLoading.classList.add('hidden');
+        if (r.code === 'NAO_AUTENTICADO') {
+          window.location.href = '/cliente/login?next=/cliente/configuracoes';
+          return;
+        }
+        elErro.classList.remove('hidden');
+        showToast(`Erro: ${r.message}`, { variant: 'error', durationMs: 0 });
+        return;
+      }
+
+      elSubheader.textContent = `${r.site.nome} · ${r.site.ambiente}`;
+
+      // Visao geral
+      document.getElementById('site-slug')!.textContent = r.site.slug;
+      document.getElementById('site-nome')!.textContent = r.site.nome;
+      document.getElementById('site-plano-cell')!.textContent = r.site.plano;
+      document.getElementById('site-ambiente-cell')!.textContent = r.site.ambiente;
+
+      setMetricCard('js-card-eventos-hoje', fmtNumero(r.consumo.eventos_hoje));
+
+      const percentDia = pct(r.consumo.eventos_hoje, r.quota.eventos_por_dia);
+      setMetricCard(
+        'js-card-quota-pct',
+        `${percentDia.toFixed(1)}%`,
+        `<p class="mt-1 text-xs ${classeQuota(percentDia)}">${fmtNumero(r.consumo.eventos_hoje)} / ${fmtNumero(r.quota.eventos_por_dia)}</p>`,
+      );
+
+      const percentCard = pct(r.cardinalidade.atual, r.cardinalidade.limite);
+      if (r.cardinalidade.limite > 0) {
+        setMetricCard(
+          'js-card-cardinalidade-pct',
+          `${percentCard.toFixed(0)}%`,
+          `<p class="mt-1 text-xs ${classeQuota(percentCard)}">${fmtNumero(r.cardinalidade.atual)} / ${fmtNumero(r.cardinalidade.limite)}</p>`,
+        );
+      } else {
+        setMetricCard('js-card-cardinalidade-pct', 'n/d', '');
+      }
+
+      // Chaves
+      renderKeys(r.publishable_keys);
+
+      // Plano & uso
+      document.getElementById('quota-dia')!.textContent = fmtNumero(r.quota.eventos_por_dia);
+      document.getElementById('quota-minuto')!.textContent = fmtNumero(r.quota.eventos_por_minuto);
+      document.getElementById('quota-retencao')!.textContent = `${r.quota.retencao_dias} dias`;
+      document.getElementById('quota-jwt')!.textContent = fmtNumero(r.quota.emissoes_jwt_por_minuto);
+
+      renderCardinalidade(r.cardinalidade.atual, r.cardinalidade.limite);
+
+      // Perfil
+      document.getElementById('perfil-email-atual')!.textContent = `Email atual: ${r.user.email}`;
+
+      elLoading.classList.add('hidden');
+      elConteudo.classList.remove('hidden');
+    }
+
+    carregar().catch((e) => {
+      console.error('configuracoes: erro inesperado', e);
+      elLoading.classList.add('hidden');
+      elErro.classList.remove('hidden');
+    });
+
+    // ----- Faturamento: plano atual + comparacao de planos -----
+
+    const PLANO_NOMES: Record<string, string> = {
+      free: 'Free',
+      pequeno: 'Pequeno',
+      medio: 'Médio',
+      grande: 'Grande',
+    };
+
+    interface Plano {
+      id: string;
+      nome: string;
+      eventos_por_dia: number;
+      eventos_por_minuto: number;
+      retencao_dias: number;
+      preco_mensal: number | null;
+    }
+
+    function renderFaturamento(planoAtual: string, planos: Plano[]) {
+      // Plano atual
+      const elAtual = document.getElementById('fat-plano-atual');
+      if (elAtual) {
+        const nomeAtual = PLANO_NOMES[planoAtual] ?? planoAtual;
+        elAtual.innerHTML = `
+          <div class="flex items-center gap-3">
+            <span class="text-2xl font-bold text-white">${nomeAtual}</span>
+            <span class="inline-flex items-center rounded-full bg-brand-500/20 px-2.5 py-0.5 text-xs font-semibold text-brand-300 ring-1 ring-inset ring-brand-500/30">
+              Plano atual
+            </span>
+          </div>
+        `;
+      }
+
+      // Grid de planos
+      const loading = document.getElementById('fat-planos-loading');
+      const grid = document.getElementById('fat-planos-grid');
+      if (!grid) return;
+      loading?.classList.add('hidden');
+      grid.classList.remove('hidden');
+      grid.innerHTML = '';
+
+      for (const p of planos) {
+        const isAtual = p.id === planoAtual;
+        const nomeExibicao = PLANO_NOMES[p.id] ?? p.nome;
+        const card = document.createElement('div');
+        card.className = [
+          'flex flex-col rounded-xl border p-5 transition',
+          isAtual
+            ? 'border-brand-500/60 bg-brand-500/10 ring-1 ring-brand-500/30'
+            : 'border-slate-700/60 bg-slate-900/40 hover:border-slate-600',
+        ].join(' ');
+
+        card.innerHTML = `
+          <div class="flex items-start justify-between gap-2">
+            <h3 class="text-base font-semibold text-white">${nomeExibicao}</h3>
+            ${isAtual ? `<span class="shrink-0 inline-flex items-center rounded-full bg-brand-500/20 px-2 py-0.5 text-xs font-medium text-brand-300 ring-1 ring-inset ring-brand-500/30">atual</span>` : ''}
+          </div>
+          <dl class="mt-3 space-y-1.5 text-sm text-slate-300 flex-1">
+            <div class="flex justify-between gap-2">
+              <dt class="text-slate-500">Eventos/dia</dt>
+              <dd class="tabular-nums font-medium text-slate-100">${fmtNumero(p.eventos_por_dia)}</dd>
+            </div>
+            <div class="flex justify-between gap-2">
+              <dt class="text-slate-500">Eventos/min</dt>
+              <dd class="tabular-nums font-medium text-slate-100">${fmtNumero(p.eventos_por_minuto)}</dd>
+            </div>
+            <div class="flex justify-between gap-2">
+              <dt class="text-slate-500">Retenção</dt>
+              <dd class="font-medium text-slate-100">${p.retencao_dias} dias</dd>
+            </div>
+          </dl>
+          <div class="mt-4">
+            ${isAtual
+              ? `<button disabled class="w-full rounded-lg border border-slate-700 px-4 py-2 text-sm font-medium text-slate-500 cursor-not-allowed">Plano atual</button>`
+              : `<a href="/precos" data-cta="config-faturamento-mudar-${p.id}" class="block w-full rounded-lg bg-brand-500 px-4 py-2 text-center text-sm font-semibold text-white shadow-elev-1 transition hover:bg-brand-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-300">${p.id === 'free' || _ordemPlano(p.id) < _ordemPlano(planoAtual) ? 'Fazer downgrade' : `Mudar para ${nomeExibicao}`}</a>`
+            }
+          </div>
+        `;
+        grid.append(card);
+      }
+    }
+
+    function _ordemPlano(id: string): number {
+      return ['free', 'pequeno', 'medio', 'grande'].indexOf(id);
+    }
+
+    async function carregarFaturamento(planoAtual: string) {
+      try {
+        const resp = await fetch(`${API_URL}/billing/planos`, { credentials: 'include' });
+        if (!resp.ok) throw new Error(`status ${resp.status}`);
+        const data = await resp.json();
+        renderFaturamento(planoAtual, data.planos ?? []);
+      } catch (e) {
+        console.error('faturamento: erro ao carregar planos', e);
+        document.getElementById('fat-planos-loading')?.classList.add('hidden');
+        document.getElementById('fat-planos-erro')?.classList.remove('hidden');
+      }
+    }
+
+    // Aguarda os dados de configuracoes para obter plano atual, depois carrega planos
+    async function iniciarFaturamento() {
+      const r = await obterConfiguracoes({ apiUrl: API_URL });
+      if (r.ok) {
+        carregarFaturamento(r.site.plano);
+      }
+    }
+
+    iniciarFaturamento().catch((e) => {
+      console.error('faturamento: erro inesperado', e);
+    });
+
+    // ----- Trocar email -----
+    const formEmail = document.getElementById('form-email') as HTMLFormElement | null;
+    const erroEmail = document.getElementById('erro-email');
+    const submitEmail = document.getElementById('submit-email') as HTMLButtonElement | null;
+
+    formEmail?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      if (!erroEmail || !submitEmail) return;
+      erroEmail.classList.add('hidden');
+      submitEmail.disabled = true;
+      submitEmail.textContent = 'Atualizando…';
+
+      const fd = new FormData(formEmail);
+      const r = await alterarEmail(
+        {
+          senha_atual: String(fd.get('senha_atual') ?? ''),
+          novo_email: String(fd.get('novo_email') ?? '').trim(),
+        },
+        { apiUrl: API_URL },
+      );
+
+      if (r.ok) {
+        showToast('Email atualizado', { variant: 'success' });
+        formEmail.reset();
+      } else {
+        const msg = (
+          r.code === 'SENHA_INVALIDA' ? 'Senha atual incorreta.' :
+          r.code === 'EMAIL_INVALIDO' ? 'Email inválido. Use um formato válido.' :
+          r.code === 'EMAIL_JA_CADASTRADO' ? 'Esse email já está em uso.' :
+          r.code === 'NAO_AUTENTICADO' ? 'Sessão expirou. Faça login de novo.' :
+          r.code === 'REDE' ? 'Sem internet agora. Tenta de novo.' :
+          'Não deu pra atualizar agora. Tenta de novo.'
+        );
+        erroEmail.textContent = msg;
+        erroEmail.classList.remove('hidden');
+      }
+      submitEmail.disabled = false;
+      submitEmail.textContent = 'Atualizar email';
+    });
+
+    // ----- Trocar senha -----
+    const formSenha = document.getElementById('form-senha') as HTMLFormElement | null;
+    const erroSenha = document.getElementById('erro-senha');
+    const submitSenha = document.getElementById('submit-senha') as HTMLButtonElement | null;
+
+    formSenha?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      if (!erroSenha || !submitSenha) return;
+      erroSenha.classList.add('hidden');
+      submitSenha.disabled = true;
+      submitSenha.textContent = 'Atualizando…';
+
+      const fd = new FormData(formSenha);
+      const r = await alterarSenha(
+        {
+          senha_atual: String(fd.get('senha_atual') ?? ''),
+          nova_senha: String(fd.get('nova_senha') ?? ''),
+        },
+        { apiUrl: API_URL },
+      );
+
+      if (r.ok) {
+        showToast('Senha atualizada', { variant: 'success' });
+        formSenha.reset();
+      } else {
+        const msg = (
+          r.code === 'SENHA_INVALIDA' ? 'Senha atual incorreta.' :
+          r.code === 'SENHA_CURTA' ? 'A nova senha precisa ter no mínimo 8 caracteres.' :
+          r.code === 'NAO_AUTENTICADO' ? 'Sessão expirou. Faça login de novo.' :
+          r.code === 'REDE' ? 'Sem internet agora. Tenta de novo.' :
+          'Não deu pra atualizar agora. Tenta de novo.'
+        );
+        erroSenha.textContent = msg;
+        erroSenha.classList.remove('hidden');
+      }
+      submitSenha.disabled = false;
+      submitSenha.textContent = 'Atualizar senha';
+    });
+  </script>
+</Base>

@@ -1,0 +1,156 @@
+:root {
+  --breakpoint-xs: 320px;
+  --breakpoint-sm: 480px;
+  --breakpoint-md: 768px;
+  --breakpoint-lg: 1024px;
+  --breakpoint-xl: 1280px;
+  --breakpoint-2xl: 1536px;
+
+  --color-primary: #4f46e5;
+  --color-secondary: #6b7280;
+  --color-accent: #10b981;
+  --color-background: #e8eaec;
+  --color-text: #111827;
+  --color-border: #e5e7eb;
+  --font-family-sans: 'Helvetica Neue', Arial, sans-serif;
+  --font-family-serif: 'Georgia', serif;
+  --font-family-mono: 'Courier New', monospace;
+  --spacing-1: 4px;
+  --spacing-2: 8px;
+  --spacing-3: 16px;
+  --spacing-4: 24px;
+  --spacing-5: 32px;
+  --border-radius-sm: 4px;
+  --border-radius-md: 8px;
+  --border-radius-lg: 16px;
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.1);
+  --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.15);
+  --transition-fast: all 0.2s ease-in-out;
+  --transition-medium: all 0.5s ease-in-out;
+  --transition-slow: all 1s ease-in-out;
+  --z-index-dropdown: 1000;
+  --z-index-modal: 1100;
+  --z-index-tooltip: 1200;
+  --z-index-toast: 1300;
+  --z-index-popover: 1400;
+  --z-index-sticky: 1500;
+  --z-index-fixed: 1600;
+  --z-index-overlay: 1700;
+  --z-index-max: 1800;
+  --opacity-low: 0.25;
+  --opacity-medium: 0.5;
+  --opacity-high: 0.75;
+  --opacity-full: 1;
+  --line-height-tight: 1.25;
+  --line-height-normal: 1.5;
+  --line-height-loose: 1.75;
+  --letter-spacing-tight: -0.05em;
+  --letter-spacing-normal: 0em;
+  --letter-spacing-wide: 0.05em;
+  --font-size-xs: 0.75rem;
+  --font-size-sm: 0.875rem;
+  --font-size-md: 1rem;
+  --font-size-lg: 1.125rem;
+  --font-size-xl: 1.25rem;
+  --font-size-2xl: 1.5rem;
+  --font-size-3xl: 1.875rem;
+  --font-size-4xl: 2.25rem;
+  --font-size-5xl: 3rem;
+  --font-size-6xl: 4rem;
+
+  --touch-target-min: 44px;
+  --fluid-h1: clamp(1.375rem, 1.05rem + 1.6vw, 2.25rem);
+  --fluid-h2: clamp(1.125rem, 0.95rem + 1.1vw, 1.75rem);
+  --fluid-h3: clamp(1rem, 0.9rem + 0.6vw, 1.25rem);
+  --fluid-body: clamp(0.875rem, 0.82rem + 0.25vw, 1rem);
+  --fluid-small: clamp(0.75rem, 0.7rem + 0.2vw, 0.875rem);
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  height: 100%;
+  overflow: hidden;
+}
+
+body {
+  margin: 0;
+  font-family: Arial, sans-serif;
+  padding: 0px;
+  height: 100%;
+  overflow: hidden;
+  background-color: var(--color-background);
+  color: var(--color-text);
+  line-height: var(--line-height-normal);
+  font-size: var(--fluid-body);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button,
+[role="button"] {
+  min-height: var(--touch-target-min);
+  min-width: var(--touch-target-min);
+}
+
+p {
+  margin: 0 0 0.75em 0;
+  padding: 0;
+  font-size: var(--fluid-small);
+  text-align: left;
+  line-height: var(--line-height-normal);
+}
+
+h1 {
+  margin: 0 0 0.5em 0;
+  padding: 0;
+  font-size: var(--fluid-h1);
+  line-height: var(--line-height-tight);
+}
+
+h2 {
+  margin: 0 0 0.5em 0;
+  padding: 0;
+  font-size: var(--fluid-h2);
+  line-height: var(--line-height-tight);
+}
+
+h3,
+h4,
+h5,
+h6 {
+  margin: 0 0 0.5em 0;
+  padding: 0;
+  font-size: var(--fluid-h3);
+  line-height: var(--line-height-tight);
+}
+
+@media screen and (min-width: 768px) {
+  p {
+    text-align: justify;
+  }
+}
+
+@media screen and (max-width: 720px) {
+
+  h1 {
+    text-align: center;
+  }
+
+  h3,
+  h4,
+  h5,
+  h6 {
+    text-align: center;
+  }
+}

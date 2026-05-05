@@ -1,0 +1,292 @@
+---
+- name: Garantir diretorio do repo com dono correto
+  file:
+    path: "{{ repo_dir }}"
+    state: directory
+    owner: "{{ deploy_user }}"
+    group: analytics
+    mode: "0750"
+
+- name: Clonar/atualizar repo do portifolio
+  git:
+    repo: "{{ repo_url }}"
+    dest: "{{ repo_dir }}"
+    version: "{{ repo_branch }}"
+    accept_hostkey: true
+    force: true
+  become_user: "{{ deploy_user }}"
+  tags: [git-clone]
+
+- name: Reforcar owner:group apos git clone (arquivos herdam primary group do deploy)
+  # Modo simbolico `X` (maiusculo) so aplica +x em diretorios (ou arquivos que
+  # ja tinham +x preservados). Sem isso, `mode: "0750"` com recurse marca
+  # *todos* os arquivos como executaveis — quebra `.vault-password` (Ansible
+  # tenta executar como script e da "Erro no formato exec").
+  #
+  # `o=rX` (em vez de `o=` que era restrito demais): permite leitura por
+  # processos fora do grupo `analytics` que precisam acessar o repo
+  # (ex: nginx do host servindo arquivos estaticos, certificados que
+  # outros usuarios checam, etc.). Resultado:
+  #   - dirs: 0755
+  #   - arquivos: 0644
+  # SEGREDOS dentro do repo_dir (`backend/.env`, `compose .env`,
+  # `.vault-password`) sao re-protegidos pelas tasks abaixo com modo
+  # explicito mais restritivo.
+  file:
+    path: "{{ repo_dir }}"
+    state: directory
+    owner: "{{ deploy_user }}"
+    group: analytics
+    mode: "u=rwX,g=rX,o=rX"
+    recurse: true
+
+- name: Re-proteger .vault-password apos chown recursivo (NUNCA world-readable)
+  # `.vault-password` mora dentro do repo_dir (ver ark/ansible/README.md).
+  # O chown recursivo acima aplica `o=r` -> 0644 no arquivo, o que vazaria
+  # o segredo do vault. Re-fechamos aqui para 0600.
+  file:
+    path: "{{ repo_dir }}/.vault-password"
+    owner: "{{ deploy_user }}"
+    group: analytics
+    mode: "0600"
+  # ignore_errors: arquivo pode nao existir em primeiro deploy ou em
+  # ambiente que nao usa vault. Nao bloqueia ansible-apply.
+  ignore_errors: true
+
+- name: SGID no diretorio backend para novos arquivos herdarem grupo analytics
+  file:
+    path: "{{ repo_dir }}/backend"
+    state: directory
+    mode: "2770"
+
+- name: Gerar .env do backend
+  template:
+    src: backend.env.j2
+    dest: "{{ repo_dir }}/backend/.env"
+    owner: "{{ deploy_user }}"
+    group: analytics
+    mode: "0640"
+
+- name: Gerar .env do compose (POSTGRES_PASSWORD, INFLUXDB_*)
+  template:
+    src: compose.env.j2
+    dest: "{{ repo_dir }}/.env"
+    owner: "{{ deploy_user }}"
+    group: analytics
+    mode: "0640"
+
+- name: Garantir security.log pertence a analytics (0660 permite container escrever via GID)
+  file:
+    path: "{{ repo_dir }}/backend/security.log"
+    state: touch
+    owner: "{{ deploy_user }}"
+    group: analytics
+    mode: "0660"
+    modification_time: preserve
+    access_time: preserve
+
+- name: Garantir volume backend_keys existente (chaves RSA do sdk_jwt)
+  community.docker.docker_volume:
+    name: portifolio_backend_keys
+    state: present
+  become_user: "{{ deploy_user }}"
+
+- name: Chown do volume backend_keys para UID do container backend (10001:10001)
+  # Previne PermissionError ao gerar sdk_jwt_private.pem: docker cria o volume
+  # com root:root, mas o backend roda como UID 10001 (Dockerfile). Se o volume
+  # for recriado (down -v), esta task reaplica o owner.
+  command: >
+    docker run --rm
+    -v portifolio_backend_keys:/mnt
+    alpine:3.19
+    chown -R 10001:10001 /mnt
+  become_user: "{{ deploy_user }}"
+  changed_when: false
+
+# Cleanup de containers parados antes de subir a stack.
+#
+# Bug observado em 2026-05-02: `community.docker.docker_compose_v2` chama
+# `docker compose images --format json` pra detectar mudancas, mas se algum
+# container parado aponta pra imagem que foi removida (rebuild anterior +
+# image prune), o subprocess retorna "No such image: sha256:<id>" no stderr
+# e quebra o parser JSON. Erro: "Expecting value: line 1 column 1 (char 0)".
+# Prune antes de subir cura — remove containers parados orfaos sem afetar
+# os em execucao.
+- name: Limpar containers parados orfaos (evita bug compose images JSON)
+  command: docker container prune -f
+  become_user: "{{ deploy_user }}"
+  changed_when: false
+
+- name: Subir stack com docker compose
+  # NODE_AUTH_TOKEN vem do .env gerado acima — compose le e propaga via
+  # `secrets.NODE_AUTH_TOKEN.environment` em docker-compose.yml para os
+  # builds de `frontend` e `landing`. Nao precisa setar env no shell aqui.
+  community.docker.docker_compose_v2:
+    project_src: "{{ repo_dir }}"
+    state: present
+    build: always
+    recreate: auto
+  become_user: "{{ deploy_user }}"
+
+# ---- Rotacao de credenciais Postgres ----
+#
+# POSTGRES_PASSWORD do compose so e honrada no initdb (criacao do volume
+# portifolio_postgres_data). Em volume ja existente (re-deploy normal), o
+# role do banco mantem a senha antiga. Quando o vault rotaciona
+# `postgres_password`, o template re-gera backend/.env com a senha NOVA,
+# mas o cluster ainda autentica a ANTIGA — backend entra em crash-loop com
+# `FATAL: password authentication failed for user "portifolio"` e nginx
+# devolve 502 publicamente. Incidente real em 2026-05-01.
+#
+# Fix idempotente: apos compose up, executar ALTER USER dentro do container
+# Postgres pra alinhar a senha do role com a do .env. Conecta via socket
+# Unix interno (pg_hba default da imagem usa trust em conexoes locais —
+# dispensa senha pra atravessar o paradoxo do "preciso da senha pra trocar
+# a senha"). SQL passa via stdin pra evitar a senha aparecer em `ps`.
+
+- name: Aguardar Postgres pronto pra aceitar comandos administrativos
+  when: not ansible_check_mode
+  ansible.builtin.shell: |
+    docker exec portifolio-postgres pg_isready -U "{{ postgres_user }}" -d "{{ postgres_db }}" -q
+  register: pg_ready
+  retries: 10
+  delay: 3
+  until: pg_ready.rc == 0
+  changed_when: false
+  # Se nao ficar pronto em 30s, falha com mensagem clara em vez de tentar
+  # ALTER USER em container morto.
+  failed_when: pg_ready.rc != 0 and pg_ready.attempts | default(1) >= 10
+
+- name: Rotacionar senha do role Postgres pra refletir vault atual (idempotente)
+  when:
+    - not ansible_check_mode
+    - pg_ready.rc | default(1) == 0
+  community.docker.docker_container_exec:
+    container: portifolio-postgres
+    # community.docker >=5 espera `argv:` para lista; `command:` e str.
+    # Passar lista em `command` faz o modulo serializar como "[psql,...]"
+    # e o OCI falha com "executable file not found".
+    argv:
+      - psql
+      - -U
+      - "{{ postgres_user }}"
+      - -d
+      - "{{ postgres_db }}"
+      - -v
+      - ON_ERROR_STOP=1
+      - -X
+      - -q
+    stdin: |
+      ALTER USER "{{ postgres_user }}" WITH PASSWORD '{{ postgres_password }}';
+  no_log: true
+  # ALTER USER nao tem feedback fiel de "mudou ou nao" — sempre executa.
+  # Marcar changed_when:false evita poluir o diff de runs (rotacao normal
+  # de senha gera changed=true em todo apply, confunde quem le).
+  changed_when: false
+  become_user: "{{ deploy_user }}"
+
+# Audit 2026-05-02 / S2: backend conecta como role least-privilege em vez de
+# superuser. Esta task e idempotente:
+#   - cria portifolio_app se nao existir (LOGIN, sem SUPERUSER)
+#   - rotaciona senha pra refletir o vault
+#   - GRANTs minimos: CONNECT/USAGE/CREATE em public, CRUD em todas as tabelas
+#   - transfere OWNERSHIP de tabelas/sequences pro app role (necessario pq o
+#     schema_postgres.sql executado no boot do backend faz ALTER TABLE; sem
+#     ownership, "must be owner of table sites")
+- name: Garantir role portifolio_app least-privilege + transferir ownership
+  when:
+    - not ansible_check_mode
+    - pg_ready.rc | default(1) == 0
+  community.docker.docker_container_exec:
+    container: portifolio-postgres
+    argv:
+      - psql
+      - -U
+      - "{{ postgres_user }}"
+      - -d
+      - "{{ postgres_db }}"
+      - -v
+      - "ON_ERROR_STOP=1"
+      - -v
+      - "app_pwd={{ postgres_app_password }}"
+      - -v
+      - "app_user={{ postgres_app_user | default('portifolio_app') }}"
+      - -X
+      - -q
+    stdin: |
+      -- Fix 2026-05-04: bloco anterior usava DO $$ ... :'var' ... $$ mas
+      -- psql NAO interpola variaveis dentro de literais $$ ... $$ — o
+      -- conteudo entre dollar-quotes vai cru pro backend, que recebe
+      -- :'app_user' literal e cospe `syntax error at or near ":"`.
+      -- Refator: usa \gexec (psql meta-command que interpola :'var' antes
+      -- de executar cada linha do SELECT como SQL). Idempotencia
+      -- preservada via WHERE NOT EXISTS / EXISTS.
+
+      -- 1) Cria role se nao existir, ou ALTER ROLE pra refletir a senha
+      -- atual do vault.
+      SELECT format('CREATE ROLE %I LOGIN PASSWORD %L', :'app_user', :'app_pwd')
+      WHERE NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = :'app_user')
+      \gexec
+
+      SELECT format('ALTER ROLE %I WITH LOGIN PASSWORD %L', :'app_user', :'app_pwd')
+      FROM pg_roles WHERE rolname = :'app_user'
+      \gexec
+
+      -- 2) Grants minimos pro app role.
+      GRANT CONNECT ON DATABASE "{{ postgres_db }}" TO :"app_user";
+      GRANT USAGE, CREATE ON SCHEMA public TO :"app_user";
+      GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO :"app_user";
+      GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO :"app_user";
+
+      -- 3) Default privileges: tabelas/sequences criadas pelo super
+      -- (postgres_user) saem com grant pro app role automaticamente.
+      ALTER DEFAULT PRIVILEGES FOR ROLE "{{ postgres_user }}" IN SCHEMA public
+        GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO :"app_user";
+      ALTER DEFAULT PRIVILEGES FOR ROLE "{{ postgres_user }}" IN SCHEMA public
+        GRANT USAGE, SELECT ON SEQUENCES TO :"app_user";
+
+      -- 4) Transfer ownership de tabelas/sequences existentes.
+      SELECT format('ALTER TABLE public.%I OWNER TO %I', tablename, :'app_user')
+      FROM pg_tables WHERE schemaname = 'public'
+      \gexec
+
+      SELECT format('ALTER SEQUENCE public.%I OWNER TO %I', sequence_name, :'app_user')
+      FROM information_schema.sequences WHERE sequence_schema = 'public'
+      \gexec
+  no_log: true
+  changed_when: false
+  become_user: "{{ deploy_user }}"
+
+- name: Aguardar backend responder health (path canonico, sem /api/)
+  when: not ansible_check_mode
+  uri:
+    url: http://127.0.0.1:5000/health/app
+    status_code: 200
+  retries: 40
+  delay: 3
+  register: backend_ok
+  until: backend_ok.status == 200
+
+- name: Aguardar landing responder health
+  when: not ansible_check_mode
+  uri:
+    url: http://127.0.0.1:3002/_health
+    status_code: 200
+  retries: 20
+  delay: 3
+  register: landing_ok
+  until: landing_ok.status == 200
+
+- name: Aplicar retencao do bucket no InfluxDB
+  when: not ansible_check_mode
+  command: >
+    docker compose exec -T backend python scripts/configurar_retencao.py
+    --dias {{ influxdb_retencao_dias | default(90) }}
+  args:
+    chdir: "{{ repo_dir }}"
+  become_user: "{{ deploy_user }}"
+  register: retencao
+  changed_when: "'OK' in retencao.stdout"
+  failed_when:
+    - retencao.rc != 0
+    - "'nao encontrado' in retencao.stderr"

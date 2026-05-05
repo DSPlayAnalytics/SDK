@@ -1,0 +1,89 @@
+---
+/**
+ * EmptyState — bloco amigavel pra "sem dados / em breve / erro recuperavel".
+ *
+ * Uso:
+ *   <EmptyState
+ *     icon="📊"
+ *     title="Nenhum evento ainda"
+ *     description="Cole o snippet no seu site pra começar a coletar."
+ *     action={{ href: '/cliente/configuracoes#integracao', label: 'Pegar snippet' }}
+ *   />
+ *
+ * variant ajusta a borda/icon-bg. Default e' neutro (estado vazio comum);
+ * 'warning' pra ainda-em-construcao; 'danger' pra falha de carga.
+ */
+type Variant = 'neutral' | 'warning' | 'danger';
+
+interface Action {
+  href?: string;
+  label: string;
+  onclick?: string;        // expressao JS p/ caller — raro, prefer href
+  'data-cta'?: string;
+}
+
+interface Props {
+  icon?: string;
+  title: string;
+  description?: string;
+  action?: Action;
+  variant?: Variant;
+  class?: string;
+}
+
+const {
+  icon = 'ℹ️',
+  title,
+  description,
+  action,
+  variant = 'neutral',
+  class: extraClass,
+} = Astro.props;
+
+const variantBorder: Record<Variant, string> = {
+  neutral: 'border-slate-800 bg-slate-900/40',
+  warning: 'border-warning-500/30 bg-warning-500/5',
+  danger:  'border-danger-500/30 bg-danger-500/5',
+};
+
+const iconBg: Record<Variant, string> = {
+  neutral: 'bg-slate-800',
+  warning: 'bg-warning-500/15',
+  danger:  'bg-danger-500/15',
+};
+---
+<div
+  class:list={[
+    'flex flex-col items-center rounded-xl border px-6 py-10 text-center',
+    variantBorder[variant],
+    extraClass,
+  ]}
+  role={variant === 'danger' ? 'alert' : undefined}
+>
+  <span
+    class:list={[
+      'flex h-12 w-12 items-center justify-center rounded-full text-2xl',
+      iconBg[variant],
+    ]}
+    aria-hidden="true"
+  >
+    {icon}
+  </span>
+  <h3 class="mt-4 text-base font-semibold text-white">{title}</h3>
+  {description && <p class="mt-1 max-w-sm text-sm text-slate-400">{description}</p>}
+  {action && (
+    action.href ? (
+      <a
+        href={action.href}
+        data-cta={action['data-cta']}
+        class="mt-5 inline-flex items-center rounded-lg border border-slate-700 px-4 py-2 text-sm font-medium text-slate-100 transition hover:border-brand-400 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400"
+      >{action.label}</a>
+    ) : (
+      <button
+        type="button"
+        data-cta={action['data-cta']}
+        class="mt-5 inline-flex items-center rounded-lg border border-slate-700 px-4 py-2 text-sm font-medium text-slate-100 transition hover:border-brand-400 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400"
+      >{action.label}</button>
+    )
+  )}
+</div>

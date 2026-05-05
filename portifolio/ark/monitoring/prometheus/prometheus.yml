@@ -1,0 +1,42 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    ambiente: local
+
+# Alertmanager — recebe alertas firing do Prometheus, encaminha pra Slack.
+# Resolve o hostname `alertmanager` via DNS interno da rede docker
+# `portifolio-monitoring`.
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+            - 'alertmanager:9093'
+
+# Regras carregadas do diretorio bind-mounted (ver docker-compose).
+# `promtool check rules <file>` valida sintaxe.
+rule_files:
+  - '/etc/prometheus/rules/*.yml'
+
+scrape_configs:
+  - job_name: prometheus
+    static_configs:
+      - targets: ['localhost:9090']
+
+  - job_name: node-exporter
+    static_configs:
+      - targets: ['node-exporter:9100']
+
+  # Backend do portifolio — quando `/metrics` for exposto (ver docs/plano-backend.md D.2)
+  - job_name: portifolio-backend
+    metrics_path: /metrics
+    scrape_interval: 10s
+    static_configs:
+      - targets: ['backend:5000']
+    honor_labels: true
+
+  # InfluxDB expoe metricas proprias em /metrics quando habilitado
+  - job_name: influxdb
+    metrics_path: /metrics
+    static_configs:
+      - targets: ['influxdb:8086']

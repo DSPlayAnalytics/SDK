@@ -1,0 +1,146 @@
+# Dependabot — abre PRs semanais para upgrades de seguranca.
+# Endereca achado P1 da auditoria 2026-05-02 (CVE scan continuo).
+#
+# Cobre: requirements.txt do backend, package.json do frontend e landing,
+# Dockerfiles (imagens base) e GitHub Actions (versoes pinadas).
+#
+# Estrategia conservadora:
+#   - schedule weekly (segunda 06:00 UTC) — nao floods em deploy day.
+#   - open-pull-requests-limit baixo — evita atrito.
+#   - groups: agrupa upgrades minor/patch num PR so (testes rodam 1x).
+#   - allow apenas direct deps; transitivas vem com a direct.
+#
+# CVEs criticos sao automaticamente "security-advisories" (sem schedule)
+# e abrem PR imediato.
+
+version: 2
+updates:
+  # ---- backend Python ----
+  - package-ecosystem: "pip"
+    directory: "/backend"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+      timezone: "Etc/UTC"
+    open-pull-requests-limit: 5
+    labels:
+      - "deps"
+      - "backend"
+    groups:
+      python-minor-patch:
+        update-types:
+          - "minor"
+          - "patch"
+    commit-message:
+      prefix: "chore(deps)"
+      include: "scope"
+
+  # ---- frontend npm ----
+  - package-ecosystem: "npm"
+    directory: "/frontend"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:30"
+      timezone: "Etc/UTC"
+    open-pull-requests-limit: 5
+    labels:
+      - "deps"
+      - "frontend"
+    groups:
+      npm-minor-patch:
+        update-types:
+          - "minor"
+          - "patch"
+    commit-message:
+      prefix: "chore(deps)"
+      include: "scope"
+    # uuid v3/v5/v6 → v14 e breaking; deixa pra PR manual quando rodar
+    # npm audit fix --force (ver P1 doc).
+    ignore:
+      - dependency-name: "uuid"
+        update-types: ["version-update:semver-major"]
+
+  # ---- landing npm ----
+  - package-ecosystem: "npm"
+    directory: "/landing"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "07:00"
+      timezone: "Etc/UTC"
+    open-pull-requests-limit: 3
+    labels:
+      - "deps"
+      - "landing"
+    groups:
+      npm-minor-patch:
+        update-types:
+          - "minor"
+          - "patch"
+    commit-message:
+      prefix: "chore(deps)"
+      include: "scope"
+
+  # ---- Dockerfiles (imagens base) ----
+  - package-ecosystem: "docker"
+    directory: "/backend"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "07:30"
+      timezone: "Etc/UTC"
+    open-pull-requests-limit: 3
+    labels:
+      - "deps"
+      - "docker"
+    commit-message:
+      prefix: "chore(deps)"
+      include: "scope"
+
+  - package-ecosystem: "docker"
+    directory: "/frontend"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "08:00"
+      timezone: "Etc/UTC"
+    open-pull-requests-limit: 3
+    labels:
+      - "deps"
+      - "docker"
+    commit-message:
+      prefix: "chore(deps)"
+      include: "scope"
+
+  - package-ecosystem: "docker"
+    directory: "/landing"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "08:30"
+      timezone: "Etc/UTC"
+    open-pull-requests-limit: 3
+    labels:
+      - "deps"
+      - "docker"
+    commit-message:
+      prefix: "chore(deps)"
+      include: "scope"
+
+  # ---- GitHub Actions ----
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+      day: "monday"
+      time: "09:00"
+      timezone: "Etc/UTC"
+    open-pull-requests-limit: 3
+    labels:
+      - "deps"
+      - "github-actions"
+    commit-message:
+      prefix: "chore(deps)"
+      include: "scope"

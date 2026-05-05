@@ -1,0 +1,9 @@
+---
+- name: reload nginx
+  # Em container de teste sem systemd (teste-ambiente-a), o reload nao sobe
+  # (ansible_service_mgr aponta pro entrypoint do container, nao systemd).
+  # Em prod (Rocky com systemd como PID 1) o reload roda normal.
+  service:
+    name: nginx
+    state: reloaded
+  when: ansible_facts['service_mgr'] | default('') == 'systemd'

@@ -1,0 +1,1135 @@
+/* ==========================================================================
+   cards.css — layout mobile-first do portfolio.
+   - Defaults valem para >=320px (smartphone).
+   - Refinamentos via @media (min-width: 480px / 768px / 1024px).
+   - Mantem classes e IDs usados por ClasseAbout (heatmap) e ClasseHome.
+   - Nao toca vidoes de fundo (BackGround / TorreBackground).
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   1. Layout base — page-root e card-carousel
+   -------------------------------------------------------------------------- */
+
+.page-root {
+    display: flex;
+    /* column: o card-carousel e filho direto e ocupa flex: 1 para preencher
+       o espaco disponivel sem overflow — em row ele nao responderia ao height do pai */
+    flex-direction: column;
+    justify-content: flex-start;
+    align-items: center;
+    width: 100%;
+    /* height: 100% herda do SlideItem (100dvh) — nao redeclara 100dvh aqui para
+       evitar que padding some a viewport em browsers antigos com box-sizing errado */
+    height: 100%;
+    box-sizing: border-box;
+    /* padding-bottom reserva espaco para o pager (altura ~48px) + safe-area iOS */
+    padding: var(--spacing-2) var(--spacing-2) max(calc(var(--spacing-2) + 56px), calc(56px + env(safe-area-inset-bottom, 0px)));
+    /* overflow: hidden — o scroll interno fica em .card-content ou .projects-scrollable,
+       nunca no page-root; assim o page-root nao cria scroll global */
+    overflow: hidden;
+}
+
+.card-carousel {
+    width: 100%;
+    max-width: 720px;
+    background: rgba(241, 245, 249, 0.78);
+    backdrop-filter: blur(14px) saturate(140%);
+    -webkit-backdrop-filter: blur(14px) saturate(140%);
+    border: 1px solid rgba(255, 255, 255, 0.4);
+    color: #0b1220;
+    border-radius: var(--border-radius-lg);
+    box-shadow:
+        0 1px 2px rgba(15, 23, 42, 0.08),
+        0 8px 32px rgba(15, 23, 42, 0.18);
+    /* Fallback para iOS ≤15: overflow: hidden (aceita). Browsers modernos usam clip,
+       que mantém border-radius e clipa horizontalmente sem criar um scroll container
+       — ao contrário de hidden, não bloqueia overflow-y: auto dos filhos. */
+    overflow: hidden;
+    overflow: clip;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    /* flex: 1 + min-height: 0 fazem o card preencher todo o espaco disponivel no
+       page-root (100% - padding) sem jamais ultrapassar o limite do pai.
+       height: 100% e necessario como fallback para browsers que nao resolvem
+       flex: 1 corretamente quando o pai usa height: 100% em vez de altura absoluta —
+       garante que home-card, project-card e about-card tenham sempre a mesma altura. */
+    flex: 1;
+    min-height: 0;
+    height: 100%;
+}
+
+.card-header {
+    padding: var(--spacing-3);
+}
+
+.card-content {
+    padding: var(--spacing-2) var(--spacing-3);
+    color: #1f2937;
+    overflow-y: auto;
+    flex: 1;
+    font-size: var(--fluid-body);
+    line-height: var(--line-height-normal);
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+}
+
+.card-footer {
+    padding: var(--spacing-3);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: var(--fluid-body);
+}
+
+/* Card variants — sem min/max-height absolutos: a altura vem de flex: 1 no .card-carousel,
+   que preenche o espaco disponivel em .page-root sem ultrapassar o limite do pai */
+
+.home-card,
+.project-card,
+.about-card {
+    z-index: 40;
+}
+
+.about-card {
+    flex-direction: column;
+    gap: var(--spacing-3);
+    padding: var(--spacing-3);
+}
+
+@media (min-width: 768px) {
+    .page-root {
+        justify-content: flex-start;
+        align-items: flex-start;
+        /* padding lateral aumentado em desktop; bottom mantém espaço para o pager */
+        padding: var(--spacing-3) var(--spacing-4) max(calc(var(--spacing-3) + 56px), calc(56px + env(safe-area-inset-bottom, 0px)));
+        margin-left: 2%;
+    }
+
+    .card-carousel {
+        width: 70%;
+        max-width: none;
+    }
+
+    .about-card {
+        flex-direction: row;
+        align-items: stretch;
+    }
+}
+
+/* --------------------------------------------------------------------------
+   2. Home — header, content, footer com tech-btn
+   -------------------------------------------------------------------------- */
+
+.home-header h1 {
+    margin-top: 0;
+    color: #0f172a;
+}
+
+#home-content {
+    padding: var(--spacing-3);
+}
+
+#home-content > h3 {
+    color: #0f172a;
+    margin-top: var(--spacing-3);
+    font-size: var(--fluid-h3);
+}
+
+#home-content > p {
+    color: #1f2937;
+    text-align: justify;
+    margin-bottom: var(--spacing-3);
+    font-size: var(--fluid-body);
+}
+
+.container-home-footer {
+    padding-top: var(--spacing-2);
+    border-top: 1px solid rgba(15, 23, 42, 0.08);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 0.4) 100%);
+}
+
+.home-footer {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
+    gap: var(--spacing-2);
+    padding: var(--spacing-3);
+    justify-content: center;
+    align-items: stretch;
+}
+
+@media (min-width: 480px) {
+    .home-footer {
+        grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+        gap: var(--spacing-3);
+    }
+}
+
+/* --------------------------------------------------------------------------
+   3. Botoes utilitarios — tech-btn, primary-btn, card-actions
+   -------------------------------------------------------------------------- */
+
+.tech-btn {
+    display: inline-flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    gap: var(--spacing-2);
+    background: linear-gradient(135deg, #0f172a, #1e293b);
+    color: #f8fafc;
+    padding: 10px 12px;
+    min-height: var(--touch-target-min);
+    border-radius: var(--border-radius-md);
+    text-decoration: none;
+    font-size: var(--fluid-small);
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    box-shadow: 0 4px 12px rgba(15, 23, 42, 0.18);
+    transition:
+        transform 0.18s cubic-bezier(0.2, 0.9, 0.3, 1.4),
+        box-shadow 0.18s ease,
+        background 0.2s ease;
+    will-change: transform;
+}
+
+.tech-btn:hover,
+.tech-btn:focus-visible {
+    transform: translateY(-2px) scale(1.03);
+    box-shadow: 0 8px 18px rgba(15, 23, 42, 0.28);
+    outline: none;
+}
+
+.tech-btn:focus-visible {
+    box-shadow:
+        0 8px 18px rgba(15, 23, 42, 0.28),
+        0 0 0 3px rgba(99, 102, 241, 0.55);
+}
+
+.tech-btn:active {
+    transform: translateY(0) scale(0.98);
+}
+
+.tech-btn svg {
+    width: 22px;
+    height: 22px;
+    flex-shrink: 0;
+}
+
+@media (min-width: 768px) {
+    .tech-btn {
+        flex-direction: column;
+        padding: 12px 14px;
+        font-size: var(--font-size-sm);
+    }
+
+    .tech-btn svg {
+        width: 28px;
+        height: 28px;
+    }
+}
+
+.card-actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: var(--spacing-2);
+    margin-top: var(--spacing-3);
+    padding: var(--spacing-2) var(--spacing-3);
+}
+
+.primary-btn {
+    background: linear-gradient(135deg, #4f46e5 0%, #6366f1 100%);
+    color: #fff;
+    border: none;
+    padding: 12px 18px;
+    min-height: var(--touch-target-min);
+    border-radius: var(--border-radius-md);
+    cursor: pointer;
+    font-weight: 600;
+    font-size: var(--fluid-body);
+    box-shadow: 0 4px 14px rgba(79, 70, 229, 0.32);
+    transition:
+        transform 0.18s ease,
+        box-shadow 0.18s ease,
+        filter 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--spacing-1);
+}
+
+.primary-btn:hover,
+.primary-btn:focus-visible {
+    transform: translateY(-1px);
+    box-shadow: 0 8px 22px rgba(79, 70, 229, 0.45);
+    filter: brightness(1.05);
+    outline: none;
+}
+
+.primary-btn:focus-visible {
+    box-shadow:
+        0 8px 22px rgba(79, 70, 229, 0.45),
+        0 0 0 3px rgba(99, 102, 241, 0.55);
+}
+
+.primary-btn:active {
+    transform: translateY(0);
+    filter: brightness(0.95);
+}
+
+/* --------------------------------------------------------------------------
+   4. Skills — cards de habilidade modernos com microinteracoes
+   -------------------------------------------------------------------------- */
+
+.skills-row {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-2);
+    width: 100%;
+}
+
+.skills-list {
+    width: 100%;
+}
+
+.skill-badges {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: var(--spacing-2);
+    width: 100%;
+}
+
+@media (min-width: 480px) {
+    .skill-badges {
+        grid-template-columns: repeat(3, 1fr);
+    }
+}
+
+@media (min-width: 768px) {
+    .skill-badges {
+        display: flex;
+        flex-wrap: wrap;
+        gap: var(--spacing-2) var(--spacing-3);
+    }
+}
+
+.skill-badge {
+    --skill-glow: rgba(79, 70, 229, 0.35);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--spacing-2);
+    padding: 10px 14px;
+    min-height: var(--touch-target-min);
+    background: linear-gradient(135deg, #ffffff 0%, #f1f5f9 100%);
+    border: 1px solid rgba(15, 23, 42, 0.08);
+    border-radius: 999px;
+    box-shadow:
+        0 1px 2px rgba(15, 23, 42, 0.06),
+        0 6px 16px rgba(15, 23, 42, 0.08);
+    color: #0f172a;
+    font-weight: 600;
+    font-size: var(--fluid-small);
+    cursor: pointer;
+    position: relative;
+    overflow: hidden;
+    transition:
+        transform 0.22s cubic-bezier(0.2, 0.9, 0.3, 1.4),
+        box-shadow 0.22s ease,
+        border-color 0.2s ease,
+        background 0.25s ease;
+    animation: skillFadeIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+    will-change: transform;
+}
+
+.skill-badge::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: radial-gradient(circle at var(--mx, 50%) var(--my, 50%), rgba(99, 102, 241, 0.18), transparent 60%);
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    pointer-events: none;
+}
+
+.skill-badge:hover::before,
+.skill-badge:focus-visible::before {
+    opacity: 1;
+}
+
+.skill-badge:hover,
+.skill-badge:focus-visible {
+    transform: translateY(-3px) scale(1.04);
+    border-color: rgba(99, 102, 241, 0.4);
+    background: linear-gradient(135deg, #ffffff 0%, #eef2ff 100%);
+    box-shadow:
+        0 1px 2px rgba(15, 23, 42, 0.06),
+        0 12px 24px var(--skill-glow);
+    outline: none;
+}
+
+.skill-badge:focus-visible {
+    box-shadow:
+        0 12px 24px var(--skill-glow),
+        0 0 0 3px rgba(99, 102, 241, 0.55);
+}
+
+.skill-badge:active {
+    transform: translateY(-1px) scale(0.98);
+    transition-duration: 0.1s;
+}
+
+.skill-badge .skill-icon {
+    display: inline-flex;
+    align-items: center;
+    font-size: 18px;
+    color: #4f46e5;
+    transition: transform 0.3s cubic-bezier(0.2, 0.9, 0.3, 1.4), color 0.2s ease;
+}
+
+.skill-badge:hover .skill-icon,
+.skill-badge:focus-visible .skill-icon {
+    transform: rotate(-8deg) scale(1.15);
+}
+
+.skill-badge .skill-label {
+    font-size: var(--fluid-small);
+    line-height: 1;
+}
+
+/* Stagger animation para cards de skill */
+.skill-badge:nth-child(1) { animation-delay: 60ms; }
+.skill-badge:nth-child(2) { animation-delay: 120ms; }
+.skill-badge:nth-child(3) { animation-delay: 180ms; }
+.skill-badge:nth-child(4) { animation-delay: 240ms; }
+.skill-badge:nth-child(5) { animation-delay: 300ms; }
+.skill-badge:nth-child(6) { animation-delay: 360ms; }
+.skill-badge:nth-child(7) { animation-delay: 420ms; }
+.skill-badge:nth-child(8) { animation-delay: 480ms; }
+
+@keyframes skillFadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(12px) scale(0.92);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .skill-badge,
+    .skill-badge::before,
+    .skill-badge .skill-icon,
+    .tech-btn,
+    .primary-btn {
+        animation: none !important;
+        transition: none !important;
+    }
+
+    .skill-badge:hover,
+    .skill-badge:focus-visible {
+        transform: none;
+    }
+}
+
+/* --------------------------------------------------------------------------
+   5. About — colunas e conteudo
+   -------------------------------------------------------------------------- */
+
+.about-left {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--spacing-2);
+    text-align: center;
+    padding: 0 var(--spacing-2);
+}
+
+.about-right {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-2);
+    padding: 0 var(--spacing-2);
+    overflow-x: hidden;
+}
+
+@media (min-width: 768px) {
+    .about-left {
+        width: 34%;
+        padding: 0;
+        text-align: left;
+    }
+
+    .about-right {
+        width: 66%;
+        padding: 0;
+    }
+}
+
+.avatar {
+    width: 96px;
+    height: 96px;
+    object-fit: cover;
+    border-radius: 50%;
+    border: 3px solid rgba(255, 255, 255, 0.6);
+    box-shadow:
+        0 8px 24px rgba(15, 23, 42, 0.22),
+        0 0 0 4px rgba(99, 102, 241, 0.18);
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.avatar:hover {
+    transform: scale(1.04);
+    box-shadow:
+        0 12px 32px rgba(15, 23, 42, 0.28),
+        0 0 0 5px rgba(99, 102, 241, 0.32);
+}
+
+@media (min-width: 768px) {
+    .avatar {
+        width: 140px;
+        height: 140px;
+        border-radius: 18px;
+    }
+}
+
+.about-text-center {
+    text-align: center;
+}
+
+.about-h3-large {
+    margin: 0;
+    font-size: var(--fluid-h2);
+    color: #0f172a;
+}
+
+.about-meta {
+    margin: 4px 0 0 0;
+    color: #475569;
+    font-size: var(--fluid-small);
+    text-align: center;
+}
+
+.about-info-strong {
+    display: block;
+    margin-bottom: 6px;
+    font-size: var(--fluid-h3);
+    color: #0f172a;
+}
+
+.about-info-text {
+    color: #1f2937;
+    font-size: var(--fluid-body);
+    margin-top: 4px;
+    margin-bottom: var(--spacing-2);
+    font-weight: 500;
+}
+
+.about-paragraph {
+    color: #1f2937;
+    line-height: 1.6;
+    margin-top: var(--spacing-2);
+    font-size: var(--fluid-body);
+    text-align: left;
+}
+
+@media (min-width: 768px) {
+    .about-paragraph {
+        text-align: justify;
+    }
+}
+
+.about-h4-small {
+    margin-bottom: 8px;
+    font-size: var(--fluid-h3);
+    color: #0f172a;
+}
+
+/* Contact list — links com icone, evento visual */
+.contact-list {
+    width: 100%;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: var(--spacing-1);
+    margin-top: var(--spacing-2);
+}
+
+.contact-list a {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--spacing-1);
+    color: #0f172a;
+    text-decoration: none;
+    padding: 10px 8px;
+    min-height: var(--touch-target-min);
+    border-radius: var(--border-radius-md);
+    background: rgba(255, 255, 255, 0.7);
+    border: 1px solid rgba(15, 23, 42, 0.06);
+    font-size: var(--fluid-small);
+    font-weight: 600;
+    box-shadow: 0 4px 10px rgba(15, 23, 42, 0.08);
+    transition:
+        transform 0.18s ease,
+        background 0.2s ease,
+        box-shadow 0.2s ease,
+        color 0.2s ease;
+}
+
+.contact-list a:hover,
+.contact-list a:focus-visible {
+    transform: translateY(-2px);
+    background: linear-gradient(135deg, #4f46e5, #6366f1);
+    color: #fff;
+    box-shadow: 0 10px 20px rgba(79, 70, 229, 0.32);
+    outline: none;
+}
+
+.contact-list a:focus-visible {
+    box-shadow:
+        0 10px 20px rgba(79, 70, 229, 0.32),
+        0 0 0 3px rgba(99, 102, 241, 0.55);
+}
+
+.contact-list a svg {
+    width: 18px;
+    height: 18px;
+    flex-shrink: 0;
+}
+
+@media (min-width: 768px) {
+    .contact-list {
+        grid-template-columns: 1fr;
+        gap: var(--spacing-2);
+    }
+
+    .contact-list a {
+        justify-content: flex-start;
+        padding: 12px 16px;
+        font-size: var(--font-size-md);
+    }
+}
+
+.info-block {
+    width: 100%;
+    margin-top: var(--spacing-2);
+}
+
+.info-box {
+    padding: var(--spacing-2);
+    border-radius: var(--border-radius-md);
+    background: rgba(255, 255, 255, 0.55);
+    border: 1px solid rgba(15, 23, 42, 0.05);
+}
+
+@media (max-width: 480px) {
+    /* Em telas muito estreitas o info-block ocupa espaco demais */
+    .info-block {
+        display: none;
+    }
+}
+
+/* --------------------------------------------------------------------------
+   6. Projects — layout interno, cabecalho e grid de cards
+   -------------------------------------------------------------------------- */
+
+.projects-layout {
+    height: 100%;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    /* overflow: hidden fecha o eixo Y no wrapper do scrollable; sem isso o flex
+       container cresce indefinidamente e projects-scrollable nunca recebe scroll. */
+    overflow: hidden;
+}
+
+.projects-scrollable {
+    overflow-y: auto;
+    flex: 1;
+    /* min-height: 0 é crítico em flex: sem ele o filho flex nunca comprime abaixo
+       do seu conteúdo natural, então o container nunca precisa clipar — e scroll
+       nunca ocorre. Esta é a causa raiz mais comum de "overflow-y: auto não scrolla". */
+    min-height: 0;
+    padding-bottom: var(--spacing-3);
+    /* Garante que gestos verticais dentro da lista scrollavel nao sejam
+       interceptados pelo carousel externo em iOS Safari */
+    touch-action: pan-y;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-y: contain;
+}
+
+.projects-title {
+    margin: 0 0 var(--spacing-2) 0;
+    color: #0b1220;
+}
+
+.projects-lead {
+    color: #475569;
+    text-align: center;
+    margin-bottom: var(--spacing-2);
+    font-size: var(--fluid-small);
+}
+
+/* --------------------------------------------------------------------------
+   Projects — grid e cards individuais (project-tile, BEM)
+   -------------------------------------------------------------------------- */
+
+.projects-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: var(--spacing-3);
+    width: 100%;
+    padding: var(--spacing-2) 0;
+}
+
+@media (min-width: 600px) {
+    .projects-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: var(--spacing-3);
+    }
+}
+
+@media (min-width: 1024px) {
+    .projects-grid {
+        grid-template-columns: repeat(auto-fit, minmax(min(280px, 100%), 1fr));
+        gap: var(--spacing-4);
+    }
+}
+
+/* Project tile — flip card responsivo, sem altura fixa em desktop */
+
+.project-tile {
+    position: relative;
+    width: 100%;
+    max-width: 360px;
+    min-height: 260px;
+    margin: 0 auto;
+    cursor: pointer;
+    perspective: 1000px;
+    border-radius: var(--border-radius-lg);
+    outline: none;
+    transition: transform 0.22s cubic-bezier(0.2, 0.9, 0.3, 1.4);
+    will-change: transform;
+}
+
+.project-tile:hover {
+    transform: translateY(-4px);
+}
+
+.project-tile:focus-visible {
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.55);
+}
+
+.project-tile__face {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    padding: var(--spacing-3);
+    border-radius: var(--border-radius-lg);
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+    overflow: hidden;
+    box-shadow:
+        0 1px 2px rgba(15, 23, 42, 0.06),
+        0 8px 24px rgba(15, 23, 42, 0.16);
+}
+
+.project-tile__face--front {
+    background: linear-gradient(140deg, #ffffff 0%, #eef2ff 100%);
+    color: #0f172a;
+    gap: var(--spacing-2);
+    justify-content: space-between;
+}
+
+.project-tile__face--back {
+    background: linear-gradient(140deg, #1e293b 0%, #312e81 100%);
+    color: #f8fafc;
+    gap: var(--spacing-2);
+    justify-content: space-between;
+}
+
+.project-tile__header {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-1);
+}
+
+.project-tile__title {
+    margin: 0;
+    font-size: var(--fluid-h3);
+    font-weight: 700;
+    color: inherit;
+    line-height: 1.25;
+}
+
+.project-tile__title--invert {
+    color: #f8fafc;
+}
+
+.project-tile__description {
+    margin: 0;
+    font-size: var(--fluid-small);
+    color: #475569;
+    line-height: 1.45;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    text-align: left;
+}
+
+.project-tile__details {
+    margin: 0 0 var(--spacing-2) 0;
+    font-size: var(--fluid-small);
+    color: #cbd5e1;
+    line-height: 1.45;
+    text-align: left;
+}
+
+.project-tile__chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 0;
+    margin: 0;
+}
+
+.project-tile__chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 10px;
+    background: rgba(99, 102, 241, 0.12);
+    color: #312e81;
+    border: 1px solid rgba(99, 102, 241, 0.18);
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 600;
+    transition: background 0.2s ease, color 0.2s ease;
+}
+
+.project-tile:hover .project-tile__chip {
+    background: rgba(99, 102, 241, 0.2);
+}
+
+.project-tile__chip-icon {
+    display: inline-flex;
+    align-items: center;
+    font-size: 12px;
+}
+
+.project-tile__chip-label {
+    line-height: 1;
+}
+
+.project-tile__hint {
+    position: absolute;
+    bottom: 8px;
+    right: 12px;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: #94a3b8;
+    pointer-events: none;
+    opacity: 0.7;
+}
+
+.project-tile__back-body {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-1);
+    overflow: hidden;
+}
+
+.project-tile__features {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    color: #e2e8f0;
+    font-size: 12px;
+    line-height: 1.4;
+}
+
+.project-tile__features li {
+    position: relative;
+    padding-left: 14px;
+}
+
+.project-tile__features li::before {
+    content: '›';
+    position: absolute;
+    left: 0;
+    color: #818cf8;
+    font-weight: 700;
+}
+
+.project-tile__actions {
+    display: flex;
+    gap: var(--spacing-1);
+    flex-wrap: wrap;
+    padding: 0;
+    margin: 0;
+}
+
+.project-tile__action {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 8px 12px;
+    min-height: 36px;
+    border: none;
+    border-radius: var(--border-radius-md);
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    color: #fff;
+    transition: transform 0.18s ease, filter 0.18s ease, box-shadow 0.18s ease;
+}
+
+.project-tile__action--primary {
+    background: linear-gradient(135deg, #4f46e5, #6366f1);
+    box-shadow: 0 4px 10px rgba(79, 70, 229, 0.32);
+}
+
+.project-tile__action--success {
+    background: linear-gradient(135deg, #10b981, #14b8a6);
+    box-shadow: 0 4px 10px rgba(16, 185, 129, 0.32);
+}
+
+.project-tile__action:hover,
+.project-tile__action:focus-visible {
+    transform: translateY(-1px);
+    filter: brightness(1.08);
+    outline: none;
+}
+
+.project-tile__action:focus-visible {
+    box-shadow:
+        0 4px 10px rgba(15, 23, 42, 0.2),
+        0 0 0 3px rgba(99, 102, 241, 0.55);
+}
+
+.project-tile__action:active {
+    transform: translateY(0);
+    filter: brightness(0.95);
+}
+
+@media (min-width: 600px) {
+    .project-tile {
+        max-width: none;
+        min-height: 280px;
+    }
+}
+
+@media (min-width: 1024px) {
+    .project-tile {
+        min-height: 320px;
+    }
+
+    .project-tile__face {
+        padding: var(--spacing-4);
+    }
+}
+
+/* --------------------------------------------------------------------------
+   7. Carousel pager — barra inferior fora do card, com dots
+   -------------------------------------------------------------------------- */
+
+.carousel-pager {
+    position: absolute;
+    left: 50%;
+    bottom: max(env(safe-area-inset-bottom, 0px), 12px);
+    transform: translateX(-50%);
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    padding: 3px 6px;
+    background: rgba(15, 23, 42, 0.55);
+    backdrop-filter: blur(10px) saturate(140%);
+    -webkit-backdrop-filter: blur(10px) saturate(140%);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 999px;
+    box-shadow: 0 4px 12px rgba(15, 23, 42, 0.32);
+    z-index: 60;
+    pointer-events: auto;
+}
+
+.carousel-pager__btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    /* hit area mantida via padding — visualmente menor, toque seguro */
+    width: 32px;
+    height: 32px;
+    min-width: 32px;
+    min-height: 32px;
+    border: none;
+    border-radius: 50%;
+    background: transparent;
+    color: #f8fafc;
+    cursor: pointer;
+    font-size: 1.1rem;
+    line-height: 1;
+    padding: 0;
+    transition: background 0.2s ease, transform 0.18s ease, opacity 0.2s ease;
+}
+
+.carousel-pager__btn:hover:not(:disabled),
+.carousel-pager__btn:focus-visible:not(:disabled) {
+    background: rgba(255, 255, 255, 0.16);
+    transform: scale(1.06);
+    outline: none;
+}
+
+.carousel-pager__btn:focus-visible:not(:disabled) {
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.65);
+}
+
+.carousel-pager__btn:active:not(:disabled) {
+    transform: scale(0.94);
+}
+
+.carousel-pager__btn:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+}
+
+.carousel-pager__dots {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+}
+
+.carousel-pager__dot {
+    /* hit area expandida via ::before — visual não sofre sobreposição */
+    position: relative;
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    min-width: 6px;
+    min-height: 6px;
+    padding: 0;
+    margin: 0;
+    border: none;
+    border-radius: 50%;
+    background: rgba(248, 250, 252, 0.35);
+    cursor: pointer;
+    transition: background 0.2s ease, transform 0.2s ease, width 0.25s ease;
+}
+
+.carousel-pager__dot::before {
+    content: '';
+    position: absolute;
+    inset: -9px;
+}
+
+.carousel-pager__dot:hover,
+.carousel-pager__dot:focus-visible {
+    background: rgba(248, 250, 252, 0.7);
+    outline: none;
+}
+
+.carousel-pager__dot:focus-visible {
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.65);
+}
+
+.carousel-pager__dot--active {
+    background: linear-gradient(135deg, #6366f1, #a855f7);
+    width: 16px;
+    border-radius: 999px;
+    box-shadow: 0 0 8px rgba(99, 102, 241, 0.6);
+}
+
+@media (min-width: 768px) {
+    .carousel-pager {
+        bottom: max(env(safe-area-inset-bottom, 0px), 24px);
+        padding: 4px 10px;
+        gap: 4px;
+    }
+
+    .carousel-pager__btn {
+        width: 36px;
+        height: 36px;
+        font-size: 1.25rem;
+    }
+}
+
+/* --------------------------------------------------------------------------
+   8. Home — secoes com respiro visual entre blocos
+   -------------------------------------------------------------------------- */
+
+.home-section {
+    margin-bottom: var(--spacing-4);
+    padding-bottom: var(--spacing-3);
+    border-bottom: 1px solid rgba(15, 23, 42, 0.06);
+}
+
+.home-section:last-child {
+    border-bottom: none;
+    margin-bottom: 0;
+}
+
+.home-section > h3 {
+    color: #0f172a;
+    margin-bottom: var(--spacing-2);
+    font-size: var(--fluid-h3);
+}
+
+/* --------------------------------------------------------------------------
+   9. Projects — rodape fixo funcional
+   -------------------------------------------------------------------------- */
+
+.projects-footer-bar {
+    display: flex;
+    justify-content: center;
+    gap: var(--spacing-2);
+    padding: var(--spacing-2) var(--spacing-3) var(--spacing-3);
+    border-top: 1px solid rgba(15, 23, 42, 0.08);
+    background: linear-gradient(180deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.35) 100%);
+    flex-shrink: 0;
+}
+
+.projects-footer-bar .primary-btn {
+    text-decoration: none;
+}
+
+/* --------------------------------------------------------------------------
+   10. Reducao de movimento — respeitar preferencia do usuario
+   -------------------------------------------------------------------------- */
+
+@media (prefers-reduced-motion: reduce) {
+    /* Transicao do flip card */
+    .project-tile,
+    .project-tile__face {
+        transition: none !important;
+    }
+
+    /* Transicao do carrossel */
+    .carousel-root [style*="transition"] {
+        transition: none !important;
+    }
+}
+
+/* --------------------------------------------------------------------------
+   11. Garantia de seguranca para o video de fundo — nunca capturar pointer
+   -------------------------------------------------------------------------- */
+
+.background-video,
+.entrada-video {
+    pointer-events: none;
+}

@@ -1,0 +1,356 @@
+---
+/**
+ * Painel — home logada do cliente. Visao geral em uma tela:
+ *   - 4 KPIs (eventos hoje, % quota, cardinalidade, plano)
+ *   - 1 ChartCard placeholder (eventos 24h, requer endpoint backend
+ *     ainda nao existente — listado como pendencia abaixo)
+ *   - Atividade recente (placeholder com EmptyState)
+ *
+ * Auth: depende do cookie cliente_session. Se ausente/invalido, redirect
+ * pra /cliente/login. Se SITE_NAO_ENCONTRADO, redirect pra cadastro.
+ *
+ * Pendencias backend (sem isto, partes ficam em EmptyState):
+ *   - GET /cliente/metricas/serie?janela=24h&granularidade=1h
+ *     -> [{ts, eventos}] pra ChartCard 24h e sparklines
+ *   - GET /cliente/metricas/atividade?limite=10
+ *     -> ultimos eventos pra timeline
+ */
+import Base from '~/layouts/Base.astro';
+import Breadcrumbs from '~/components/ui/Breadcrumbs.astro';
+import Button from '~/components/ui/Button.astro';
+import MetricCard from '~/components/ui/MetricCard.astro';
+import ChartCard from '~/components/ui/ChartCard.astro';
+import EmptyState from '~/components/ui/EmptyState.astro';
+---
+<Base
+  title="Painel"
+  description="Visão geral do seu site — eventos, quota e plano."
+  noindex={true}
+>
+  <section class="mx-auto max-w-6xl px-4 py-10 sm:px-6">
+    <Breadcrumbs items={[{ label: 'Painel' }]} class="mb-4" />
+    <header class="flex flex-wrap items-end justify-between gap-4">
+      <div>
+        <h1 class="text-3xl font-bold text-white">Painel</h1>
+        <p
+          id="painel-subheader"
+          class="mt-1 text-sm text-slate-400"
+        >Carregando dados do seu site…</p>
+      </div>
+      <div class="flex items-center gap-3">
+        <!-- Indicador "live" — pulsa quando polling esta ativo. Hidden ate
+             carregar pela primeira vez. -->
+        <span
+          id="painel-live-pill"
+          class="hidden inline-flex items-center gap-1.5 rounded-full bg-success-500/15 px-2 py-0.5 text-xs font-medium text-success-200 ring-1 ring-inset ring-success-500/30"
+          aria-live="polite"
+        >
+          <span class="relative flex h-1.5 w-1.5" aria-hidden="true">
+            <span class="absolute inset-0 animate-ping rounded-full bg-success-400 opacity-75"></span>
+            <span class="relative h-1.5 w-1.5 rounded-full bg-success-400"></span>
+          </span>
+          <span id="painel-live-text">live</span>
+        </span>
+        <Button href="/cliente/configuracoes" variant="secondary" data-cta="painel-configuracoes">Configurações</Button>
+      </div>
+    </header>
+
+    <!-- ESTADO INICIAL: skeleton + escondido apos carregar -->
+    <div id="painel-loading" class="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4" aria-busy="true">
+      {[0, 1, 2, 3].map(() => (
+        <div class="h-32 animate-pulse rounded-xl border border-slate-800 bg-slate-900/40"></div>
+      ))}
+    </div>
+
+    <!-- ESTADO ERRO: erro de rede ou auth -->
+    <div id="painel-erro" class="mt-8 hidden">
+      <EmptyState
+        variant="danger"
+        icon="⚠️"
+        title="Não foi possível carregar"
+        description="Verifique sua conexão ou tente fazer login de novo."
+        action={{ href: '/cliente/login', label: 'Ir pro login', 'data-cta': 'painel-erro-login' }}
+      />
+    </div>
+
+    <!-- ESTADO PRONTO -->
+    <div id="painel-conteudo" class="mt-8 hidden space-y-8">
+
+      <!-- KPIs -->
+      <section aria-label="Indicadores chave">
+        <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+
+          <MetricCard
+            label="Eventos hoje"
+            value="—"
+            class="js-card-eventos-hoje"
+            hint="Volume bruto de eventos coletados desde a meia-noite"
+          />
+
+          <MetricCard
+            label="Quota do dia"
+            value="—"
+            class="js-card-quota"
+            hint="Quanto da sua quota diária você já usou"
+          />
+
+          <MetricCard
+            label="Cardinalidade tags"
+            value="—"
+            class="js-card-cardinalidade"
+            hint="Valores únicos de tags. Limite alto = risco de bloqueio."
+          />
+
+          <MetricCard
+            label="Plano"
+            value="—"
+            class="js-card-plano"
+            hint="Plano ativo e ambiente do site"
+          />
+
+        </div>
+      </section>
+
+      <!-- CHART 24h — pendencia de endpoint backend -->
+      <ChartCard
+        title="Eventos por hora"
+        subtitle="Últimas 24 horas"
+        state="empty"
+        emptyTitle="Em breve neste painel"
+        emptyDescription="Endpoint /cliente/metricas/serie ainda em desenvolvimento. Por enquanto, gráficos completos no Grafana."
+        action={{ href: 'https://app.dsplayground.com.br', label: 'Abrir no Grafana', 'data-cta': 'painel-grafana' }}
+        height="lg"
+      >
+        <canvas id="js-chart-24h" aria-label="Gráfico de eventos por hora"></canvas>
+      </ChartCard>
+
+      <!-- ATIVIDADE RECENTE — pendencia tambem -->
+      <section aria-label="Atividade recente">
+        <h2 class="text-lg font-semibold text-white">Atividade recente</h2>
+        <p class="mt-1 text-sm text-slate-400">Ultimos eventos coletados, em tempo real.</p>
+        <div class="mt-4">
+          <EmptyState
+            variant="warning"
+            icon="🚧"
+            title="Em construção"
+            description="A timeline em tempo real chega na próxima onda — ela depende de um endpoint backend que está em desenvolvimento."
+          />
+        </div>
+      </section>
+
+      <!-- ATALHOS -->
+      <section aria-label="Atalhos">
+        <h2 class="text-lg font-semibold text-white">Atalhos</h2>
+        <div class="mt-4 grid gap-3 sm:grid-cols-3">
+          <a
+            href="/cliente/configuracoes"
+            data-cta="painel-atalho-keys"
+            class="group rounded-xl border border-slate-800 bg-slate-900/40 p-4 transition hover:border-brand-400 hover:bg-slate-900/60 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400"
+          >
+            <p class="text-sm font-semibold text-white">🔑 Suas chaves</p>
+            <p class="mt-1 text-xs text-slate-400">Copiar publishable key e configurar SDK</p>
+          </a>
+          <a
+            href="/cliente/exportar"
+            data-cta="painel-atalho-exportar"
+            class="group rounded-xl border border-slate-800 bg-slate-900/40 p-4 transition hover:border-brand-400 hover:bg-slate-900/60 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400"
+          >
+            <p class="text-sm font-semibold text-white">📥 Exportar dados</p>
+            <p class="mt-1 text-xs text-slate-400">CSV diário com seus eventos</p>
+          </a>
+          <a
+            href="/precos"
+            data-cta="painel-atalho-precos"
+            class="group rounded-xl border border-slate-800 bg-slate-900/40 p-4 transition hover:border-brand-400 hover:bg-slate-900/60 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400"
+          >
+            <p class="text-sm font-semibold text-white">💎 Mudar de plano</p>
+            <p class="mt-1 text-xs text-slate-400">Comparar Free / Pro / Business</p>
+          </a>
+        </div>
+      </section>
+    </div>
+  </section>
+
+  <script>
+    import { obterConfiguracoes } from '~/lib/api';
+    import { API_URL } from '~/config';
+    import { showToast } from '~/lib/toast';
+
+    const elLoading = document.getElementById('painel-loading')!;
+    const elErro = document.getElementById('painel-erro')!;
+    const elConteudo = document.getElementById('painel-conteudo')!;
+    const elSubheader = document.getElementById('painel-subheader')!;
+
+    function fmtNumero(n: number): string {
+      return new Intl.NumberFormat('pt-BR').format(n);
+    }
+
+    function pct(parte: number, todo: number): number {
+      if (todo <= 0) return 0;
+      return Math.min(100, (parte / todo) * 100);
+    }
+
+    /** Substitui valor renderizado num MetricCard via class js-card-*. */
+    function setMetric(klass: string, value: string, deltaHTML?: string) {
+      const card = document.querySelector(`.${klass}`);
+      if (!card) return;
+      const valueEl = card.querySelector('p.text-3xl');
+      if (valueEl) valueEl.textContent = value;
+      if (deltaHTML !== undefined) {
+        // remove delta antigo se houver
+        const oldDelta = card.querySelector('p.flex.items-center');
+        if (oldDelta) oldDelta.remove();
+        if (deltaHTML) {
+          const wrapper = document.createElement('div');
+          wrapper.innerHTML = deltaHTML;
+          if (valueEl?.parentNode) {
+            valueEl.parentNode.insertBefore(wrapper.firstChild!, valueEl.nextSibling);
+          }
+        }
+      }
+    }
+
+    function classeQuota(percentual: number): string {
+      if (percentual >= 95) return 'text-danger-300';
+      if (percentual >= 80) return 'text-warning-300';
+      return 'text-success-300';
+    }
+
+    function direcaoQuota(percentual: number): 'up' | 'down' | 'flat' {
+      if (percentual >= 95) return 'down';   // ruim quando alto
+      if (percentual >= 80) return 'flat';
+      return 'up';
+    }
+
+    async function carregar() {
+      const r = await obterConfiguracoes({ apiUrl: API_URL });
+
+      if (!r.ok) {
+        elLoading.classList.add('hidden');
+        if (r.code === 'NAO_AUTENTICADO') {
+          window.location.href = '/cliente/login?next=/cliente/painel';
+          return;
+        }
+        if (r.code === 'SITE_NAO_ENCONTRADO') {
+          window.location.href = '/cliente/cadastro?welcome=true';
+          return;
+        }
+        elErro.classList.remove('hidden');
+        showToast('Erro ao carregar painel — ' + r.message, { variant: 'error', durationMs: 0 });
+        return;
+      }
+
+      elSubheader.textContent = `${r.site.nome} · ${r.site.ambiente}`;
+
+      // KPI 1 — eventos hoje (sem delta histórico ainda — pendência backend)
+      setMetric('js-card-eventos-hoje', fmtNumero(r.consumo.eventos_hoje));
+
+      // KPI 2 — % quota dia. eventos_por_dia esta no quota.
+      const percentDia = pct(r.consumo.eventos_hoje, r.quota.eventos_por_dia);
+      setMetric(
+        'js-card-quota',
+        `${percentDia.toFixed(1)}%`,
+        `<p class="mt-1 flex items-center gap-1 text-xs font-medium ${classeQuota(percentDia)}">
+          <span aria-hidden="true">${direcaoQuota(percentDia) === 'up' ? '↑' : direcaoQuota(percentDia) === 'down' ? '↓' : '→'}</span>
+          <span>${fmtNumero(r.consumo.eventos_hoje)} / ${fmtNumero(r.quota.eventos_por_dia)}</span>
+          <span class="text-slate-500">eventos</span>
+        </p>`,
+      );
+
+      // KPI 3 — cardinalidade
+      const percentCard = pct(r.cardinalidade.atual, r.cardinalidade.limite);
+      if (r.cardinalidade.limite > 0) {
+        setMetric(
+          'js-card-cardinalidade',
+          `${percentCard.toFixed(0)}%`,
+          `<p class="mt-1 flex items-center gap-1 text-xs font-medium ${classeQuota(percentCard)}">
+            <span aria-hidden="true">${direcaoQuota(percentCard) === 'up' ? '↑' : direcaoQuota(percentCard) === 'down' ? '↓' : '→'}</span>
+            <span>${fmtNumero(r.cardinalidade.atual)} / ${fmtNumero(r.cardinalidade.limite)}</span>
+            <span class="text-slate-500">tags</span>
+          </p>`,
+        );
+      } else {
+        setMetric('js-card-cardinalidade', 'n/d', '');
+      }
+
+      // KPI 4 — plano + ambiente
+      setMetric(
+        'js-card-plano',
+        r.site.plano,
+        `<p class="mt-1 text-xs font-medium text-slate-400">${r.site.ambiente}</p>`,
+      );
+
+      elLoading.classList.add('hidden');
+      elConteudo.classList.remove('hidden');
+
+      // Live polling — refresh discreto a cada 30s. Mantem KPIs vivos
+      // sem WebSocket reverso (SDK so envia pra cima). Pausa quando aba
+      // oculta pra poupar bateria/rede. Mostra delta no pill.
+      iniciarLivePolling(r.consumo.eventos_hoje);
+    }
+
+    let lastLiveSnapshot = 0;
+    let livePollTimer: ReturnType<typeof setInterval> | null = null;
+    const LIVE_POLL_MS = 30_000;
+
+    function pararLivePolling() {
+      if (livePollTimer) {
+        clearInterval(livePollTimer);
+        livePollTimer = null;
+      }
+    }
+
+    async function tickLive() {
+      const r = await obterConfiguracoes({ apiUrl: API_URL });
+      if (!r.ok) return; // erro silencioso, mantem ultimos valores
+
+      const atual = r.consumo.eventos_hoje;
+      const delta = atual - lastLiveSnapshot;
+      lastLiveSnapshot = atual;
+
+      // Atualiza KPI eventos_hoje + quota %
+      setMetric('js-card-eventos-hoje', new Intl.NumberFormat('pt-BR').format(atual));
+      const percentDia = pct(atual, r.quota.eventos_por_dia);
+      setMetric(
+        'js-card-quota',
+        `${percentDia.toFixed(1)}%`,
+        `<p class="mt-1 flex items-center gap-1 text-xs font-medium ${classeQuota(percentDia)}">
+          <span aria-hidden="true">${direcaoQuota(percentDia) === 'up' ? '↑' : direcaoQuota(percentDia) === 'down' ? '↓' : '→'}</span>
+          <span>${new Intl.NumberFormat('pt-BR').format(atual)} / ${new Intl.NumberFormat('pt-BR').format(r.quota.eventos_por_dia)}</span>
+          <span class="text-slate-500">eventos</span>
+        </p>`,
+      );
+
+      // Pill atualiza com delta visivel
+      const liveText = document.getElementById('painel-live-text');
+      if (liveText) {
+        liveText.textContent = delta > 0 ? `+${delta} novos` : 'live';
+      }
+    }
+
+    function iniciarLivePolling(eventosInicial: number) {
+      pararLivePolling();
+      lastLiveSnapshot = eventosInicial;
+
+      const pill = document.getElementById('painel-live-pill');
+      if (pill) pill.classList.remove('hidden');
+
+      livePollTimer = setInterval(tickLive, LIVE_POLL_MS);
+    }
+
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) {
+        pararLivePolling();
+      } else if (!elConteudo.classList.contains('hidden') && lastLiveSnapshot > 0) {
+        // Retomou foco — re-inicia polling com snapshot atual.
+        livePollTimer = setInterval(tickLive, LIVE_POLL_MS);
+      }
+    });
+
+    carregar().catch((e) => {
+      console.error('painel: erro inesperado', e);
+      elLoading.classList.add('hidden');
+      elErro.classList.remove('hidden');
+    });
+  </script>
+</Base>
