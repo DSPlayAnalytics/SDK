@@ -1,6 +1,6 @@
 {
   "name": "@danpqdan/dsplayground-analytics-sdk",
-  "version": "0.4.5",
+  "version": "0.4.6",
   "description": "SDK de analytics em tempo real (Web Vitals, eventos de navegacao, custom events). Envia via Socket.IO autenticado por publishable_key + JWT.",
   "type": "module",
   "main": "./dist/index.cjs",
