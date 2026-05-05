@@ -1,0 +1,68 @@
+---
+/**
+ * Breadcrumbs — trilha hierárquica padrão SaaS, com schema.org
+ * BreadcrumbList inline pra SEO (mesmo em paginas noindex, ajuda
+ * crawlers internos / acessibilidade assistiva).
+ *
+ * O ultimo item nao e' link — e' a pagina atual com aria-current="page".
+ * Separador `/` e' aria-hidden (nao e' lido por screen reader).
+ *
+ * Uso:
+ *   <Breadcrumbs items={[
+ *     { href: '/cliente/painel', label: 'Painel' },
+ *     { href: '/cliente/configuracoes', label: 'Configurações' },
+ *     { label: 'Chaves de API' },  // sem href = current
+ *   ]} />
+ */
+import { SITE_URL } from '~/config';
+
+interface Item {
+  href?: string;
+  label: string;
+}
+
+interface Props {
+  items: Item[];
+  class?: string;
+}
+
+const { items, class: extraClass } = Astro.props;
+
+// Schema.org BreadcrumbList — position 1-indexed
+const ldJson = {
+  '@context': 'https://schema.org',
+  '@type': 'BreadcrumbList',
+  itemListElement: items.map((it, idx) => ({
+    '@type': 'ListItem',
+    position: idx + 1,
+    name: it.label,
+    ...(it.href ? { item: new URL(it.href, SITE_URL).toString() } : {}),
+  })),
+};
+---
+<nav aria-label="Trilha de navegação" class:list={['text-sm', extraClass]}>
+  <ol class="flex flex-wrap items-center gap-1.5 text-slate-400">
+    {items.map((item, idx) => {
+      const isLast = idx === items.length - 1;
+      return (
+        <li class="flex items-center gap-1.5">
+          {idx > 0 && (
+            <span aria-hidden="true" class="text-slate-600">/</span>
+          )}
+          {item.href && !isLast ? (
+            <a
+              href={item.href}
+              class="rounded transition hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950"
+            >{item.label}</a>
+          ) : (
+            <span
+              aria-current={isLast ? 'page' : undefined}
+              class:list={[isLast ? 'text-slate-200 font-medium' : 'text-slate-400']}
+            >{item.label}</span>
+          )}
+        </li>
+      );
+    })}
+  </ol>
+</nav>
+<script is:inline type="application/ld+json" set:html={JSON.stringify(ldJson)} />

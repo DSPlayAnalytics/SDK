@@ -1,0 +1,154 @@
+---
+/**
+ * Tabs — tablist acessivel (WAI-ARIA APG pattern).
+ *
+ * Uso:
+ *   <Tabs tabs={[{id:'visao', label:'Visao geral'}, {id:'keys', label:'Chaves'}]} hashSync>
+ *     <Fragment slot="visao"> ... </Fragment>
+ *     <Fragment slot="keys">  ... </Fragment>
+ *   </Tabs>
+ *
+ * Comportamento:
+ *   - aria-selected/aria-controls/aria-labelledby coerentes
+ *   - roving tabindex (0 ativo, -1 inativos)
+ *   - setas Esq/Dir/Home/End navegam (foco + ativacao automatica — pattern
+ *     "automatic activation" do APG, adequado quando trocar painel e' barato)
+ *   - hashSync opcional: location.hash <-> tab ativa (deep link)
+ *
+ * Limitacao SSG: render inicial fixa o `defaultTab` ou primeiro item. Se
+ * `hashSync` estiver ligado, o script no client re-sincroniza com a URL
+ * em load. Painel inativo = `hidden`, nao `display:none` via class
+ * (evita FOUC e respeita usuarios que desabilitam JS).
+ */
+interface Tab {
+  id: string;
+  label: string;
+}
+
+interface Props {
+  tabs: Tab[];
+  defaultTab?: string;
+  hashSync?: boolean;
+  ariaLabel?: string;
+  class?: string;
+}
+
+const {
+  tabs,
+  defaultTab,
+  hashSync = false,
+  ariaLabel = 'Abas',
+  class: extraClass,
+} = Astro.props;
+
+const activeTab = defaultTab ?? tabs[0]?.id;
+
+// Astro nao aceita `<slot name={t.id} />` (nome dinamico) — workaround:
+// renderizar slots por ID via API runtime e injetar com set:html. O conteudo
+// vem do proprio compilador Astro, ja escapado/seguro pra essa fonte.
+const slotHtml: Record<string, string> = {};
+for (const t of tabs) {
+  if (Astro.slots.has(t.id)) {
+    slotHtml[t.id] = await Astro.slots.render(t.id);
+  } else {
+    slotHtml[t.id] = '';
+  }
+}
+---
+<div class:list={['ds-tabs', extraClass]} data-hash-sync={hashSync ? 'true' : 'false'}>
+  <!-- Mobile (overflow-x-auto): scroll horizontal quando tabs estouram a
+       largura. Desktop: layout normal. whitespace-nowrap impede quebra
+       de label dentro de cada tab; flex-shrink-0 mantem tamanho minimo.
+       Migracao de flex-wrap (empilhava feio com 7+ abas em 375px). -->
+  <div role="tablist" aria-label={ariaLabel} class="-mx-1 flex gap-1 overflow-x-auto border-b border-slate-800 px-1">
+    {tabs.map((t) => (
+      <button
+        type="button"
+        role="tab"
+        id={`tab-${t.id}`}
+        aria-controls={`panel-${t.id}`}
+        aria-selected={t.id === activeTab ? 'true' : 'false'}
+        tabindex={t.id === activeTab ? 0 : -1}
+        data-tab-id={t.id}
+        class:list={[
+          '-mb-px flex-shrink-0 whitespace-nowrap rounded-t px-4 py-2 text-sm font-medium transition border-b-2',
+          'focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400',
+          t.id === activeTab
+            ? 'border-brand-400 text-white'
+            : 'border-transparent text-slate-400 hover:text-slate-200',
+        ]}
+      >
+        {t.label}
+      </button>
+    ))}
+  </div>
+  <div class="mt-4">
+    {tabs.map((t) => (
+      <div
+        role="tabpanel"
+        id={`panel-${t.id}`}
+        aria-labelledby={`tab-${t.id}`}
+        hidden={t.id !== activeTab}
+        tabindex={0}
+        set:html={slotHtml[t.id]}
+      />
+    ))}
+  </div>
+</div>
+
+<script>
+  // Inicializacao multi-instancia: cada `.ds-tabs` na pagina opera de forma
+  // isolada. Idempotente — se o script rodar duas vezes (HMR), reanexa
+  // listeners no mesmo no sem efeito visivel pro usuario.
+  document.querySelectorAll<HTMLElement>('.ds-tabs').forEach((root) => {
+    const tabs = Array.from(root.querySelectorAll<HTMLButtonElement>('[role="tab"]'));
+    const panels = Array.from(root.querySelectorAll<HTMLElement>('[role="tabpanel"]'));
+    const hashSync = root.dataset.hashSync === 'true';
+
+    function activate(id: string, focus = false) {
+      tabs.forEach((tab) => {
+        const isActive = tab.dataset.tabId === id;
+        tab.setAttribute('aria-selected', String(isActive));
+        tab.tabIndex = isActive ? 0 : -1;
+        tab.classList.toggle('border-brand-400', isActive);
+        tab.classList.toggle('text-white', isActive);
+        tab.classList.toggle('border-transparent', !isActive);
+        tab.classList.toggle('text-slate-400', !isActive);
+        if (isActive && focus) tab.focus();
+      });
+      panels.forEach((panel) => {
+        panel.hidden = panel.id !== `panel-${id}`;
+      });
+      if (hashSync) {
+        history.replaceState(null, '', `#${id}`);
+      }
+    }
+
+    tabs.forEach((tab) => {
+      tab.addEventListener('click', () => {
+        const id = tab.dataset.tabId;
+        if (id) activate(id);
+      });
+      tab.addEventListener('keydown', (e) => {
+        const idx = tabs.indexOf(tab);
+        let next: number | null = null;
+        if (e.key === 'ArrowRight') next = (idx + 1) % tabs.length;
+        else if (e.key === 'ArrowLeft') next = (idx - 1 + tabs.length) % tabs.length;
+        else if (e.key === 'Home') next = 0;
+        else if (e.key === 'End') next = tabs.length - 1;
+        if (next !== null) {
+          e.preventDefault();
+          const nextId = tabs[next]?.dataset.tabId;
+          if (nextId) activate(nextId, true);
+        }
+      });
+    });
+
+    if (hashSync && location.hash) {
+      const hashId = location.hash.slice(1);
+      if (tabs.some((t) => t.dataset.tabId === hashId)) {
+        activate(hashId);
+      }
+    }
+  });
+</script>

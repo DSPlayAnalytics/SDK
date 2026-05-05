@@ -1,0 +1,52 @@
+---
+import { SITE_NAME, SITE_URL } from '~/config';
+
+interface Props {
+  title: string;
+  description: string;
+  canonical?: string;
+  ogImage?: string;
+  noindex?: boolean;
+}
+
+const {
+  title,
+  description,
+  canonical,
+  // SVG decent pros principais crawlers (Twitter/X, Facebook, LinkedIn aceita
+  // SVG desde 2023). PNG gerado a partir do SVG fica como upgrade futuro
+  // quando tivermos pipeline de imagem (sharp/satori).
+  ogImage = '/og-default.svg',
+  noindex = false,
+} = Astro.props;
+
+const canonicalUrl = canonical ?? new URL(Astro.url.pathname, SITE_URL).toString();
+const fullTitle = title === SITE_NAME ? title : `${title} — ${SITE_NAME}`;
+---
+<title>{fullTitle}</title>
+<meta name="description" content={description} />
+<link rel="canonical" href={canonicalUrl} />
+{noindex && <meta name="robots" content="noindex,nofollow" />}
+
+<meta property="og:type" content="website" />
+<meta property="og:site_name" content={SITE_NAME} />
+<meta property="og:title" content={fullTitle} />
+<meta property="og:description" content={description} />
+<meta property="og:url" content={canonicalUrl} />
+<meta property="og:image" content={new URL(ogImage, SITE_URL).toString()} />
+
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content={fullTitle} />
+<meta name="twitter:description" content={description} />
+<meta name="twitter:image" content={new URL(ogImage, SITE_URL).toString()} />
+
+<script is:inline type="application/ld+json" set:html={JSON.stringify({
+  '@context': 'https://schema.org',
+  '@type': 'SoftwareApplication',
+  name: SITE_NAME,
+  applicationCategory: 'BusinessApplication',
+  operatingSystem: 'Web',
+  description,
+  url: SITE_URL,
+  offers: { '@type': 'Offer', price: '0', priceCurrency: 'BRL' },
+})} />

@@ -1,0 +1,127 @@
+---
+import Base from '~/layouts/Base.astro';
+---
+<Base
+  title="Embed Test (Fase 1)"
+  description="Página interna de teste — embeda widget de gráficos via iframe pra validar fluxo de token e CSP."
+  noindex={true}
+>
+  <section class="mx-auto max-w-3xl px-4 py-16 sm:px-6">
+    <div class="card">
+      <h1 class="text-2xl font-bold text-white">Embed test</h1>
+      <p class="mt-1 text-sm text-slate-400">
+        Página interna pra dogfood do embed (Fase 1, ver
+        <code class="rounded bg-slate-800 px-1 py-0.5">ark/docs/embed-iframe.md</code>).
+        Você precisa estar logado em <code class="rounded bg-slate-800 px-1 py-0.5">dsplayground.com.br</code>
+        — o cookie é usado pra emitir um token curto que vai pro <code class="rounded bg-slate-800 px-1 py-0.5">src</code> do iframe.
+      </p>
+
+      <div id="status" class="mt-6 text-sm text-slate-400" role="status">Solicitando token…</div>
+      <div id="erro" role="alert" class="mt-4 hidden rounded-md border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm text-red-200"></div>
+
+      <div id="iframe-wrapper" class="mt-6 hidden">
+        <iframe
+          id="embed-iframe"
+          title="Widget de teste — eventos por minuto"
+          width="100%"
+          height="320"
+          sandbox="allow-scripts allow-same-origin"
+          referrerpolicy="strict-origin-when-cross-origin"
+          class="rounded-lg border border-slate-700/40"
+        ></iframe>
+        <p class="mt-2 text-xs text-slate-500">
+          Última mensagem do widget: <span id="msg-widget" class="text-slate-300">—</span>
+        </p>
+      </div>
+    </div>
+  </section>
+</Base>
+
+<script>
+  import { API_URL } from '~/config';
+
+  const PORTIFOLIO_SITE_ID = (import.meta.env.PUBLIC_PORTIFOLIO_SITE_ID || '').trim();
+  const EMBED_BASE = (import.meta.env.PUBLIC_EMBED_URL || 'https://embed.dsplayground.com.br').replace(/\/$/, '');
+  const GRAFICO = 'eventos_por_minuto';
+
+  const status = document.getElementById('status') as HTMLElement;
+  const erro = document.getElementById('erro') as HTMLElement;
+  const wrapper = document.getElementById('iframe-wrapper') as HTMLElement;
+  const iframe = document.getElementById('embed-iframe') as HTMLIFrameElement;
+  const msgWidget = document.getElementById('msg-widget') as HTMLElement;
+
+  function mostrarErro(texto: string) {
+    erro.textContent = texto;
+    erro.classList.remove('hidden');
+    status.classList.add('hidden');
+  }
+
+  async function emitirToken(): Promise<string | null> {
+    if (!PORTIFOLIO_SITE_ID) {
+      mostrarErro(
+        'PUBLIC_PORTIFOLIO_SITE_ID não configurado no build do landing — informe o site_id do portifolio.dsplayground.com.br no .env.'
+      );
+      return null;
+    }
+    try {
+      const r = await fetch(`${API_URL.replace(/\/$/, '')}/embed/token`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          site_id: PORTIFOLIO_SITE_ID,
+          grafico_id: GRAFICO,
+          ttl_segundos: 600,
+        }),
+      });
+      if (r.status === 401) {
+        mostrarErro('Não autenticado. Faça login em /cliente/login antes de carregar essa página.');
+        return null;
+      }
+      if (!r.ok) {
+        const body = await r.json().catch(() => ({}));
+        mostrarErro(`Falha ao emitir token (HTTP ${r.status}): ${body.code || 'erro'}`);
+        return null;
+      }
+      const body = await r.json();
+      return body.token as string;
+    } catch (e) {
+      mostrarErro(`Erro de rede ao emitir token: ${(e as Error).message}`);
+      return null;
+    }
+  }
+
+  function montarIframe(token: string) {
+    const url = `${EMBED_BASE}/widget/${encodeURIComponent(PORTIFOLIO_SITE_ID)}/${encodeURIComponent(GRAFICO)}?token=${encodeURIComponent(token)}`;
+    iframe.src = url;
+    wrapper.classList.remove('hidden');
+    status.textContent = 'Token emitido. Carregando widget…';
+  }
+
+  async function renovar() {
+    const novo = await emitirToken();
+    if (novo && iframe.contentWindow) {
+      iframe.contentWindow.postMessage({ tipo: 'embed.token_renovado', token: novo }, '*');
+    }
+  }
+
+  window.addEventListener('message', (ev) => {
+    const expected = new URL(EMBED_BASE);
+    if (ev.origin !== expected.origin) return;
+    const data = ev.data;
+    if (!data || typeof data !== 'object') return;
+    if (data.tipo === 'embed.pronto') {
+      msgWidget.textContent = `pronto (render ${data.render_ms}ms)`;
+      status.classList.add('hidden');
+    } else if (data.tipo === 'embed.token_expirado') {
+      msgWidget.textContent = 'token_expirado — renovando…';
+      renovar();
+    } else if (data.tipo === 'embed.erro') {
+      msgWidget.textContent = `erro (${data.codigo || 'desconhecido'})`;
+    }
+  });
+
+  emitirToken().then((token) => {
+    if (token) montarIframe(token);
+  });
+</script>

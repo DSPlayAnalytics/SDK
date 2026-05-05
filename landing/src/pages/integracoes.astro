@@ -1,0 +1,245 @@
+---
+/**
+ * Integrações — página pública com guias de instalação por plataforma.
+ *
+ * Diferente do /cliente/onboarding (wizard logado com a key real do
+ * cliente), aqui o foco é avaliação anonima: qualquer visitante vê o
+ * snippet usando placeholder `pk_xxxxxxxxxxxxxxxxxxxx` e entende como
+ * funciona antes de criar conta.
+ */
+import Base from '~/layouts/Base.astro';
+import Badge from '~/components/ui/Badge.astro';
+import Card from '~/components/ui/Card.astro';
+import Button from '~/components/ui/Button.astro';
+import Tabs from '~/components/ui/Tabs.astro';
+
+const PLACEHOLDER = 'pk_xxxxxxxxxxxxxxxxxxxx';
+
+const platformTabs = [
+  { id: 'html',      label: 'HTML / Wix' },
+  { id: 'react',     label: 'React' },
+  { id: 'next',      label: 'Next.js' },
+  { id: 'astro',     label: 'Astro' },
+  { id: 'wordpress', label: 'WordPress' },
+  { id: 'shopify',   label: 'Shopify' },
+];
+
+const restEndpoints = [
+  { metodo: 'POST', path: '/auth/sdk-token', desc: 'Emite JWT de curta duração pra autenticar evento.' },
+  { metodo: 'POST', path: '/eventos',        desc: 'Persiste evento (alternativa ao WebSocket).' },
+  { metodo: 'GET',  path: '/cliente/auth/configuracoes', desc: 'Lê config do cliente logado (cookie).' },
+  { metodo: 'GET',  path: '/cliente/exportar/<dia>',     desc: 'Download CSV/LP do dia (302 → R2 signed URL).' },
+  { metodo: 'GET',  path: '/health/app',     desc: 'Liveness probe.' },
+];
+---
+<Base
+  title="Integrações"
+  description="Como conectar seu site, app ou backend ao dsplayground. SDK npm, snippet HTML, REST e WebSocket — exemplos prontos."
+>
+  <section class="relative overflow-hidden">
+    <div class="absolute inset-0 -z-10 bg-gradient-to-b from-brand-950 via-slate-950 to-slate-950"></div>
+    <div class="mx-auto max-w-4xl px-4 py-20 text-center sm:px-6 sm:py-24">
+      <Badge variant="info" dot>Integrações</Badge>
+      <h1 class="mt-6 text-display-sm sm:text-display-md text-white">
+        Cole, instale, <span class="bg-gradient-to-r from-brand-300 to-brand-500 bg-clip-text text-transparent">pronto.</span>
+      </h1>
+      <p class="mx-auto mt-6 max-w-2xl text-lg text-slate-300">
+        Funciona em todo lugar onde tem JavaScript. Snippet em HTML puro, pacote npm, ou via REST se você prefere fazer no backend.
+      </p>
+    </div>
+  </section>
+
+  <!-- POR PLATAFORMA -->
+  <section class="mx-auto max-w-5xl px-4 py-16 sm:px-6">
+    <h2 class="text-2xl font-bold tracking-tight text-white sm:text-3xl">Pra começar, escolha sua stack</h2>
+    <p class="mt-3 text-slate-300">Substitua <code class="rounded bg-slate-800 px-1 py-0.5 font-mono text-xs">{PLACEHOLDER}</code> pela sua publishable key (vem na Conta após cadastro).</p>
+
+    <div class="mt-8">
+      <Tabs tabs={platformTabs} ariaLabel="Plataforma">
+        <Fragment slot="html">
+          <Card>
+            <p class="text-sm text-slate-300">Cole no <code class="rounded bg-slate-800 px-1 py-0.5 font-mono text-xs">&lt;head&gt;</code> de todas as páginas.</p>
+            <pre class="mt-4 overflow-x-auto rounded-lg bg-slate-950 p-4 text-xs text-slate-200"><code class="font-mono">{`<script src="https://cdn.dsplayground.com.br/sdk/v0/sdk.umd.js"></script>
+<script>
+  window.DSPlayground.iniciarAnalytics({
+    publishableKey: '${PLACEHOLDER}',
+    websocketUrl: 'https://api.dsplayground.com.br',
+  });
+</script>`}</code></pre>
+          </Card>
+        </Fragment>
+
+        <Fragment slot="react">
+          <Card>
+            <p class="text-sm text-slate-300">Pacote npm. Inicialize uma vez no entrypoint.</p>
+            <pre class="mt-4 overflow-x-auto rounded-lg bg-slate-950 p-4 text-xs text-slate-200"><code class="font-mono">{`# 1) instalar
+npm i @danpqdan/dsplayground-analytics-sdk
+
+# 2) src/main.tsx (ou index.tsx)
+import { iniciarAnalytics } from '@danpqdan/dsplayground-analytics-sdk';
+
+iniciarAnalytics({
+  publishableKey: '${PLACEHOLDER}',
+  websocketUrl: 'https://api.dsplayground.com.br',
+});`}</code></pre>
+          </Card>
+        </Fragment>
+
+        <Fragment slot="next">
+          <Card>
+            <p class="text-sm text-slate-300">Em App Router, use Client Component. Em Pages Router, em <code class="rounded bg-slate-800 px-1 py-0.5 font-mono text-xs">_app.tsx</code>.</p>
+            <pre class="mt-4 overflow-x-auto rounded-lg bg-slate-950 p-4 text-xs text-slate-200"><code class="font-mono">{`// app/providers.tsx
+'use client';
+import { useEffect } from 'react';
+import { iniciarAnalytics } from '@danpqdan/dsplayground-analytics-sdk';
+
+export function AnalyticsProvider({ children }: { children: React.ReactNode }) {
+  useEffect(() => {
+    iniciarAnalytics({
+      publishableKey: '${PLACEHOLDER}',
+      websocketUrl: 'https://api.dsplayground.com.br',
+    });
+  }, []);
+  return <>{children}</>;
+}
+
+// app/layout.tsx — envolva o {children} com <AnalyticsProvider>`}</code></pre>
+          </Card>
+        </Fragment>
+
+        <Fragment slot="astro">
+          <Card>
+            <p class="text-sm text-slate-300">Astro carrega scripts em paralelo. Coloque no Layout.astro.</p>
+            <pre class="mt-4 overflow-x-auto rounded-lg bg-slate-950 p-4 text-xs text-slate-200"><code class="font-mono">{`---
+// src/layouts/Base.astro
+---
+<html>
+  <head>...</head>
+  <body>
+    <slot />
+    <script>
+      import { iniciarAnalytics } from '@danpqdan/dsplayground-analytics-sdk';
+      iniciarAnalytics({
+        publishableKey: '${PLACEHOLDER}',
+        websocketUrl: 'https://api.dsplayground.com.br',
+      });
+    </script>
+  </body>
+</html>`}</code></pre>
+          </Card>
+        </Fragment>
+
+        <Fragment slot="wordpress">
+          <Card>
+            <p class="text-sm text-slate-300">Plugin "Insert Headers and Footers" → Cabeçalho. Ou tema → personalizar → código.</p>
+            <pre class="mt-4 overflow-x-auto rounded-lg bg-slate-950 p-4 text-xs text-slate-200"><code class="font-mono">{`<script src="https://cdn.dsplayground.com.br/sdk/v0/sdk.umd.js"></script>
+<script>
+  window.DSPlayground.iniciarAnalytics({
+    publishableKey: '${PLACEHOLDER}',
+    websocketUrl: 'https://api.dsplayground.com.br',
+  });
+</script>`}</code></pre>
+          </Card>
+        </Fragment>
+
+        <Fragment slot="shopify">
+          <Card>
+            <p class="text-sm text-slate-300">Online Store → Themes → Edit code → <code class="rounded bg-slate-800 px-1 py-0.5 font-mono text-xs">layout/theme.liquid</code>. Antes de <code class="rounded bg-slate-800 px-1 py-0.5 font-mono text-xs">&lt;/head&gt;</code>.</p>
+            <pre class="mt-4 overflow-x-auto rounded-lg bg-slate-950 p-4 text-xs text-slate-200"><code class="font-mono">{`<script src="https://cdn.dsplayground.com.br/sdk/v0/sdk.umd.js"></script>
+<script>
+  window.DSPlayground.iniciarAnalytics({
+    publishableKey: '${PLACEHOLDER}',
+    websocketUrl: 'https://api.dsplayground.com.br',
+    extras: { customer_id: '{{ customer.id | default: "" }}' },
+  });
+</script>`}</code></pre>
+            <p class="mt-3 text-xs text-slate-500">Liquid: passa o <code class="rounded bg-slate-800 px-1 py-0.5">customer.id</code> automaticamente quando logado.</p>
+          </Card>
+        </Fragment>
+      </Tabs>
+    </div>
+  </section>
+
+  <!-- EVENTOS CUSTOMIZADOS -->
+  <section class="mx-auto max-w-5xl px-4 py-16 sm:px-6">
+    <h2 class="text-2xl font-bold tracking-tight text-white sm:text-3xl">Disparar evento customizado</h2>
+    <p class="mt-3 text-slate-300">Depois do <code class="rounded bg-slate-800 px-1 py-0.5 font-mono text-xs">iniciarAnalytics()</code>, qualquer ação importante vira evento.</p>
+    <Card class="mt-6">
+      <pre class="overflow-x-auto rounded-lg bg-slate-950 p-4 text-xs text-slate-200"><code class="font-mono">{`import { enviarEvento } from '@danpqdan/dsplayground-analytics-sdk';
+
+// Venda concluída
+enviarEvento('venda_concluida', {
+  produto_id: 'sku-123',
+  valor: 199.90,
+  moeda: 'BRL',
+  metodo_pagamento: 'pix',
+});
+
+// Formulário enviado
+enviarEvento('lead_capturado', {
+  origem: 'newsletter-rodape',
+  campanha: 'lancamento-2026',
+});
+
+// Vídeo terminado
+enviarEvento('video_concluido', {
+  video_id: 'apresentacao',
+  duracao_s: 142,
+});`}</code></pre>
+      <p class="mt-4 text-xs text-slate-500">
+        Boas práticas: nomes em snake_case, valores em tipos primitivos.
+        Não envie PII (email, CPF) como tag — explode cardinalidade e fere LGPD.
+      </p>
+    </Card>
+  </section>
+
+  <!-- REST API -->
+  <section class="mx-auto max-w-5xl px-4 py-16 sm:px-6">
+    <h2 class="text-2xl font-bold tracking-tight text-white sm:text-3xl">REST API</h2>
+    <p class="mt-3 text-slate-300">Pra integrações backend ou plataformas onde JS no browser não dá. Base URL: <code class="rounded bg-slate-800 px-1 py-0.5 font-mono text-xs">https://api.dsplayground.com.br</code></p>
+
+    <div class="mt-6 overflow-x-auto rounded-xl border border-slate-800 bg-slate-900/40">
+      <table class="min-w-full divide-y divide-slate-800 text-sm">
+        <thead class="bg-slate-900/60">
+          <tr class="text-left text-xs font-semibold uppercase tracking-wide text-slate-400">
+            <th class="px-4 py-3">Método</th>
+            <th class="px-4 py-3">Endpoint</th>
+            <th class="px-4 py-3">Descrição</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-800/60">
+          {restEndpoints.map((ep) => (
+            <tr>
+              <td class="px-4 py-3">
+                <span class:list={[
+                  'rounded font-mono text-xs px-2 py-0.5',
+                  ep.metodo === 'POST' ? 'bg-success-500/15 text-success-200' : 'bg-info-500/15 text-info-200',
+                ]}>{ep.metodo}</span>
+              </td>
+              <td class="px-4 py-3 font-mono text-xs text-slate-100">{ep.path}</td>
+              <td class="px-4 py-3 text-slate-300">{ep.desc}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+
+    <p class="mt-4 text-xs text-slate-500">Documentação completa em desenvolvimento — abrir issue no GitHub se precisar de detalhe específico.</p>
+  </section>
+
+  <!-- CTA -->
+  <section class="mx-auto max-w-6xl px-4 py-16 sm:px-6">
+    <Card>
+      <div class="flex flex-col items-start gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h2 class="text-2xl font-bold text-white sm:text-3xl">Pronto pra ligar?</h2>
+          <p class="mt-1 text-slate-300">Crie a conta, pegue sua key e cole no seu site. Em uns minutos os eventos chegam.</p>
+        </div>
+        <div class="flex gap-2">
+          <Button href="/cliente/cadastro" variant="primary" data-cta="integracoes-cadastro">Criar conta grátis</Button>
+          <Button href="https://github.com/danpqdan/dsplayground-analytics-sdk" variant="secondary" data-cta="integracoes-github">SDK no GitHub</Button>
+        </div>
+      </div>
+    </Card>
+  </section>
+</Base>

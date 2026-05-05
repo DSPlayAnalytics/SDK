@@ -1,0 +1,38 @@
+---
+/**
+ * 404 — pagina nao encontrada. CF Pages serve esse HTML em qualquer
+ * rota que nao bate com page existente. Tom: erro reconhece, oferece
+ * caminho de volta. Sem culpar o usuario.
+ */
+import Base from '~/layouts/Base.astro';
+import Button from '~/components/ui/Button.astro';
+import Card from '~/components/ui/Card.astro';
+---
+<Base
+  title="Página não encontrada"
+  description="Essa página não existe — talvez tenha sido movida ou o link esteja errado."
+  noindex={true}
+>
+  <section class="mx-auto flex min-h-[70vh] max-w-3xl flex-col items-center justify-center px-4 py-16 text-center sm:px-6">
+    <p class="text-display-lg font-bold text-brand-500" aria-hidden="true">404</p>
+    <h1 class="mt-4 text-3xl font-bold text-white sm:text-4xl">Essa página não existe</h1>
+    <p class="mt-3 max-w-xl text-slate-300">
+      Pode ter sido removida, renomeada, ou o link que te trouxe aqui tá errado. Não foi você — foi a gente.
+    </p>
+
+    <div class="mt-8 flex flex-wrap justify-center gap-3">
+      <Button href="/" variant="primary" data-cta="404-home">Voltar pra home</Button>
+      <Button href="/recursos" variant="secondary" data-cta="404-recursos">Ver recursos</Button>
+    </div>
+
+    <Card class="mt-12 max-w-md text-left">
+      <h2 class="text-sm font-semibold text-white">Quer dar uma volta?</h2>
+      <ul class="mt-3 space-y-2 text-sm text-slate-300">
+        <li>📖 <a href="/recursos" class="text-brand-300 hover:text-brand-200">Recursos</a> — o que dá pra fazer aqui</li>
+        <li>💎 <a href="/precos" class="text-brand-300 hover:text-brand-200">Preços</a> — planos sem letra miúda</li>
+        <li>🔒 <a href="/seguranca" class="text-brand-300 hover:text-brand-200">Segurança & LGPD</a> — como cuidamos dos dados</li>
+        <li>🤝 <a href="/sobre" class="text-brand-300 hover:text-brand-200">Sobre</a> — quem faz isso</li>
+      </ul>
+    </Card>
+  </section>
+</Base>
