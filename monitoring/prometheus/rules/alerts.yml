@@ -1,0 +1,88 @@
+# Regras Prometheus iniciais — P4 audit.
+# Cobertura por categoria:
+#   * Disponibilidade: InstanceDown (cobre todos os jobs scrape: prometheus,
+#     node-exporter, backend, influxdb).
+#   * Recursos do host: disk usage, memory, CPU sustained.
+#   * Aplicacao: por enquanto so o que sai direto do node-exporter; quando
+#     backend expor /metrics estavel (D.2 plano-backend), adicionar
+#     ErrorRate5xx, RequestLatencyP95.
+#
+# Validacao: docker exec portifolio-prometheus promtool check rules /etc/prometheus/rules/alerts.yml
+groups:
+  - name: instancia
+    interval: 30s
+    rules:
+      - alert: InstanceDown
+        expr: up == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Instancia {{ $labels.instance }} ({{ $labels.job }}) caiu"
+          description: |
+            Prometheus nao consegue scrape em {{ $labels.instance }} ha mais
+            de 2 minutos. Job: {{ $labels.job }}.
+            Investigar: `docker ps`, `docker logs <container>`, status do host.
+
+  - name: host
+    interval: 30s
+    rules:
+      - alert: HostHighDiskUsage
+        # Filesystem raiz, ignorando overlays do docker e tmpfs.
+        expr: |
+          (
+            (node_filesystem_size_bytes{mountpoint="/rootfs",fstype!~"tmpfs|overlay"} -
+             node_filesystem_avail_bytes{mountpoint="/rootfs",fstype!~"tmpfs|overlay"})
+            / node_filesystem_size_bytes{mountpoint="/rootfs",fstype!~"tmpfs|overlay"}
+          ) > 0.85
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Disco do host >85% por 10min"
+          description: |
+            Filesystem raiz com {{ $value | humanizePercentage }} de uso.
+            Limpar logs antigos (`journalctl --vacuum-time=7d`),
+            imagens Docker orfas (`docker image prune -a`),
+            backups locais (`/var/lib/backup-prod/`).
+
+      - alert: HostHighMemoryUsage
+        expr: |
+          (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) > 0.90
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Memoria do host >90% por 5min"
+          description: |
+            Memoria disponivel < 10%. Possiveis causas: leak num container,
+            spike de carga, journal/log bloating. Investigar:
+            `docker stats --no-stream` e `ps auxf --sort=-rss | head`.
+
+      - alert: HostHighCpuLoad
+        # Media de CPU em modo nao-idle (1 menos idle).
+        # 1 vCPU na VPS HostGator; 0.90 = 90% de saturacao sustentada.
+        expr: |
+          (1 - avg(rate(node_cpu_seconds_total{mode="idle"}[5m]))) > 0.90
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "CPU do host >90% por 15min"
+          description: |
+            CPU saturada por tempo prolongado. Container fora de controle?
+            `docker stats` + `top -c -o %CPU` no host.
+
+      - alert: HostFilesystemReadOnly
+        # Detecta filesystem que ficou read-only (sintoma de erro de disco).
+        expr: |
+          node_filesystem_readonly{fstype!~"tmpfs|overlay|squashfs"} == 1
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Filesystem em {{ $labels.mountpoint }} virou read-only"
+          description: |
+            Sintoma de erro de disco/raid. Apps nao conseguem mais
+            escrever (logs, DB writes). Checar `dmesg` e `smartctl` se
+            disponivel. Containers podem precisar restart.

@@ -1,0 +1,19 @@
+---
+# Detecta flood em endpoints de ingestao e consulta de analytics.
+# 200 eventos do backend em 10 segundos do mesmo IP e suspeito.
+
+type: leaky
+name: portifolio/analytics-flood
+description: "Flood de eventos de analytics do mesmo IP"
+filter: |
+  evt.Meta.log_type == "backend-structured"
+  && evt.Parsed.evento in ["recebido", "validado", "rejeitado"]
+  && evt.Meta.source_ip != ""
+groupby: evt.Meta.source_ip
+capacity: 200
+leakspeed: 20s
+blackhole: 2m
+labels:
+  service: portifolio-analytics
+  type: http
+  remediation: true

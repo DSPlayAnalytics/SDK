@@ -1,0 +1,21 @@
+[Unit]
+Description=Housekeeping de embed_jwt_revogados (apaga linhas >48h)
+Documentation=https://github.com/danpqdan/portifolio/blob/main/ark/docs/seguranca-auditoria-2026-05-02.md
+After=docker.service
+Wants=docker.service
+
+[Service]
+Type=oneshot
+User=deploy
+EnvironmentFile=/opt/portifolio/backend/.env
+ExecStart=/usr/bin/curl --silent --show-error --fail --max-time 30 \
+    --request POST \
+    --header "Authorization: Bearer ${ADMIN_API_TOKEN}" \
+    --header "Content-Type: application/json" \
+    --data '{"retencao_horas": 48}' \
+    http://127.0.0.1:5000/admin/embed/housekeeping
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

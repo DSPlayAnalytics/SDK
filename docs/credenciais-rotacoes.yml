@@ -1,0 +1,71 @@
+# Estado de rotacao das credenciais. Lido pelo workflow GHA
+# .github/workflows/credenciais-rotacao-reminder.yml todo dia 1 do mes
+# 09:00 UTC. Atualiza `last_rotated` quando rotacionar (manualmente).
+#
+# Procedimento de cada credencial em ark/docs/credenciais-cadence.md.
+#
+# Formato:
+#   - name: NOME
+#     cadence_days: int        # cadencia em dias
+#     last_rotated: YYYY-MM-DD # ou null se nunca rotacionada
+#     critical: true|false     # se true, issue tem label P0
+---
+- name: ADMIN_API_TOKEN
+  cadence_days: 30
+  last_rotated: null
+  critical: true
+
+- name: INFLUXDB_TOKEN
+  cadence_days: 90
+  last_rotated: null
+  critical: true
+
+- name: POSTGRES_PASSWORD
+  cadence_days: 180
+  last_rotated: 2026-05-02
+  critical: true
+
+- name: flask_secret_key
+  cadence_days: 365
+  last_rotated: null
+  critical: false   # rotacao invalida sessoes — agendar com aviso
+
+- name: RESEND_API_KEY
+  cadence_days: 180
+  last_rotated: null
+  critical: false
+
+- name: R2_credentials
+  cadence_days: 180
+  last_rotated: null
+  critical: false
+
+- name: GRAFANA_ADMIN_PASSWORD
+  cadence_days: 180
+  last_rotated: null
+  critical: false
+
+- name: NODE_AUTH_TOKEN
+  cadence_days: 365
+  last_rotated: null
+  critical: false
+
+- name: sdk_jwt_RSA_keys
+  cadence_days: 365
+  last_rotated: null
+  critical: false
+
+- name: SSH_host_keys
+  cadence_days: 365
+  last_rotated: null
+  critical: false
+
+- name: vault_password_file
+  cadence_days: 365
+  last_rotated: null
+  critical: true
+
+- name: self_hosted_runner_PAT
+  cadence_days: 365
+  last_rotated: null
+  critical: true

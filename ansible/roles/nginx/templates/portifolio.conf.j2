@@ -1,0 +1,351 @@
+# Restaura IP real da Cloudflare antes de qualquer rate limit / log key.
+# Sem isso, tudo que e por-IP (rate limit, fail2ban via log, CrowdSec)
+# enxerga apenas IPs de edge da CF e e burlavel.
+include /etc/nginx/snippets/cloudflare-real-ip.conf;
+
+limit_req_zone $binary_remote_addr zone=analytics_edge:10m rate=20r/s;
+limit_req_zone $binary_remote_addr zone=cliente_auth:10m rate=10r/s;
+
+# log_format precisa estar em http{} (este arquivo e incluido la pelo
+# nginx.conf base via `include /etc/nginx/conf.d/*.conf`).
+# api_no_query: omite query string — widget embed passa ?token=<JWT> e
+# nao queremos persistir tokens no access.log.
+log_format api_no_query '$remote_addr - $remote_user [$time_local] '
+                        '"$request_method $uri $server_protocol" '
+                        '$status $body_bytes_sent '
+                        '"$http_referer" "$http_user_agent" '
+                        'rt=$request_time';
+
+upstream portifolio_backend {
+    server 127.0.0.1:5000;
+    keepalive 32;
+}
+
+# Portfolio pessoal (React 3D — Home/Projects/About)
+upstream portifolio_frontend {
+    server 127.0.0.1:3000;
+    keepalive 16;
+}
+
+# Grafana (dashboard self-service do cliente) — ver ark/docs/dashboard-cliente.md
+upstream portifolio_grafana {
+    server 127.0.0.1:3001;
+    keepalive 8;
+}
+
+# Apex `{{ dominio }}` NAO esta mais aqui — DNS apontado pro Cloudflare Pages
+# (projeto `comercial`, repo separado dsplayground/comercial). Landing comercial
+# servida do edge. CF Pages nao roteia auth_request, por isso a area logada
+# (/cliente/metricas) migrou pro subdominio dedicado app.{{ dominio }} abaixo.
+# Ver ark/docs/migracao-multi-vps.md §4.4.
+
+server {
+    listen 80;
+    listen [::]:80;
+    server_name app.{{ dominio }} portifolio.{{ dominio }} api.{{ dominio }} embed.{{ dominio }};
+    return 301 https://$host$request_uri;
+}
+
+# ============== app.{{ dominio }}: dashboard logado do cliente ==============
+# Subdominio dedicado pra area logada. Cookie `cliente_session` viaja entre
+# api.{{ dominio }} e app.{{ dominio }} porque o backend seta
+# Domain={{ cookie_domain | default(dominio) }} (var Ansible cookie_domain).
+#
+# Fluxo /cliente/metricas:
+#   1. Browser app.{{ dominio }}/cliente/metricas/...
+#   2. nginx auth_request -> /__cliente_auth_gate -> Flask valida cookie
+#   3. Flask retorna 200 + X-WEBAUTH-USER (= site_id)
+#   4. nginx propaga o header e faz proxy_pass pro Grafana
+#   5. Grafana auth.proxy confia e cria/mapeia o usuario
+server {
+    listen 443 ssl;
+    listen [::]:443 ssl;
+    server_name app.{{ dominio }};
+
+    ssl_certificate     /etc/ssl/cloudflare-origin/fullchain.pem;
+    ssl_certificate_key /etc/ssl/cloudflare-origin/privkey.pem;
+    include             /etc/nginx/snippets/ssl.conf;
+
+    client_max_body_size 1m;
+    access_log /var/log/nginx/portifolio-app.access.log;
+    error_log  /var/log/nginx/portifolio-app.error.log warn;
+
+    # Raiz do app — placeholder ate UI propria existir.
+    # Por enquanto manda pro dashboard direto. Quando dsplayground-app entrar
+    # (Astro+React em CF Pages), trocar por proxy/redirect pra ele.
+    location = / {
+        return 302 /cliente/metricas/;
+    }
+
+    # Fallback `/cliente/*` que NAO seja `/cliente/metricas/`: redireciona pro
+    # apex (CF Pages tem login/cadastro/configuracoes/exportar). Sem isso,
+    # `app.X/cliente/configuracoes` retorna 404 — cliente clica em link
+    # relativo dentro do dashboard ou faz bookmark errado e fica perdido.
+    #
+    # Specificity: `/cliente/metricas/` (mais longo) ganha pra paths que
+    # comecam com ele; demais `/cliente/*` caem aqui.
+    location /cliente/ {
+        return 302 https://{{ dominio }}$request_uri;
+    }
+
+    location /cliente/metricas/ {
+        auth_request /__cliente_auth_gate;
+        auth_request_set $cliente_user  $upstream_http_x_webauth_user;
+        auth_request_set $cliente_papel $upstream_http_x_webauth_papel;
+
+        error_page 401 = @cliente_nao_autenticado;
+
+        # IMPORTANTE: proxy_pass SEM trailing `/` — preserva o path original
+        # `/cliente/metricas/...` quando passa pro Grafana. Com trailing `/`
+        # o nginx strippa o prefixo, Grafana recebe `/`, e como
+        # GF_SERVER_SERVE_FROM_SUB_PATH=true + root_url=app.X/cliente/metricas/,
+        # ele redireciona 301 pro root_url completo — loop infinito.
+        proxy_pass http://portifolio_grafana;
+        proxy_http_version 1.1;
+        proxy_set_header Host              $host;
+        proxy_set_header X-Real-IP         $remote_addr;
+        proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-WEBAUTH-USER    $cliente_user;
+        proxy_set_header X-WEBAUTH-PAPEL   $cliente_papel;
+
+        proxy_set_header Upgrade           $http_upgrade;
+        proxy_set_header Connection        "upgrade";
+        proxy_read_timeout 300s;
+        proxy_send_timeout 300s;
+    }
+
+    location = /__cliente_auth_gate {
+        internal;
+        proxy_pass http://portifolio_backend/cliente/auth/gate;
+        proxy_pass_request_body off;
+        proxy_set_header Content-Length "";
+        proxy_set_header Host              $host;
+        proxy_set_header X-Real-IP         $remote_addr;
+        proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+    }
+
+    # Nao-autenticado vai pra tela de login da landing (em CF Pages no apex).
+    # Absoluto porque app.{{ dominio }} e apex sao hosts diferentes.
+    location @cliente_nao_autenticado {
+        return 302 https://{{ dominio }}/cliente/login;
+    }
+}
+
+# ============== portifolio.{{ dominio }}: portfolio pessoal (React 3D) ==============
+# portifolio.{{ dominio }} -> Home/Projects/About do Daniel.
+# Nao tem rotas /cliente/* (essas vivem em app.{{ dominio }}).
+server {
+    listen 443 ssl;
+    listen [::]:443 ssl;
+    server_name portifolio.{{ dominio }};
+
+    ssl_certificate     /etc/ssl/cloudflare-origin/fullchain.pem;
+    ssl_certificate_key /etc/ssl/cloudflare-origin/privkey.pem;
+    include             /etc/nginx/snippets/ssl.conf;
+
+    client_max_body_size 1m;
+    access_log /var/log/nginx/portifolio.access.log;
+    error_log  /var/log/nginx/portifolio.error.log warn;
+
+    # CSP do portfolio (React + assets). 'unsafe-inline' em script/style e
+    # exigencia do bundle Vite atual; restringir quando o bundle for migrado
+    # pra nonce/hash. connect-src libera api.X (xhr+ws) e o proprio host.
+    add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' https://api.{{ dominio }} wss://api.{{ dominio }}; frame-ancestors 'self'; base-uri 'self'; form-action 'self'" always;
+
+    location / {
+        proxy_pass http://portifolio_frontend;
+        proxy_http_version 1.1;
+        proxy_set_header Host              $host;
+        proxy_set_header X-Real-IP         $remote_addr;
+        proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+
+        proxy_read_timeout 60s;
+        proxy_send_timeout 60s;
+    }
+
+    # Bloqueio publico de /api/metrics — mesmo motivo do api.X (Prometheus
+    # scrape interno via rede docker, nao via nginx).
+    location = /api/metrics {
+        deny all;
+        return 404;
+    }
+
+    # Compat: o portfolio ainda chama /api/* pelo bundle Vite. Strippa o prefixo.
+    location /api/ {
+        rewrite ^/api/(.*)$ /$1 break;
+        limit_req zone=analytics_edge burst=40 nodelay;
+        proxy_pass http://portifolio_backend;
+        proxy_http_version 1.1;
+        proxy_set_header Host              $host;
+        proxy_set_header X-Real-IP         $remote_addr;
+        proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+
+# ============== embed.{{ dominio }}: widget de iframe (Fase 1 dogfood) ==============
+# Subdominio dedicado pra widget React isolado. Serve o mesmo bundle do
+# portifolio.{{ dominio }} (container portifolio-frontend) mas restringe
+# o path a `/widget/*` e troca o `X-Frame-Options: SAMEORIGIN` herdado do
+# ssl.conf por `Content-Security-Policy: frame-ancestors` permitindo embed
+# de qualquer host sob {{ dominio }}.
+#
+# Auth do widget: token JWT na URL (?token=...), validado por /embed/dados
+# em api.{{ dominio }}. Cookie cliente_session NAO entra aqui — SameSite=Strict.
+#
+# Ver ark/docs/embed-iframe.md (Fase 1).
+server {
+    listen 443 ssl;
+    listen [::]:443 ssl;
+    server_name embed.{{ dominio }};
+
+    ssl_certificate     /etc/ssl/cloudflare-origin/fullchain.pem;
+    ssl_certificate_key /etc/ssl/cloudflare-origin/privkey.pem;
+    include             /etc/nginx/snippets/ssl.conf;
+
+    client_max_body_size 1m;
+    access_log /var/log/nginx/portifolio-embed.access.log;
+    error_log  /var/log/nginx/portifolio-embed.error.log warn;
+
+    # Bloqueio total de qualquer path que NAO seja /widget/*. Evita usar o
+    # subdominio como vetor pra outras paginas da SPA portfolio.
+    location = / {
+        return 404;
+    }
+
+    # Widget React em /widget/<site_id>/<grafico_id>. Re-emite headers de
+    # seguranca aqui pra substituir o `X-Frame-Options: SAMEORIGIN` do
+    # ssl.conf por CSP `frame-ancestors` (semantica do nginx: add_header
+    # do filho sobrescreve TODOS herdados do pai).
+    location /widget/ {
+        add_header X-Content-Type-Options "nosniff"                    always;
+        add_header Referrer-Policy        "strict-origin-when-cross-origin" always;
+        add_header Content-Security-Policy
+            "frame-ancestors 'self' https://*.{{ dominio }} https://{{ dominio }}; default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self' https://api.{{ dominio }}; img-src 'self' data:; font-src 'self' data:"
+            always;
+
+        proxy_pass http://portifolio_frontend;
+        proxy_http_version 1.1;
+        proxy_set_header Host              $host;
+        proxy_set_header X-Real-IP         $remote_addr;
+        proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+
+        proxy_read_timeout 60s;
+        proxy_send_timeout 60s;
+    }
+
+    # Bundle Vite (assets de /widget/...) precisa servir /assets/* tambem.
+    # Mesmos headers de seguranca aplicados.
+    location /assets/ {
+        add_header X-Content-Type-Options "nosniff"                    always;
+        add_header Referrer-Policy        "strict-origin-when-cross-origin" always;
+        add_header Content-Security-Policy
+            "frame-ancestors 'self' https://*.{{ dominio }} https://{{ dominio }}; default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self' https://api.{{ dominio }}; img-src 'self' data:; font-src 'self' data:"
+            always;
+
+        proxy_pass http://portifolio_frontend;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+    }
+
+    # Tudo mais retorna 404. Evita expor rotas portfolio (/projects, /about)
+    # via embed.X.
+    location / {
+        return 404;
+    }
+}
+
+# ============== API: backend Flask + Socket.IO ==============
+server {
+    listen 443 ssl;
+    listen [::]:443 ssl;
+    server_name api.{{ dominio }};
+    # http2 desligado: nginx 1.20 (Rocky 9) nao suporta WebSocket sobre HTTP/2 (RFC 8441).
+    # socket.io abre wss://api/socket.io e o handshake Upgrade so funciona em HTTP/1.1.
+
+    ssl_certificate     /etc/ssl/cloudflare-origin/fullchain.pem;
+    ssl_certificate_key /etc/ssl/cloudflare-origin/privkey.pem;
+    include             /etc/nginx/snippets/ssl.conf;
+
+    client_max_body_size 1m;
+    # Usa log_format api_no_query (definido no http{} no topo deste arquivo)
+    # pra omitir query string — widget embed passa ?token=<JWT> ali e nao
+    # queremos persistir tokens no access.log.
+    access_log /var/log/nginx/portifolio-api.access.log api_no_query;
+    error_log  /var/log/nginx/portifolio-api.error.log warn;
+
+    # CSP estrito: a API so retorna JSON, nao deve carregar nada.
+    add_header Content-Security-Policy "default-src 'none'; frame-ancestors 'none'; base-uri 'none'" always;
+
+    # Bloqueio publico de /metrics — Prometheus scrape acontece DENTRO da rede
+    # docker (backend:5000/metrics), nao via nginx. Externamente vaza
+    # contadores operacionais (volume por cliente, erros, etc.).
+    location = /metrics {
+        deny all;
+        return 404;
+    }
+
+    # Login do dashboard do cliente — rate limit per-IP (10r/s, burst 5)
+    # contra brute force. Defesa em profundidade vs limiter no Flask.
+    location = /cliente/auth/login {
+        limit_req zone=cliente_auth burst=5 nodelay;
+        proxy_pass http://portifolio_backend;
+        proxy_http_version 1.1;
+        proxy_set_header Host              $host;
+        proxy_set_header X-Real-IP         $remote_addr;
+        proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    # Idem para magic-link e cadastro: fluxos de autenticacao escritos.
+    location = /cliente/auth/magic-link/solicitar {
+        limit_req zone=cliente_auth burst=3 nodelay;
+        proxy_pass http://portifolio_backend;
+        proxy_http_version 1.1;
+        proxy_set_header Host              $host;
+        proxy_set_header X-Real-IP         $remote_addr;
+        proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    location = /cliente/auth/cadastro {
+        limit_req zone=cliente_auth burst=3 nodelay;
+        proxy_pass http://portifolio_backend;
+        proxy_http_version 1.1;
+        proxy_set_header Host              $host;
+        proxy_set_header X-Real-IP         $remote_addr;
+        proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    # SDK token issuance: 1 emissao deveria sobrar pra um SDK normal; 5/s
+    # com burst 10 cobre concorrencia entre paginas mas barra brute force.
+    location = /auth/sdk-token {
+        limit_req zone=cliente_auth burst=10 nodelay;
+        proxy_pass http://portifolio_backend;
+        proxy_http_version 1.1;
+        proxy_set_header Host              $host;
+        proxy_set_header X-Real-IP         $remote_addr;
+        proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    location / {
+        limit_req zone=analytics_edge burst=40 nodelay;
+
+        proxy_pass http://portifolio_backend;
+        proxy_http_version 1.1;
+        proxy_set_header Host              $host;
+        proxy_set_header X-Real-IP         $remote_addr;
+        proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+
+        proxy_set_header Upgrade    $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_read_timeout 300s;
+        proxy_send_timeout 300s;
+    }
+}

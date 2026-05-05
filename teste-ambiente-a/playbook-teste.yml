@@ -1,0 +1,47 @@
+---
+# Playbook de teste para Ambiente A. Importa as group_vars locais e roda
+# as roles que funcionam em container Ubuntu sem firewall/TLS reais.
+#
+# Para a role nginx funcionar, geramos um cert self-signed antes — em prod
+# o certbot cuida disso (skipped via --skip-tags tls).
+
+- name: Ambiente A — provisionamento em container
+  hosts: analytics
+  become: true
+  gather_facts: true
+  vars_files:
+    - group_vars/all.yml
+
+  pre_tasks:
+    - name: Aceitar valores de teste (skip do assert de producao)
+      debug:
+        msg: "Modo teste em container — asserts de producao desabilitados."
+
+    - name: Garantir openssl instalado para gerar cert de teste
+      # Modulo `package` agnostico de distro — funciona em Rocky (dnf) e
+      # eventualmente em Ubuntu (apt). Em Rocky openssl ja vem instalado.
+      package:
+        name: openssl
+        state: present
+
+    - name: Criar diretorio do cert mock
+      file:
+        path: "/etc/letsencrypt/live/{{ dominio }}"
+        state: directory
+        recurse: true
+
+    - name: Gerar cert self-signed para validar nginx no teste
+      command: >
+        openssl req -x509 -newkey rsa:2048 -nodes
+        -keyout /etc/letsencrypt/live/{{ dominio }}/privkey.pem
+        -out /etc/letsencrypt/live/{{ dominio }}/fullchain.pem
+        -days 1 -subj "/CN={{ dominio }}"
+      args:
+        creates: "/etc/letsencrypt/live/{{ dominio }}/fullchain.pem"
+
+  roles:
+    - role: base
+      tags: [base]
+    - role: nginx
+      tags: [nginx]
+    # docker, analytics-stack, monitoring e crowdsec ficam pra Ambiente B

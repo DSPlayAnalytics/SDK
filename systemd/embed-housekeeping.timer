@@ -1,0 +1,10 @@
+[Unit]
+Description=Roda embed-housekeeping.service diariamente as 04:30 UTC
+
+[Timer]
+OnCalendar=*-*-* 04:30:00 UTC
+Persistent=true
+RandomizedDelaySec=15min
+
+[Install]
+WantedBy=timers.target
