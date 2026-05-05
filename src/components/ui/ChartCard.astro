@@ -1,0 +1,129 @@
+---
+/**
+ * ChartCard — wrapper pra gráficos (header + state machine + slot).
+ *
+ * Estados visiveis:
+ *   - state="loading" → skeleton animado, esconde slot
+ *   - state="empty"   → EmptyState neutro
+ *   - state="error"   → EmptyState danger com retry opcional
+ *   - state="ready"   → slot renderiza
+ *
+ * Caller passa o canvas/svg/component dentro do slot default. Padrao
+ * pretendido: client carrega Chart.js via dynamic import e popula um
+ * <canvas data-chart-id="..."> no slot. ChartCard nao conhece o
+ * library — so gerencia o container.
+ *
+ * Note: o estado vem como prop renderizada por SSR; pra mudancas
+ * dinamicas (loading -> ready) o caller deve manipular as classes
+ * `js-chart-state-*` ou trocar via attribute `data-state`.
+ */
+type State = 'loading' | 'ready' | 'empty' | 'error';
+
+interface Action {
+  href?: string;
+  label: string;
+  'data-cta'?: string;
+}
+
+interface Props {
+  title: string;
+  subtitle?: string;
+  state?: State;
+  errorMessage?: string;
+  emptyTitle?: string;
+  emptyDescription?: string;
+  action?: Action;       // header action (ex: "ver tudo")
+  height?: 'sm' | 'md' | 'lg';
+  class?: string;
+}
+
+const {
+  title,
+  subtitle,
+  state = 'ready',
+  errorMessage = 'Não foi possível carregar.',
+  emptyTitle = 'Sem dados pra mostrar',
+  emptyDescription = 'Quando começarem a chegar eventos, o gráfico aparece aqui.',
+  action,
+  height = 'md',
+  class: extraClass,
+} = Astro.props;
+
+const heightClass: Record<NonNullable<Props['height']>, string> = {
+  sm: 'h-40',
+  md: 'h-64',
+  lg: 'h-80',
+};
+---
+<section
+  class:list={[
+    'rounded-xl border border-slate-800 bg-slate-900/60 shadow-elev-1 backdrop-blur',
+    extraClass,
+  ]}
+  data-chart-card
+  data-state={state}
+>
+  <header class="flex items-start justify-between gap-4 px-5 py-4">
+    <div>
+      <h3 class="text-base font-semibold text-white">{title}</h3>
+      {subtitle && <p class="mt-0.5 text-xs text-slate-400">{subtitle}</p>}
+    </div>
+    {action && action.href && (
+      <a
+        href={action.href}
+        data-cta={action['data-cta']}
+        class="text-xs font-medium text-brand-300 hover:text-brand-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 rounded"
+      >{action.label} →</a>
+    )}
+  </header>
+
+  <div class:list={['relative px-5 pb-5', heightClass[height]]}>
+    <!-- LOADING -->
+    <div
+      class:list={[
+        'js-chart-state-loading absolute inset-x-5 bottom-5 top-0 flex items-end gap-2',
+        state !== 'loading' && 'hidden',
+      ]}
+      aria-hidden={state !== 'loading' ? 'true' : 'false'}
+    >
+      {/* Skeleton bars com animacao pulse */}
+      {[60, 40, 80, 55, 70, 45, 65, 50, 75, 30, 60, 50].map((h) => (
+        <div class="flex-1 animate-pulse rounded-t bg-slate-800" style={`height: ${h}%`}></div>
+      ))}
+    </div>
+
+    <!-- EMPTY -->
+    <div
+      class:list={[
+        'js-chart-state-empty absolute inset-x-5 bottom-5 top-0 flex flex-col items-center justify-center text-center',
+        state !== 'empty' && 'hidden',
+      ]}
+    >
+      <span class="text-3xl" aria-hidden="true">📊</span>
+      <p class="mt-2 text-sm font-medium text-slate-300">{emptyTitle}</p>
+      <p class="mt-1 max-w-xs text-xs text-slate-500">{emptyDescription}</p>
+    </div>
+
+    <!-- ERROR -->
+    <div
+      class:list={[
+        'js-chart-state-error absolute inset-x-5 bottom-5 top-0 flex flex-col items-center justify-center text-center',
+        state !== 'error' && 'hidden',
+      ]}
+      role="alert"
+    >
+      <span class="flex h-10 w-10 items-center justify-center rounded-full bg-danger-500/15 text-xl" aria-hidden="true">⚠️</span>
+      <p class="mt-2 text-sm font-medium text-danger-300">{errorMessage}</p>
+    </div>
+
+    <!-- READY (slot do caller) -->
+    <div
+      class:list={[
+        'js-chart-state-ready h-full',
+        state !== 'ready' && 'hidden',
+      ]}
+    >
+      <slot />
+    </div>
+  </div>
+</section>

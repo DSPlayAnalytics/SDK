@@ -1,0 +1,66 @@
+---
+/**
+ * Input com label, hint e erro inline padronizados.
+ *
+ * label associado a id via `for=` (a11y). aria-describedby aponta pro
+ * hint/erro quando presentes. Use `name` igual ao `id` quando o form
+ * processa por FormData.
+ */
+import type { HTMLAttributes } from 'astro/types';
+
+type InputType = NonNullable<HTMLAttributes<'input'>['type']>;
+
+interface Props {
+  id: string;
+  name?: string;
+  label: string;
+  type?: InputType;
+  required?: boolean;
+  autocomplete?: string;
+  placeholder?: string;
+  hint?: string;
+  pattern?: string;
+  minlength?: number;
+  maxlength?: number;
+  value?: string;
+  class?: string;
+}
+
+const {
+  id,
+  name = id,
+  label,
+  type = 'text',
+  required = false,
+  autocomplete,
+  placeholder,
+  hint,
+  pattern,
+  minlength,
+  maxlength,
+  value,
+  class: extraClass,
+} = Astro.props;
+
+const hintId = hint ? `${id}-hint` : undefined;
+---
+<div class={extraClass}>
+  <label for={id} class="input-label">{label}</label>
+  <input
+    id={id}
+    name={name}
+    type={type}
+    required={required}
+    autocomplete={autocomplete}
+    placeholder={placeholder}
+    pattern={pattern}
+    minlength={minlength}
+    maxlength={maxlength}
+    value={value}
+    aria-describedby={hintId}
+    class="input-field"
+  />
+  {hint && (
+    <p id={hintId} class="mt-1 text-xs text-slate-500">{hint}</p>
+  )}
+</div>

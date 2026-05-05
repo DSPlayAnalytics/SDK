@@ -1,0 +1,33 @@
+{
+  "name": "@danpqdan/dsplayground-landing",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview",
+    "check": "astro check",
+    "lint": "astro check && tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "deploy": "wrangler deploy"
+  },
+  "dependencies": {
+    "@danpqdan/dsplayground-analytics-sdk": "^0.4.0",
+    "@tailwindcss/vite": "^4.2.4",
+    "astro": "^6.2.1",
+    "tailwindcss": "^4.2.4"
+  },
+  "devDependencies": {
+    "@astrojs/check": "^0.9.9",
+    "@types/node": "^22.7.5",
+    "happy-dom": "^20.9.0",
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.4",
+    "wrangler": "^4.0.0"
+  },
+  "overrides": {
+    "yaml": "^2.8.3"
+  }
+}

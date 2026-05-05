@@ -1,0 +1,14 @@
+User-agent: *
+Allow: /
+
+# Area logada — disallow explicito (paginas tambem tem meta noindex,
+# isso aqui evita gasto de crawl budget).
+Disallow: /cliente/
+
+# Endpoints de API ficam em api.dsplayground.com.br, nao no apex,
+# mas mantemos por seguranca (URL relativa as vezes vaza em link).
+Disallow: /api/
+
+# Sem Disallow pra /404 ou /500 — paginas tem meta noindex direto.
+
+Sitemap: https://dsplayground.com.br/sitemap.xml

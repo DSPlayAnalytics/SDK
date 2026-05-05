@@ -1,0 +1,35 @@
+---
+/**
+ * ToastContainer — regiao aria-live + <template> consumidos por toast.ts.
+ *
+ * Drop-in unico no Base.astro. O helper `showToast()` clona o template,
+ * popula classes/texto e anexa ao region. aria-live="polite" anuncia
+ * mudancas em screen readers sem interromper leitura corrente.
+ *
+ * Layout: top centralizado em mobile (overlay nao compete com FAB),
+ * bottom-right em sm+ (padrao desktop).
+ */
+---
+<div
+  id="ds-toast-region"
+  role="region"
+  aria-label="Notificações"
+  aria-live="polite"
+  class="pointer-events-none fixed inset-x-0 top-4 z-50 flex flex-col items-center gap-2 px-4 sm:bottom-4 sm:top-auto sm:items-end"
+></div>
+
+<template id="ds-toast-tpl">
+  <div
+    role="status"
+    class="pointer-events-auto flex max-w-md items-start gap-3 rounded-lg border px-4 py-3 text-sm shadow-elev-2 backdrop-blur transition duration-200"
+  >
+    <span data-slot="icon" class="mt-1 inline-block h-2 w-2 flex-shrink-0 rounded-full" aria-hidden="true"></span>
+    <p data-slot="message" class="flex-1 text-slate-100"></p>
+    <button
+      type="button"
+      data-slot="close"
+      aria-label="Fechar notificação"
+      class="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded text-slate-400 hover:text-white focus:outline-none focus:ring-2 focus:ring-brand-400"
+    >×</button>
+  </div>
+</template>

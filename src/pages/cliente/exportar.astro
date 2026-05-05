@@ -1,0 +1,124 @@
+---
+import Base from '~/layouts/Base.astro';
+import Breadcrumbs from '~/components/ui/Breadcrumbs.astro';
+---
+<Base
+  title="Baixar arquivos arquivados"
+  description="Baixe os dados de analytics arquivados pelo backup automático."
+  noindex={true}
+>
+  <section class="mx-auto flex min-h-[70vh] max-w-2xl flex-col px-4 py-16 sm:px-6">
+    <Breadcrumbs
+      items={[
+        { href: '/cliente/painel', label: 'Painel' },
+        { label: 'Exportar dados' },
+      ]}
+      class="mb-4"
+    />
+    <div class="card">
+      <h1 class="text-2xl font-bold text-white">Arquivo de dados</h1>
+      <p class="mt-1 text-sm text-slate-400">
+        O backup diário roda às 03:00 UTC e guarda os eventos do dia que está
+        prestes a expirar da retenção do seu plano. Cada arquivo é um
+        <code class="rounded bg-slate-800 px-1 py-0.5 text-xs">.lp.gz</code>
+        (line protocol Influx, gzipado) — re-importável com
+        <code class="rounded bg-slate-800 px-1 py-0.5 text-xs">influx write</code>.
+      </p>
+
+      <div id="estado" class="mt-6 text-sm text-slate-400">Carregando…</div>
+
+      <div id="erro" role="alert" class="mt-4 hidden rounded-md border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm text-red-200"></div>
+
+      <ul id="arquivos" class="mt-6 hidden divide-y divide-slate-700/60"></ul>
+
+      <p class="mt-6 text-xs text-slate-500">
+        Os links de download são válidos por 5 minutos a partir do clique. Se
+        expirar, atualize a página.
+      </p>
+    </div>
+  </section>
+
+  <script>
+    import { listarExports, urlDownloadExport } from '~/lib/api';
+    import { API_URL } from '~/config';
+
+    const estadoBox = document.getElementById('estado')!;
+    const erroBox = document.getElementById('erro')!;
+    const lista = document.getElementById('arquivos') as HTMLUListElement;
+
+    function mostrarErro(msg: string) {
+      estadoBox.classList.add('hidden');
+      lista.classList.add('hidden');
+      erroBox.textContent = msg;
+      erroBox.classList.remove('hidden');
+    }
+
+    function formatarDia(iso: string): string {
+      // 'YYYY-MM-DD' → 'DD/MM/YYYY' (pt-BR humano)
+      const [y, m, d] = iso.split('-');
+      return `${d}/${m}/${y}`;
+    }
+
+    async function carregar() {
+      const r = await listarExports({ apiUrl: API_URL });
+
+      if (!r.ok) {
+        if (r.code === 'NAO_AUTENTICADO') {
+          window.location.href = '/cliente/login?next=/cliente/exportar';
+          return;
+        }
+        if (r.code === 'REDE') {
+          mostrarErro('Sem internet agora. Tenta de novo em uns segundos.');
+          return;
+        }
+        mostrarErro('Não deu pra carregar agora. Tenta de novo, por favor.');
+        return;
+      }
+
+      estadoBox.classList.add('hidden');
+
+      if (r.arquivos.length === 0) {
+        estadoBox.textContent = 'Nenhum arquivo disponível ainda. O backup começa a rodar quando seus dados completarem o tempo de retenção do seu plano.';
+        estadoBox.classList.remove('hidden');
+        return;
+      }
+
+      // Mais recente primeiro
+      const ordenados = [...r.arquivos].sort((a, b) => b.dia.localeCompare(a.dia));
+
+      for (const arq of ordenados) {
+        const li = document.createElement('li');
+        li.className = 'flex items-center justify-between py-3';
+
+        const label = document.createElement('span');
+        label.className = 'text-sm text-slate-200';
+        label.textContent = formatarDia(arq.dia);
+
+        const link = document.createElement('a');
+        link.href = urlDownloadExport(API_URL, arq.dia);
+        link.className = 'btn-secondary text-sm';
+        link.setAttribute('data-cta', 'baixar-arquivo');
+        link.setAttribute('data-dia', arq.dia);
+        link.textContent = 'Baixar';
+        // Sem target=_blank: o backend retorna 302 pra signed URL R2 — o
+        // browser segue o redirect e o R2 manda o blob com o filename certo.
+        link.addEventListener('click', () => {
+          (window as any).__dsplayground?.enviarEvento?.('exportar_iniciado', {
+            dia: arq.dia,
+          });
+        });
+
+        li.appendChild(label);
+        li.appendChild(link);
+        lista.appendChild(li);
+      }
+
+      lista.classList.remove('hidden');
+    }
+
+    carregar().catch((e) => {
+      console.error(e);
+      mostrarErro('Erro inesperado. Tenta atualizar a página.');
+    });
+  </script>
+</Base>

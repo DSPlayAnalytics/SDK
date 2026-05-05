@@ -1,0 +1,289 @@
+---
+import Base from '~/layouts/Base.astro';
+import Badge from '~/components/ui/Badge.astro';
+import Card from '~/components/ui/Card.astro';
+import Button from '~/components/ui/Button.astro';
+
+const features = [
+  {
+    icon: '⚡',
+    title: 'Saiba se seu site está rápido',
+    descricao: 'Veja quanto tempo a sua página leva pra abrir e o que está travando. Separado por celular, desktop e por página.',
+  },
+  {
+    icon: '🎯',
+    title: 'Veja o que importa pro seu negócio',
+    descricao: 'Acompanhe vendas, formulários enviados, vídeos assistidos — qualquer ação que move o ponteiro. Você escolhe o que medir.',
+  },
+  {
+    icon: '🔒',
+    title: 'Seus dados, seu controle',
+    descricao: 'Cada conta tem um espaço só seu. Nada se mistura, nada vai pra Google ou Meta. Dentro da LGPD.',
+  },
+  {
+    icon: '🚀',
+    title: 'Comece a entender em 5 minutos',
+    descricao: 'Painel pronto desde o primeiro dia. Sem precisar configurar gráfico nem aprender ferramenta nova.',
+  },
+];
+
+const passos = [
+  { n: '1', titulo: 'Em 1 minuto, conta pronta', texto: 'Coloca email, senha e o nome do seu site. Só isso.' },
+  { n: '2', titulo: 'Cole uma linha no seu site', texto: 'Funciona em WordPress, Shopify, React ou HTML puro. Copia e cola.' },
+  { n: '3', titulo: 'Veja os números aparecerem', texto: 'O painel atualiza em segundos. Você abre e entende — sem manual.' },
+];
+
+// Comparativo — usado pra posicionar a oferta sem brigar feio com concorrentes.
+// Critérios escolhidos pelo que importa pro publico-alvo (pequeno/medio,
+// preocupado com LGPD): privacidade, custo, dono dos dados, possibilidade de
+// embedar grafico no proprio site, codigo aberto.
+const comparacao = [
+  { criterio: 'Dados ficam só com você',         dsp: true,  ga: false, plausible: true,  fathom: true  },
+  { criterio: 'Cumpre LGPD por padrão',          dsp: true,  ga: false, plausible: true,  fathom: true  },
+  { criterio: 'Plano grátis útil',               dsp: true,  ga: true,  plausible: false, fathom: false },
+  { criterio: 'Em português',                    dsp: true,  ga: true,  plausible: false, fathom: false },
+  { criterio: 'Embed do gráfico no seu site',    dsp: true,  ga: false, plausible: false, fathom: false },
+  { criterio: 'Servidor no Brasil',              dsp: true,  ga: false, plausible: false, fathom: false },
+];
+
+const faq = [
+  {
+    p: 'Vou precisar de banner de cookie?',
+    r: 'Não, porque a gente não usa cookie pra rastrear. Coletamos só o que você configurou e nada que identifique a pessoa por padrão. Se quiser identificar usuário logado é opcional e fica visível no painel.',
+  },
+  {
+    p: 'Funciona em WordPress / Shopify / Wix?',
+    r: 'Sim. É uma linha de código que cola no <head> ou em "scripts personalizados". Em frameworks como React/Vue/Astro tem pacote npm @danpqdan/dsplayground-analytics-sdk.',
+  },
+  {
+    p: 'Por que não usar Google Analytics?',
+    r: 'GA é grátis mas em troca seus visitantes alimentam dados pra propaganda. Aqui você é o cliente, não o produto. E se o seu publico mora no Brasil, dado em servidor brasileiro evita risco com LGPD.',
+  },
+  {
+    p: 'Posso exportar meus dados?',
+    r: 'Sim, em CSV pelo painel a qualquer momento. Sem trava de fornecedor — se quiser ir embora, sai com tudo.',
+  },
+  {
+    p: 'Quanto demora pra ver dado novo?',
+    r: 'O painel atualiza em segundos. Eventos chegam por websocket; o gráfico move enquanto você olha.',
+  },
+  {
+    p: 'Posso colocar um gráfico desses no meu site?',
+    r: 'Pode — é o que a gente chama de embed. Você gera um trecho de iframe na sua área de cliente e cola onde quiser. Tem domínio próprio e tudo isolado por chave.',
+  },
+];
+---
+<Base
+  title="Entenda seu site sem complicar"
+  description="Entenda quem usa seu site, o que trava e onde você está perdendo dinheiro. Painel pronto, dados só seus, plano grátis."
+>
+  <!-- HERO -->
+  <section class="relative overflow-hidden">
+    <div class="absolute inset-0 -z-10 bg-gradient-to-b from-brand-950 via-slate-950 to-slate-950"></div>
+    <div class="absolute inset-x-0 top-0 -z-10 h-72 bg-[radial-gradient(ellipse_at_top,rgba(44,121,230,0.25),transparent_60%)]"></div>
+
+    <div class="mx-auto grid max-w-6xl gap-12 px-4 py-20 sm:px-6 sm:py-28 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:items-center lg:py-32">
+      <div>
+        <Badge variant="brand" dot>Feito no Brasil · Dentro da LGPD</Badge>
+        <h1 class="mt-6 text-display-sm sm:text-display-md lg:text-display-lg text-white">
+          Entenda seu site
+          <span class="bg-gradient-to-r from-brand-300 to-brand-500 bg-clip-text text-transparent">sem complicar.</span>
+        </h1>
+        <p class="mt-6 text-lg text-slate-300 sm:text-xl">
+          Veja se está rápido, o que as pessoas fazem nele e onde você está perdendo dinheiro. Tudo num painel pronto, com seus dados só seus.
+        </p>
+        <div class="mt-8 flex flex-wrap gap-3">
+          <Button href="/cliente/cadastro" variant="primary" data-cta="hero-cadastro">Criar conta grátis</Button>
+          <Button href="/precos" variant="secondary" data-cta="hero-precos">Ver planos</Button>
+        </div>
+        <p class="mt-4 text-sm text-slate-400">Grátis até 100 mil visitas por dia. Sem cartão de crédito.</p>
+      </div>
+
+      <!-- DASHBOARD MOCKUP — SVG estatico, zero JS, zero deps. Espelha visual
+           real do painel: header com filtros, MetricCards, area chart. Decisao
+           por mockup em vez de iframe vivo: embed publico exige token JWT que
+           hoje so e gerado autenticado (Fase 1 dogfood-only). -->
+      <div aria-hidden="true" class="hidden lg:block">
+        <div class="relative">
+          <div class="absolute -inset-4 -z-10 rounded-2xl bg-gradient-to-br from-brand-500/20 via-info-500/10 to-transparent blur-2xl"></div>
+          <div class="rounded-2xl border border-slate-800 bg-slate-900/90 shadow-elev-3 backdrop-blur">
+            <!-- Top bar -->
+            <div class="flex items-center justify-between border-b border-slate-800 px-4 py-3">
+              <div class="flex items-center gap-2">
+                <span class="h-2.5 w-2.5 rounded-full bg-danger-500/80"></span>
+                <span class="h-2.5 w-2.5 rounded-full bg-warning-500/80"></span>
+                <span class="h-2.5 w-2.5 rounded-full bg-success-500/80"></span>
+                <span class="ml-3 text-xs font-medium text-slate-400">app.dsplayground.com.br</span>
+              </div>
+              <span class="rounded bg-slate-800 px-2 py-0.5 text-[10px] font-medium text-slate-300">últimos 7 dias</span>
+            </div>
+            <!-- Metricas -->
+            <div class="grid grid-cols-3 gap-3 p-4">
+              <div class="rounded-lg border border-slate-800 bg-slate-950/60 p-3">
+                <p class="text-[10px] uppercase tracking-wide text-slate-500">Visitas</p>
+                <p class="mt-1 text-xl font-bold text-white">12.847</p>
+                <p class="text-[10px] font-medium text-success-300">↑ 18% vs semana anterior</p>
+              </div>
+              <div class="rounded-lg border border-slate-800 bg-slate-950/60 p-3">
+                <p class="text-[10px] uppercase tracking-wide text-slate-500">Conversões</p>
+                <p class="mt-1 text-xl font-bold text-white">342</p>
+                <p class="text-[10px] font-medium text-success-300">↑ 7%</p>
+              </div>
+              <div class="rounded-lg border border-slate-800 bg-slate-950/60 p-3">
+                <p class="text-[10px] uppercase tracking-wide text-slate-500">Tempo médio</p>
+                <p class="mt-1 text-xl font-bold text-white">2:14</p>
+                <p class="text-[10px] font-medium text-warning-300">→ estável</p>
+              </div>
+            </div>
+            <!-- Chart -->
+            <div class="px-4 pb-4">
+              <svg viewBox="0 0 400 140" class="w-full" preserveAspectRatio="none">
+                <defs>
+                  <linearGradient id="chart-fill" x1="0" x2="0" y1="0" y2="1">
+                    <stop offset="0%" stop-color="#549cf0" stop-opacity="0.6" />
+                    <stop offset="100%" stop-color="#549cf0" stop-opacity="0" />
+                  </linearGradient>
+                </defs>
+                <!-- gridlines -->
+                <g stroke="currentColor" class="text-slate-800" stroke-width="0.5">
+                  <line x1="0" x2="400" y1="35" y2="35" />
+                  <line x1="0" x2="400" y1="70" y2="70" />
+                  <line x1="0" x2="400" y1="105" y2="105" />
+                </g>
+                <!-- area -->
+                <path d="M 0 110 L 30 95 L 60 100 L 90 78 L 120 82 L 150 60 L 180 70 L 210 45 L 240 55 L 270 30 L 300 38 L 330 22 L 360 28 L 400 15 L 400 140 L 0 140 Z" fill="url(#chart-fill)" />
+                <!-- line -->
+                <path d="M 0 110 L 30 95 L 60 100 L 90 78 L 120 82 L 150 60 L 180 70 L 210 45 L 240 55 L 270 30 L 300 38 L 330 22 L 360 28 L 400 15" fill="none" stroke="#549cf0" stroke-width="2" />
+              </svg>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- FEATURES -->
+  <section id="features" class="mx-auto max-w-6xl px-4 py-16 sm:px-6">
+    <h2 class="text-3xl font-bold tracking-tight text-white sm:text-4xl">Tudo que você precisa pra entender quem usa seu site</h2>
+    <p class="mt-3 max-w-2xl text-slate-300">Ferramenta feita pra te entregar respostas, não pra vender seus dados. Você é o cliente, não o produto.</p>
+    <div class="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+      {features.map((f) => (
+        <Card>
+          <span class="text-2xl" aria-hidden="true">{f.icon}</span>
+          <h3 class="mt-3 text-lg font-semibold text-white">{f.title}</h3>
+          <p class="mt-2 text-sm text-slate-300">{f.descricao}</p>
+        </Card>
+      ))}
+    </div>
+  </section>
+
+  <!-- 3 PASSOS -->
+  <section class="mx-auto max-w-6xl px-4 py-16 sm:px-6">
+    <h2 class="text-3xl font-bold tracking-tight text-white sm:text-4xl">Em 3 passos você está rodando</h2>
+    <ol class="mt-10 grid gap-5 sm:grid-cols-3">
+      {passos.map((p) => (
+        <Card as="li" class="flex flex-col gap-2">
+          <span class="grid size-9 place-items-center rounded-full bg-brand-500 text-sm font-bold text-white">{p.n}</span>
+          <h3 class="text-lg font-semibold text-white">{p.titulo}</h3>
+          <p class="text-sm text-slate-300">{p.texto}</p>
+        </Card>
+      ))}
+    </ol>
+  </section>
+
+  <!-- COMPARACAO -->
+  <section class="mx-auto max-w-5xl px-4 py-16 sm:px-6">
+    <h2 class="text-3xl font-bold tracking-tight text-white sm:text-4xl">Como comparamos com as outras ferramentas</h2>
+    <p class="mt-3 max-w-2xl text-slate-300">Comparativo honesto. Cada ferramenta tem seu lugar — a gente brilha quando privacidade e dado em casa importam.</p>
+    <div class="mt-8 overflow-x-auto rounded-xl border border-slate-800 bg-slate-900/40">
+      <table class="min-w-full divide-y divide-slate-800 text-sm">
+        <thead>
+          <tr class="text-left text-xs font-semibold uppercase tracking-wide text-slate-400">
+            <th class="px-4 py-3">Critério</th>
+            <th class="px-4 py-3">
+              <span class="rounded bg-brand-500/15 px-2 py-0.5 text-brand-200">dsplayground</span>
+            </th>
+            <th class="px-4 py-3 text-slate-300">Google Analytics</th>
+            <th class="px-4 py-3 text-slate-300">Plausible</th>
+            <th class="px-4 py-3 text-slate-300">Fathom</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-800/60">
+          {comparacao.map((linha) => (
+            <tr>
+              <td class="px-4 py-3 text-slate-200">{linha.criterio}</td>
+              <td class="px-4 py-3">
+                {linha.dsp
+                  ? <span class="inline-flex items-center gap-1 text-success-300" aria-label="Sim"><span aria-hidden="true">✓</span> sim</span>
+                  : <span class="inline-flex items-center gap-1 text-slate-500" aria-label="Não"><span aria-hidden="true">×</span> não</span>}
+              </td>
+              <td class="px-4 py-3">
+                {linha.ga
+                  ? <span class="inline-flex items-center gap-1 text-slate-300" aria-label="Sim"><span aria-hidden="true">✓</span> sim</span>
+                  : <span class="inline-flex items-center gap-1 text-slate-500" aria-label="Não"><span aria-hidden="true">×</span> não</span>}
+              </td>
+              <td class="px-4 py-3">
+                {linha.plausible
+                  ? <span class="inline-flex items-center gap-1 text-slate-300" aria-label="Sim"><span aria-hidden="true">✓</span> sim</span>
+                  : <span class="inline-flex items-center gap-1 text-slate-500" aria-label="Não"><span aria-hidden="true">×</span> não</span>}
+              </td>
+              <td class="px-4 py-3">
+                {linha.fathom
+                  ? <span class="inline-flex items-center gap-1 text-slate-300" aria-label="Sim"><span aria-hidden="true">✓</span> sim</span>
+                  : <span class="inline-flex items-center gap-1 text-slate-500" aria-label="Não"><span aria-hidden="true">×</span> não</span>}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+    <p class="mt-3 text-xs text-slate-500">Comparativo baseado em informação publica em maio/2026. Marcas dos concorrentes pertencem aos respectivos donos.</p>
+  </section>
+
+  <!-- PROVA SOCIAL — placeholder honesto. Quando tiver clientes,
+       substituir pelo grid de logos + depoimentos. -->
+  <section class="mx-auto max-w-5xl px-4 py-16 sm:px-6">
+    <Card>
+      <div class="flex flex-col items-start gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <Badge variant="info">primeiros clientes — em breve</Badge>
+          <h2 class="mt-3 text-2xl font-bold text-white">Estamos abrindo as portas</h2>
+          <p class="mt-2 max-w-xl text-sm text-slate-300">
+            Estamos no piloto. Quando você criar uma conta, sua marca pode estar aqui na próxima atualização — e a gente conta sua história em vez de te tratar como número.
+          </p>
+        </div>
+        <Button href="/cliente/cadastro" variant="primary" data-cta="prova-social-cadastro">Quero fazer parte</Button>
+      </div>
+    </Card>
+  </section>
+
+  <!-- FAQ — <details> nativo, zero JS, totalmente acessivel.
+       Marcado com itemScope JSON-LD pra SEO opcional (futuro). -->
+  <section class="mx-auto max-w-3xl px-4 py-16 sm:px-6">
+    <h2 class="text-3xl font-bold tracking-tight text-white sm:text-4xl">Perguntas que aparecem sempre</h2>
+    <div class="mt-8 divide-y divide-slate-800 rounded-xl border border-slate-800 bg-slate-900/40">
+      {faq.map((item) => (
+        <details class="group">
+          <summary class="flex cursor-pointer items-center justify-between gap-4 px-5 py-4 text-base font-medium text-white hover:bg-slate-900/60 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400">
+            <span>{item.p}</span>
+            <span class="text-slate-400 transition group-open:rotate-180" aria-hidden="true">⌄</span>
+          </summary>
+          <p class="px-5 pb-4 text-sm text-slate-300">{item.r}</p>
+        </details>
+      ))}
+    </div>
+  </section>
+
+  <!-- CTA FINAL -->
+  <section class="mx-auto max-w-6xl px-4 py-16 sm:px-6">
+    <Card>
+      <div class="flex flex-col items-start gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h2 class="text-2xl font-bold text-white sm:text-3xl">Pronto pra começar?</h2>
+          <p class="mt-1 text-slate-300">Crie sua conta e veja o painel funcionando hoje.</p>
+        </div>
+        <Button href="/cliente/cadastro" variant="primary" data-cta="footer-cadastro">Criar conta grátis</Button>
+      </div>
+    </Card>
+  </section>
+</Base>

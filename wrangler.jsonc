@@ -1,0 +1,22 @@
+/**
+ * Cloudflare Workers — landing comercial DS Playground.
+ *
+ * Worker servindo apenas assets estaticos do bundle Astro (output: 'static').
+ * Sem codigo de Worker em si — `dist/` vem do `npm run build` e o Workers
+ * Assets serve diretamente do edge.
+ *
+ * Variaveis de build (configurar no dashboard CF Workers Builds):
+ *   NODE_AUTH_TOKEN          PAT GitHub com read:packages (npm ci do SDK)
+ *   PUBLIC_SITE_URL          https://dsplayground.com.br
+ *   PUBLIC_API_URL           https://api.dsplayground.com.br
+ *   PUBLIC_PUBLISHABLE_KEY   pk_production_... (vazio em dev/staging)
+ *   PUBLIC_DEBUG             false
+ */
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "comercial",
+  "compatibility_date": "2025-04-01",
+  "assets": {
+    "directory": "./dist"
+  }
+}

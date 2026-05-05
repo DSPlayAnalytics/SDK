@@ -1,0 +1,31 @@
+---
+/**
+ * FormError — caixinha de erro pra forms. role="alert" pra leitores de
+ * tela. Comeca escondida (`hidden`); script da pagina remove a classe
+ * via `classList.remove('hidden')` quando preenche o textContent.
+ */
+interface Props {
+  id: string;
+  /** Variante visual: warning (amarelo) usado pra avisos nao-bloqueantes,
+   *  ex: 'voce esta cadastrando pra plano Pro'. */
+  variant?: 'error' | 'warning' | 'success';
+  class?: string;
+}
+
+const { id, variant = 'error', class: extraClass } = Astro.props;
+
+const variantCls = {
+  error: 'border-red-500/40 bg-red-500/10 text-red-200',
+  warning: 'border-amber-500/40 bg-amber-500/10 text-amber-200',
+  success: 'border-emerald-500/40 bg-emerald-500/10 text-emerald-200',
+}[variant];
+
+const classes = [
+  'hidden rounded-md border px-3 py-2 text-sm',
+  variantCls,
+  extraClass ?? '',
+].filter(Boolean).join(' ');
+---
+<div id={id} role="alert" class={classes}>
+  <slot />
+</div>

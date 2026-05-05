@@ -1,0 +1,135 @@
+/* Tailwind 4: import unico + tokens em @theme. Substitui o
+ * tailwind.config.mjs (que ainda existe pra content paths legacy mas
+ * nao define mais cores). */
+@import "tailwindcss";
+
+@theme {
+  /* Marca — azul institucional. Tailwind 4 expoe automaticamente classes
+   * bg-brand-500, text-brand-300, ring-brand-400 etc. a partir destes
+   * --color-* tokens. */
+  --color-brand-50:  #f0f7ff;
+  --color-brand-100: #dceefd;
+  --color-brand-200: #bcdcfb;
+  --color-brand-300: #8cc1f7;
+  --color-brand-400: #549cf0;
+  --color-brand-500: #2c79e6;
+  --color-brand-600: #1c5dd2;
+  --color-brand-700: #1849ab;
+  --color-brand-800: #173e8b;
+  --color-brand-900: #173672;
+  --color-brand-950: #0f2247;
+
+  /* Tokens semanticos: componentes referenciam por intencao
+   * ('success', 'danger') em vez da paleta crua. */
+  --color-success-50:  #ecfdf5;
+  --color-success-100: #d1fae5;
+  --color-success-200: #a7f3d0;
+  --color-success-300: #6ee7b7;
+  --color-success-400: #34d399;
+  --color-success-500: #10b981;
+  --color-success-600: #059669;
+  --color-success-700: #047857;
+  --color-success-800: #065f46;
+  --color-success-900: #064e3b;
+  --color-success-950: #022c22;
+
+  --color-warning-50:  #fffbeb;
+  --color-warning-100: #fef3c7;
+  --color-warning-200: #fde68a;
+  --color-warning-300: #fcd34d;
+  --color-warning-400: #fbbf24;
+  --color-warning-500: #f59e0b;
+  --color-warning-600: #d97706;
+  --color-warning-700: #b45309;
+  --color-warning-800: #92400e;
+  --color-warning-900: #78350f;
+  --color-warning-950: #451a03;
+
+  --color-danger-50:  #fef2f2;
+  --color-danger-100: #fee2e2;
+  --color-danger-200: #fecaca;
+  --color-danger-300: #fca5a5;
+  --color-danger-400: #f87171;
+  --color-danger-500: #ef4444;
+  --color-danger-600: #dc2626;
+  --color-danger-700: #b91c1c;
+  --color-danger-800: #991b1b;
+  --color-danger-900: #7f1d1d;
+  --color-danger-950: #450a0a;
+
+  --color-info-50:  #f0f9ff;
+  --color-info-100: #e0f2fe;
+  --color-info-200: #bae6fd;
+  --color-info-300: #7dd3fc;
+  --color-info-400: #38bdf8;
+  --color-info-500: #0ea5e9;
+  --color-info-600: #0284c7;
+  --color-info-700: #0369a1;
+  --color-info-800: #075985;
+  --color-info-900: #0c4a6e;
+  --color-info-950: #082f49;
+
+  /* Tipografia */
+  --font-sans: "Inter", system-ui, sans-serif;
+
+  /* Display — heros marketing. Tailwind 4 aceita line-height/letter-spacing/
+   * font-weight via sub-tokens com `--`. */
+  --text-display-sm: 2.25rem;
+  --text-display-sm--line-height: 2.5rem;
+  --text-display-sm--letter-spacing: -0.02em;
+  --text-display-sm--font-weight: 700;
+
+  --text-display-md: 3rem;
+  --text-display-md--line-height: 3.25rem;
+  --text-display-md--letter-spacing: -0.025em;
+  --text-display-md--font-weight: 700;
+
+  --text-display-lg: 3.75rem;
+  --text-display-lg--line-height: 4rem;
+  --text-display-lg--letter-spacing: -0.03em;
+  --text-display-lg--font-weight: 800;
+
+  /* Sombras de elevacao em fundo escuro. */
+  --shadow-elev-1: 0 1px 2px 0 rgb(0 0 0 / 0.4), 0 1px 3px 0 rgb(0 0 0 / 0.3);
+  --shadow-elev-2: 0 4px 6px -1px rgb(0 0 0 / 0.5), 0 2px 4px -2px rgb(0 0 0 / 0.4);
+  --shadow-elev-3: 0 10px 15px -3px rgb(0 0 0 / 0.5), 0 4px 6px -4px rgb(0 0 0 / 0.4);
+}
+
+/* Resets de base mantidos. Tailwind 4 ainda respeita @layer base. */
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+  body {
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+  }
+}
+
+/* Components custom — @apply continua funcionando em Tailwind 4. */
+@layer components {
+  .btn-primary {
+    @apply inline-flex items-center justify-center rounded-lg bg-brand-500 px-5 py-2.5 text-sm font-semibold text-white shadow-md transition hover:bg-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-300 focus:ring-offset-2 focus:ring-offset-slate-950;
+  }
+  .btn-secondary {
+    @apply inline-flex items-center justify-center rounded-lg border border-slate-700 px-5 py-2.5 text-sm font-semibold text-slate-100 transition hover:border-brand-400 hover:text-white;
+  }
+  .input-field {
+    @apply block w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500 focus:border-brand-400 focus:outline-none focus:ring-1 focus:ring-brand-400;
+  }
+  .input-label {
+    @apply mb-1.5 block text-sm font-medium text-slate-300;
+  }
+  .card {
+    @apply rounded-2xl border border-slate-800 bg-slate-900/60 p-6 shadow-lg backdrop-blur;
+  }
+}
+
+/* Em Tailwind 4 a fronteira default mudou de gray-200 pra currentColor.
+ * Pra manter o comportamento de Tailwind 3 onde `border-X` sem cor
+ * caia em slate-700 do dark mode, mantemos override leve aqui. */
+@layer base {
+  *, ::before, ::after {
+    border-color: var(--color-slate-700, currentColor);
+  }
+}

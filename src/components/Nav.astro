@@ -1,0 +1,111 @@
+---
+import { SITE_NAME, DASHBOARD_URL } from '~/config';
+const path = Astro.url.pathname;
+
+// Items "publicos" — sempre aparecem. Em mobile, alguns ficam escondidos
+// (overflow nao cabe — Recursos/Segurança aparecem em sm+ apenas).
+const publicos = [
+  { href: '/', label: 'Início', mobileHidden: false },
+  { href: '/recursos', label: 'Recursos', mobileHidden: true },
+  { href: '/precos', label: 'Preços', mobileHidden: false },
+  { href: '/seguranca', label: 'Segurança', mobileHidden: true },
+];
+
+// Items mostrados condicionalmente — Nav comeca com `nav-deslogado` visivel
+// (caso comum: visitante anonimo). Apos o fetch /cliente/auth/me, o JS troca
+// pra `nav-logado` se 200. Cookie cliente_session e' HttpOnly entao nao da
+// pra detectar via JS direto — fonte de verdade fica no backend.
+---
+<header class="sticky top-0 z-30 border-b border-slate-800/80 bg-slate-950/80 backdrop-blur">
+  <div class="mx-auto flex max-w-6xl items-center justify-between px-4 py-3 sm:px-6">
+    <a href="/" class="flex items-center gap-2 font-semibold tracking-tight">
+      <span class="grid size-7 place-items-center rounded-md bg-brand-500 text-white">DS</span>
+      <span class="hidden text-slate-100 sm:inline">{SITE_NAME}</span>
+    </a>
+    <nav class="flex items-center gap-1 sm:gap-3">
+      {publicos.map(item => (
+        <a
+          href={item.href}
+          class:list={[
+            'rounded-md px-3 py-1.5 text-sm transition',
+            item.mobileHidden && 'hidden sm:inline-block',
+            path === item.href ? 'text-white' : 'text-slate-300 hover:text-white',
+          ]}
+        >
+          {item.label}
+        </a>
+      ))}
+
+      {/* Wrapper externo controla display via class `hidden` (toggle JS).
+          Wrapper interno aplica flex layout — evita conflito Tailwind
+          entre `hidden` (display:none) e `flex` (display:flex) na mesma
+          tag. */}
+      <div id="nav-deslogado">
+        <div class="flex items-center gap-1 sm:gap-3">
+          <a
+            href="/cliente/login"
+            class:list={[
+              'rounded-md px-3 py-1.5 text-sm transition',
+              path === '/cliente/login' ? 'text-white' : 'text-slate-300 hover:text-white',
+            ]}
+          >Entrar</a>
+          <a href="/cliente/cadastro" class="btn-primary !py-1.5 !px-4 ml-1">Criar conta</a>
+        </div>
+      </div>
+
+      {/* Logado: Painel (interno) + Configuracoes + Sair. Comeca hidden pra
+          nao piscar pro visitante deslogado (caso dominante). DASHBOARD_URL
+          (Grafana externo) sai como botao primario; /cliente/painel e' o
+          home interno. */}
+      <div id="nav-logado" class="hidden">
+        <div class="flex items-center gap-1 sm:gap-3">
+          <a
+            href="/cliente/painel"
+            class:list={[
+              'rounded-md px-3 py-1.5 text-sm transition',
+              path === '/cliente/painel' ? 'text-white' : 'text-slate-300 hover:text-white',
+            ]}
+          >Painel</a>
+          <a
+            href="/cliente/configuracoes"
+            class:list={[
+              'hidden rounded-md px-3 py-1.5 text-sm transition sm:inline-block',
+              path.startsWith('/cliente/configuracoes') ? 'text-white' : 'text-slate-300 hover:text-white',
+            ]}
+          >Configurações</a>
+          <a href={DASHBOARD_URL} class="btn-primary !py-1.5 !px-4 ml-1" data-cta="nav-grafana">Métricas</a>
+          <button
+            id="nav-logout"
+            type="button"
+            class="rounded-md px-3 py-1.5 text-sm text-slate-300 transition hover:text-white"
+          >Sair</button>
+        </div>
+      </div>
+    </nav>
+  </div>
+</header>
+
+<script>
+  import { aplicarEstadoLogado, criarFetcherMe } from '~/lib/nav-auth';
+  import { API_URL } from '~/config';
+
+  // Fire-and-forget — Nav comeca em estado deslogado e troca quando souber.
+  // Nao bloquear render: usuario ve a Nav imediatamente.
+  void aplicarEstadoLogado(criarFetcherMe(API_URL), document);
+
+  // Logout: POST /cliente/auth/logout (backend revoga sessao + limpa cookie),
+  // depois reload pra atualizar UI.
+  const btnLogout = document.getElementById('nav-logout');
+  btnLogout?.addEventListener('click', async () => {
+    try {
+      await fetch(`${API_URL}/cliente/auth/logout`, {
+        method: 'POST',
+        credentials: 'include',
+      });
+    } catch {
+      // mesmo se a request falhar, recarregar — backend pode ter limpado
+      // antes da rede cair, ou usuario quer simplesmente sair localmente.
+    }
+    window.location.href = '/';
+  });
+</script>
