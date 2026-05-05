@@ -1,0 +1,65 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    name: pip-audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405  # v5
+        with:
+          python-version: '3.12'
+      - name: Normalizar encoding requirements.txt
+        run: |
+          if file requirements.txt | grep -qi 'UTF-16'; then
+            iconv -f UTF-16 -t UTF-8 requirements.txt > requirements.utf8.txt
+            mv requirements.utf8.txt requirements.txt
+          fi
+      - run: pip install pip-audit
+      - name: pip-audit (falha em CVE known)
+        run: pip-audit --strict --requirement requirements.txt
+
+  lint:
+    name: ruff
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405  # v5
+        with:
+          python-version: '3.12'
+      - run: pip install ruff
+      - run: ruff check .
+
+  test:
+    name: pytest
+    runs-on: ubuntu-latest
+    env:
+      FLASK_ENV: development
+      INFLUXDB_ENABLED: "false"
+      SECRET_KEY: ci-test-key-nao-usar-em-producao
+      ADMIN_API_TOKEN: ci-test-token
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405  # v5
+        with:
+          python-version: '3.12'
+      - name: Normalizar encoding requirements.txt
+        run: |
+          if file requirements.txt | grep -qi 'UTF-16'; then
+            iconv -f UTF-16 -t UTF-8 requirements.txt > requirements.utf8.txt
+            mv requirements.utf8.txt requirements.txt
+          fi
+      - name: Instalar dependencias
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt pytest
+      - name: pytest
+        run: pytest -x --tb=short

@@ -1,0 +1,36 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+    paths:
+      - 'ansible/**'
+      - '!ansible/**/*.example.yml'
+      - '!ansible/**/*.example.ini'
+      - '!ansible/README.md'
+
+permissions:
+  contents: read
+
+jobs:
+  ansible-syntax:
+    name: Ansible playbook syntax
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405  # v5
+        with:
+          python-version: '3.12'
+      - name: Instalar ansible
+        run: pip install 'ansible-core>=2.16' 'ansible>=9'
+      - name: Copiar group_vars de exemplo
+        working-directory: ansible
+        run: cp group_vars/all.example.yml group_vars/all.yml
+      - name: Dummy vault password
+        run: echo "ci-dummy-not-used-for-decrypt" > /tmp/ansible-vault-pass
+      - name: Syntax check
+        working-directory: ansible
+        env:
+          ANSIBLE_VAULT_PASSWORD_FILE: /tmp/ansible-vault-pass
+        run: ansible-playbook --syntax-check -i inventory.example.ini playbook.yml

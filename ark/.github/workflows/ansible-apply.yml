@@ -1,0 +1,79 @@
+name: Ansible Apply
+
+# CD de infra: roda ansible-apply automaticamente quando arquivos do Ansible
+# mudam em main. Coordena com deploy.yml (danpqdan/portifolio) via concurrency
+# group `deploy-production` — serializa apply com rebuild de app pra evitar
+# race entre escrita de .env e recreate de container.
+#
+# PRE-REQUISITO: runner `production-vps` registrado como runner de organizacao
+# em DSPlayAnalytics (Settings → Actions → Runners → New self-hosted runner).
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'ansible/**'
+      - '!ansible/**/*.example.yml'
+      - '!ansible/**/*.example.ini'
+      - '!ansible/README.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  apply:
+    name: Ansible apply + recreate condicional
+    runs-on: [self-hosted, production-vps]
+    environment: production
+
+    steps:
+      - name: Apply + recreate
+        run: |
+          set -euo pipefail
+          cd /opt/portifolio
+
+          echo "==> git state antes"
+          git rev-parse --short HEAD
+
+          echo "==> fetch + reset para origin/main"
+          git fetch --prune origin main
+          git reset --hard origin/main
+
+          echo "==> git state apos"
+          git rev-parse --short HEAD
+          git log --oneline -1
+
+          ENV_HASH_BEFORE=$(md5sum backend/.env 2>/dev/null | cut -d' ' -f1 || echo none)
+
+          echo "==> ansible-apply"
+          make -f ark/Makefile ansible-apply
+
+          ENV_HASH_AFTER=$(md5sum backend/.env | cut -d' ' -f1)
+
+          if [ "$ENV_HASH_BEFORE" != "$ENV_HASH_AFTER" ]; then
+            echo "==> backend/.env mudou — force-recreate"
+            docker compose up -d --force-recreate --no-deps backend
+
+            echo "==> aguardando backend saudavel (timeout ~60s)"
+            ok=0
+            for i in $(seq 1 20); do
+              if curl -sf http://127.0.0.1:5000/health/app >/dev/null 2>&1; then
+                ok=1; break
+              fi
+              sleep 3
+            done
+
+            if [ "$ok" -ne 1 ]; then
+              echo "::error::Backend nao saudavel apos recreate. Logs:"
+              docker compose logs --tail 100 backend
+              exit 1
+            fi
+            echo "==> backend OK pos-recreate"
+          else
+            echo "==> backend/.env inalterado, sem recreate"
+          fi

@@ -1,0 +1,138 @@
+name: Prod Security Regression
+
+# Smoke contra regressoes de seguranca em producao.
+# Roda diariamente e em push em main (qualquer mudanca de infra pode afetar comportamento em prod).
+
+on:
+  schedule:
+    - cron: '17 3 * * *'
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  debugger-leak:
+    name: Werkzeug debugger nao vazou
+    runs-on: ubuntu-latest
+    env:
+      HOST: https://api.dsplayground.com.br
+    steps:
+      - name: debugger.js publico → conteudo Werkzeug ausente no body
+        run: |
+          body=$(curl -sk "${HOST}/?__debugger__=yes&cmd=resource&f=debugger.js")
+          if echo "$body" | grep -qE 'Werkzeug|__debugger__|debugger\.js'; then
+            echo "::error::REGRESSAO: Werkzeug debugger acessivel publicamente."
+            exit 1
+          fi
+          echo "OK: sem Werkzeug debugger"
+
+      - name: /console publico → != 200
+        run: |
+          code=$(curl -sk -o /dev/null -w '%{http_code}' "${HOST}/console")
+          [ "$code" = "200" ] && { echo "::error::REGRESSAO: /console acessivel."; exit 1; }
+          echo "OK: /console bloqueado (HTTP $code)"
+
+      - name: Health responde 200
+        run: |
+          code=$(curl -sk -o /dev/null -w '%{http_code}' "${HOST}/health/app")
+          [ "$code" != "200" ] && { echo "::error::Backend nao saudavel (HTTP $code)."; exit 1; }
+          echo "OK: /health/app = 200"
+
+      - name: FLASK_ENV=production no health
+        run: |
+          body=$(curl -sk "${HOST}/health/app")
+          echo "$body"
+          echo "$body" | grep -q '"ambiente": *"production"' \
+            || { echo "::error::REGRESSAO: ambiente != production."; exit 1; }
+
+  apex-landing:
+    name: Apex serve landing estatica (CF Pages)
+    runs-on: ubuntu-latest
+    env:
+      APEX: https://dsplayground.com.br
+    steps:
+      - name: Sem Vite dev server no apex
+        run: |
+          body=$(curl -sk "${APEX}/")
+          echo "$body" | grep -q '@vite/client' \
+            && { echo "::error::REGRESSAO: @vite/client detectado no apex."; exit 1; }
+          echo "OK: sem @vite/client"
+
+      - name: Bundle estatico (/_astro/* ou /assets/*) responde 200
+        run: |
+          body=$(curl -sk "${APEX}/")
+          asset=$(echo "$body" | grep -oE '/(_astro|assets)/[a-zA-Z0-9._-]+\.(js|css)' | head -1)
+          [ -z "$asset" ] && { echo "::error::Bundle estatico nao encontrado."; exit 1; }
+          echo "Asset: $asset"
+          code=$(curl -sk -o /dev/null -w '%{http_code}' "${APEX}${asset}")
+          [ "$code" != "200" ] && { echo "::error::Asset retornou HTTP $code."; exit 1; }
+          echo "OK: asset = 200"
+
+  portifolio-producao:
+    name: Portfolio React servido estatico
+    runs-on: ubuntu-latest
+    env:
+      PORTFOLIO: https://portifolio.dsplayground.com.br
+    steps:
+      - name: Sem Vite dev server
+        run: |
+          body=$(curl -sk "${PORTFOLIO}/")
+          echo "$body" | grep -q '@vite/client' \
+            && { echo "::error::REGRESSAO: @vite/client em portifolio.X."; exit 1; }
+          echo "OK: sem @vite/client"
+
+      - name: Bundle /assets/* responde 200
+        run: |
+          body=$(curl -sk "${PORTFOLIO}/")
+          asset=$(echo "$body" | grep -oE '/assets/[a-zA-Z0-9._-]+\.(js|css)' | head -1)
+          [ -z "$asset" ] && { echo "::error::Bundle nao encontrado em portifolio.X."; exit 1; }
+          code=$(curl -sk -o /dev/null -w '%{http_code}' "${PORTFOLIO}${asset}")
+          [ "$code" != "200" ] && { echo "::error::Asset retornou HTTP $code."; exit 1; }
+          echo "OK: asset = 200"
+
+  metrics-leak:
+    name: /metrics nao vaza publicamente
+    runs-on: ubuntu-latest
+    steps:
+      - name: api.X /metrics bloqueado
+        run: |
+          code=$(curl -sk -o /dev/null -w '%{http_code}' https://api.dsplayground.com.br/metrics)
+          [ "$code" = "200" ] && { echo "::error::REGRESSAO: /metrics acessivel."; exit 1; }
+          echo "OK: /metrics bloqueado (HTTP $code)"
+
+      - name: portifolio.X /api/metrics bloqueado
+        run: |
+          code=$(curl -sk -o /dev/null -w '%{http_code}' https://portifolio.dsplayground.com.br/api/metrics)
+          [ "$code" = "200" ] && { echo "::error::REGRESSAO: /api/metrics acessivel."; exit 1; }
+          echo "OK: bloqueado (HTTP $code)"
+
+  app-x-fallback:
+    name: app.X /cliente/* redireciona pro apex
+    runs-on: ubuntu-latest
+    env:
+      APP: https://app.dsplayground.com.br
+      APEX: https://dsplayground.com.br
+    steps:
+      - name: /cliente/configuracoes → 302 apex
+        run: |
+          status=$(curl -sk -o /dev/null -w '%{http_code}' "${APP}/cliente/configuracoes")
+          target=$(curl -sk -o /dev/null -w '%{redirect_url}' "${APP}/cliente/configuracoes")
+          echo "HTTP $status → $target"
+          [[ "$status" != "302" && "$status" != "301" ]] \
+            && { echo "::error::Sem redirect (HTTP $status)."; exit 1; }
+          case "$target" in
+            "${APEX}"/cliente/*) echo "OK: redirect para apex" ;;
+            *) echo "::error::Redirect para destino inesperado: $target"; exit 1 ;;
+          esac
+
+      - name: /cliente/metricas/ NAO cai no fallback
+        run: |
+          target=$(curl -sk -o /dev/null -w '%{redirect_url}' "${APP}/cliente/metricas/")
+          case "$target" in
+            *"/cliente/metricas/"*)
+              echo "::error::REGRESSAO: /metricas/ caiu no fallback (→ $target)."; exit 1 ;;
+          esac
+          echo "OK: /metricas/ nao caiu no fallback"
