@@ -30,9 +30,11 @@ jobs:
           npm run build
 
       - name: Publish no GitHub Packages
+        # PACKAGES_TOKEN = PAT de danpqdan com write:packages
+        # (GITHUB_TOKEN da org DSPlayAnalytics nao tem permissao no namespace @danpqdan)
         run: npm publish
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NODE_AUTH_TOKEN: ${{ secrets.PACKAGES_TOKEN }}
 
       - name: Criar GitHub Release com bundle UMD anexado
         # Anexa dist/sdk.umd.js como asset do release pra uso direto via
