@@ -1,0 +1,157 @@
+---
+// Pagina de "Definir nova senha" apos clicar no link de recuperacao.
+// Token vem na query string `?t=<token>`. POST pra
+// /cliente/auth/recuperar-senha/confirmar com {token, nova_senha}.
+//
+// Servida pela landing (Astro estatico em CF Pages). Form reutiliza
+// componentes UI da pagina /cliente/cadastro.
+
+import Base from '~/layouts/Base.astro';
+import Button from '~/components/ui/Button.astro';
+import Card from '~/components/ui/Card.astro';
+import FormError from '~/components/ui/FormError.astro';
+import Input from '~/components/ui/Input.astro';
+import Section from '~/components/ui/Section.astro';
+---
+<Base
+  title="Definir nova senha"
+  description="Escolha uma nova senha para sua conta."
+  noindex={true}
+>
+  <Section narrow class="flex min-h-[70vh] flex-col justify-center">
+    <Card>
+      <h1 class="text-2xl font-bold text-white">Definir nova senha</h1>
+      <p class="mt-1 text-sm text-slate-400">
+        Escolha uma senha nova com pelo menos 8 caracteres. Apos
+        confirmar, voce sera logado automaticamente.
+      </p>
+
+      <FormError id="erro-link" class="mt-6">
+        <p class="font-semibold">Link invalido ou expirado.</p>
+        <p class="mt-1">
+          Pedidos de redefinicao valem 15 minutos e so podem ser usados
+          uma vez. <a href="/cliente/esqueci-senha" class="text-brand-300 hover:text-brand-200 underline">Pedir um novo link</a>.
+        </p>
+      </FormError>
+
+      <form id="form-redefinir" class="mt-6 space-y-4 hidden" novalidate>
+        <Input id="senha" type="password" label="Nova senha"
+               autocomplete="new-password" required minlength="8"
+               placeholder="••••••••" />
+        <Input id="senha2" type="password" label="Confirme a nova senha"
+               autocomplete="new-password" required minlength="8"
+               placeholder="••••••••" />
+
+        <FormError id="erro-form" />
+
+        <Button type="submit" id="submit" fullWidth
+                data-cta="form-redefinir-senha">Salvar nova senha</Button>
+
+        <p class="text-center text-sm text-slate-400">
+          Lembrou da senha antiga?
+          <a href="/cliente/login" class="text-brand-300 hover:text-brand-200">Entrar</a>
+        </p>
+      </form>
+
+      <FormError id="sucesso" variant="success" class="mt-6">
+        <p class="font-semibold">Senha redefinida.</p>
+        <p class="mt-1">
+          Voce ja esta logado. Redirecionando pro painel…
+        </p>
+      </FormError>
+    </Card>
+  </Section>
+
+  <script>
+    import { confirmarRecuperarSenha } from '~/lib/api';
+    import { API_URL } from '~/config';
+
+    const form = document.getElementById('form-redefinir') as HTMLFormElement | null;
+    const erroLink = document.getElementById('erro-link')!;
+    const erroForm = document.getElementById('erro-form')!;
+    const sucessoBox = document.getElementById('sucesso')!;
+    const submitBtn = document.getElementById('submit') as HTMLButtonElement | null;
+
+    function mostrarErro(msg: string) {
+      erroForm.textContent = msg;
+      erroForm.classList.remove('hidden');
+    }
+    function limparErro() {
+      erroForm.textContent = '';
+      erroForm.classList.add('hidden');
+    }
+
+    // Le token da query string. Se ausente OU veio com flag de erro do
+    // backend (?erro=token_invalido apos clicar link expirado), mostra
+    // mensagem em vez do form.
+    const params = new URLSearchParams(window.location.search);
+    const token = params.get('t') ?? '';
+    const flagErro = params.get('erro');
+
+    if (!token || flagErro) {
+      erroLink.classList.remove('hidden');
+    } else {
+      form?.classList.remove('hidden');
+    }
+
+    form?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      limparErro();
+
+      const senha = (document.getElementById('senha') as HTMLInputElement).value;
+      const senha2 = (document.getElementById('senha2') as HTMLInputElement).value;
+
+      if (senha.length < 8) {
+        mostrarErro('Senha precisa de pelo menos 8 caracteres.');
+        return;
+      }
+      if (senha !== senha2) {
+        mostrarErro('As senhas nao coincidem.');
+        return;
+      }
+
+      submitBtn!.disabled = true;
+      submitBtn!.textContent = 'Salvando…';
+
+      const r = await confirmarRecuperarSenha(
+        { token, nova_senha: senha },
+        { apiUrl: API_URL },
+      );
+
+      const sdk = (window as any).__dsplayground;
+
+      if (r.ok) {
+        sdk?.enviarEvento?.('redefinir_senha_ok', {});
+        form.classList.add('hidden');
+        sucessoBox.classList.remove('hidden');
+        // Pequeno delay pra usuario ver a mensagem antes do redirect.
+        setTimeout(() => {
+          window.location.href = r.redirect ?? '/cliente/metricas';
+        }, 1500);
+        return;
+      }
+
+      sdk?.enviarEvento?.('formulario_erro', {
+        formulario: 'redefinir-senha', code: r.code, status: r.status,
+      });
+
+      if (r.code === 'TOKEN_INVALIDO' || r.code === 'TOKEN_AUSENTE') {
+        // Token foi invalidado entre o GET e o POST (clique duplo, expiracao
+        // exata na hora). Mostra a tela de erro principal.
+        form.classList.add('hidden');
+        erroLink.classList.remove('hidden');
+        return;
+      }
+
+      mostrarErro(
+        r.code === 'SENHA_CURTA'
+          ? 'Senha muito curta. Use pelo menos 8 caracteres.'
+          : r.code === 'REDE'
+            ? 'Sem internet. Tenta de novo.'
+            : 'Nao foi possivel salvar agora. Tenta de novo.',
+      );
+      submitBtn!.disabled = false;
+      submitBtn!.textContent = 'Salvar nova senha';
+    });
+  </script>
+</Base>

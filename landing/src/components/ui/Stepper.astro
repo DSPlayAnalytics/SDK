@@ -1,0 +1,87 @@
+---
+/**
+ * Stepper — indicador visual de progresso em wizards (numerado).
+ *
+ * Uso:
+ *   <Stepper
+ *     steps={[
+ *       { id: 'key',    label: 'Pegar a key' },
+ *       { id: 'snippet',label: 'Colar no site' },
+ *       { id: 'evento', label: 'Esperar evento' },
+ *     ]}
+ *     current="snippet"
+ *   />
+ *
+ * Estados visuais:
+ *   - completed (passos antes do current): check + brand
+ *   - current: numero + brand cheio
+ *   - pending: numero + slate
+ *
+ * Acessibilidade: ol com aria-label; cada step com aria-current="step"
+ * quando ativo. Conector horizontal entre steps em md+, vertical em sm.
+ */
+interface Step {
+  id: string;
+  label: string;
+}
+
+interface Props {
+  steps: Step[];
+  current: string;
+  ariaLabel?: string;
+  class?: string;
+}
+
+const { steps, current, ariaLabel = 'Progresso', class: extraClass } = Astro.props;
+
+const currentIdx = steps.findIndex((s) => s.id === current);
+---
+<ol
+  aria-label={ariaLabel}
+  class:list={[
+    'flex flex-col gap-3 md:flex-row md:items-center md:gap-2',
+    extraClass,
+  ]}
+>
+  {steps.map((step, idx) => {
+    const isCompleted = idx < currentIdx;
+    const isCurrent = idx === currentIdx;
+    const isPending = idx > currentIdx;
+
+    return (
+      <li
+        class="flex flex-1 items-center gap-3"
+        aria-current={isCurrent ? 'step' : undefined}
+        data-step-id={step.id}
+        data-step-state={isCompleted ? 'completed' : isCurrent ? 'current' : 'pending'}
+      >
+        <span
+          class:list={[
+            'flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full text-sm font-semibold ring-2',
+            isCompleted && 'bg-brand-500 text-white ring-brand-500',
+            isCurrent && 'bg-brand-500 text-white ring-brand-300 shadow-elev-1',
+            isPending && 'bg-slate-900 text-slate-400 ring-slate-700',
+          ]}
+          aria-hidden="true"
+        >
+          {isCompleted ? '✓' : idx + 1}
+        </span>
+        <span
+          class:list={[
+            'flex-1 text-sm font-medium',
+            isPending ? 'text-slate-400' : 'text-white',
+          ]}
+        >{step.label}</span>
+        {idx < steps.length - 1 && (
+          <span
+            aria-hidden="true"
+            class:list={[
+              'hidden h-px flex-1 md:block',
+              isCompleted ? 'bg-brand-500' : 'bg-slate-700',
+            ]}
+          ></span>
+        )}
+      </li>
+    );
+  })}
+</ol>

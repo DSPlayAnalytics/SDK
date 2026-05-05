@@ -1,0 +1,20 @@
+{
+  "id_registro": "",
+  "timestamp_inicial": "agora",
+  "paginas": {
+    "/": [
+      {
+        "eventos": [
+          { "tipo": "evento_inventado", "timestamp": 1000, "dados": {} },
+          { "tipo": "click", "timestamp": "nao-numerico", "dados": {} },
+          "string-no-lugar-de-evento"
+        ],
+        "visualizacoes": 1,
+        "segundos": 5,
+        "timestamp_inicial": 1,
+        "timestamp_final": 2
+      }
+    ],
+    "/produto/x": "lista-esperada-aqui"
+  }
+}

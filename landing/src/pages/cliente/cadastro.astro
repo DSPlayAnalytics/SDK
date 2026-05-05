@@ -1,0 +1,125 @@
+---
+import Base from '~/layouts/Base.astro';
+import Button from '~/components/ui/Button.astro';
+import Card from '~/components/ui/Card.astro';
+import FormError from '~/components/ui/FormError.astro';
+import Input from '~/components/ui/Input.astro';
+import Section from '~/components/ui/Section.astro';
+---
+<Base
+  title="Criar conta"
+  description="Crie sua conta grátis e comece a entender seu site em minutos. Sem cartão de crédito."
+  noindex={false}
+>
+  <Section narrow class="flex min-h-[70vh] flex-col justify-center">
+    <Card>
+      <h1 class="text-2xl font-bold text-white">Criar conta</h1>
+      <p class="mt-1 text-sm text-slate-400">É grátis. Sem cartão de crédito.</p>
+
+      <form id="form-cadastro" class="mt-6 space-y-4" novalidate>
+        <Input id="nome_site" type="text" label="Nome do seu site ou negócio" autocomplete="organization" required placeholder="Minha Loja de Tênis" />
+        <Input
+          id="slug"
+          type="text"
+          label="Apelido do site"
+          autocomplete="off"
+          required
+          pattern="[a-z0-9](?:[a-z0-9\-]{1,30}[a-z0-9])"
+          minlength={3}
+          maxlength={32}
+          placeholder="minha-loja"
+          hint="Vai aparecer na URL do seu painel. Use letras minúsculas, números e hífen."
+        />
+        <Input id="email" type="email" label="Email" autocomplete="email" required placeholder="voce@suaempresa.com.br" />
+        <Input id="senha" type="password" label="Senha" autocomplete="new-password" required minlength={8} placeholder="pelo menos 8 caracteres" />
+
+        <FormError id="erro" />
+
+        <Button type="submit" id="submit" fullWidth data-cta="form-cadastro">Criar conta</Button>
+        <p class="text-center text-sm text-slate-400">
+          Já tem conta? <a href="/cliente/login" class="text-brand-300 hover:text-brand-200">Entrar</a>
+        </p>
+      </form>
+    </Card>
+  </Section>
+
+  <script>
+    import { cadastrar } from '~/lib/api';
+    import { resolverDestinoPosLogin } from '~/lib/redirect';
+    import { API_URL } from '~/config';
+
+    // Cadastro novo direciona pro /cliente/onboarding (wizard guiado)
+    // em vez do POS_LOGIN_URL — onboarding cobre os primeiros 3 passos
+    // (copy key, snippet, esperar primeiro evento). Login existente
+    // segue caindo em POS_LOGIN_URL via login.astro.
+    const ONBOARDING_URL = '/cliente/onboarding';
+
+    const form = document.getElementById('form-cadastro') as HTMLFormElement | null;
+    const erroBox = document.getElementById('erro')!;
+    const submitBtn = document.getElementById('submit') as HTMLButtonElement | null;
+
+    function mensagemPorCode(code: string): string {
+      switch (code) {
+        case 'EMAIL_JA_CADASTRADO': return 'Esse email já tem conta. Você pode entrar por aqui mesmo.';
+        case 'SLUG_JA_CADASTRADO':  return 'Esse apelido já está sendo usado. Tenta outro.';
+        case 'SLUG_INVALIDO':       return 'Apelido inválido. Use letras minúsculas, números e hífen (3 a 32 caracteres).';
+        case 'EMAIL_INVALIDO':      return 'Esse email não parece válido. Confere se digitou certo.';
+        case 'SENHA_CURTA':         return 'A senha precisa ter pelo menos 8 caracteres.';
+        case 'PAYLOAD_INCOMPLETO':  return 'Preencha todos os campos pra continuar.';
+        case 'REDE':                return 'Sem internet agora. Tenta de novo em alguns segundos.';
+        default:                    return 'Não deu pra criar a conta agora. Tenta de novo, por favor.';
+      }
+    }
+
+    function mostrarErro(msg: string) {
+      erroBox.textContent = msg;
+      erroBox.classList.remove('hidden');
+    }
+    function limparErro() {
+      erroBox.textContent = '';
+      erroBox.classList.add('hidden');
+    }
+
+    form?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      limparErro();
+      submitBtn!.disabled = true;
+      submitBtn!.textContent = 'Criando conta…';
+
+      const fd = new FormData(form);
+      const payload = {
+        email: String(fd.get('email') ?? '').trim(),
+        senha: String(fd.get('senha') ?? ''),
+        nome_site: String(fd.get('nome_site') ?? '').trim(),
+        slug: String(fd.get('slug') ?? '').trim().toLowerCase(),
+      };
+
+      const r = await cadastrar(payload, { apiUrl: API_URL });
+
+      const sdk = (window as any).__dsplayground;
+
+      if (r.ok) {
+        sdk?.enviarEvento?.('cadastro_concluido', {
+          site_id: r.user.site_id, plano: r.site.plano,
+        });
+        sdk?.trackSignup?.(r.site.plano || 'free', { source: 'cadastro' });
+        // Respeita ?next= se valido (cliente veio de pagina protegida).
+        // Fallback default e' o wizard de onboarding — cobre key+snippet+
+        // primeiro evento. Cliente que ja sabe usar pula via "Pular onboarding".
+        const dest = resolverDestinoPosLogin(
+          new URL(window.location.href).searchParams,
+          ONBOARDING_URL,
+        );
+        window.location.href = dest;
+        return;
+      }
+
+      sdk?.enviarEvento?.('formulario_erro', {
+        formulario: 'cadastro', code: r.code, status: r.status,
+      });
+      mostrarErro(mensagemPorCode(r.code));
+      submitBtn!.disabled = false;
+      submitBtn!.textContent = 'Criar conta';
+    });
+  </script>
+</Base>

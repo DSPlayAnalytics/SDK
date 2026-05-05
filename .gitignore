@@ -1,0 +1,62 @@
+# Logs em runtime
+backend/security.log
+*.log
+!docs/**/*.log
+
+# Bundles do SDK
+frontend/dist/
+
+# Vagrant
+ark/teste-ambiente-b/.vagrant/
+**/.vagrant/
+
+# Ansible
+ark/ansible/inventory.ini
+ark/ansible/group_vars/all.yml
+# Senha do vault — jamais versionar
+.vault-password
+
+# Monitoring (.env com senha real)
+ark/monitoring/.env
+ark/monitoring/alertmanager/slack_webhook.url
+ark/crowdsec/.env
+
+# Editor
+.vscode/
+.idea/
+*.swp
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+backend/venv/
+
+# Node
+frontend/node_modules/
+
+# Segredos do backend (prod nao deve versionar)
+backend/.env
+backend/.env.*
+!backend/.env.example
+
+# Compose secrets (raiz)
+/.env
+
+# Auth tokens — nunca versionar (NODE_AUTH_TOKEN, etc.)
+.npmrc.local
+.env.local
+**/auth_token
+**/*.token
+cookies.txt
+
+# Dados runtime do backend (auth multi-tenant)
+backend/data/keys/
+backend/data/tenants.db
+backend/data/tenants.db-*
+
+# Quando o backend roda local com bind mount, o volume `portifolio_backend_keys`
+# aparece como `data/` na raiz do repo. Jamais versionar — sao chaves RSA do
+# JWT do SDK e auth multi-tenant.
+/data/
+.claude

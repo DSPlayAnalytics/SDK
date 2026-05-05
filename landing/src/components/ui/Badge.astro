@@ -1,0 +1,62 @@
+---
+/**
+ * Badge — chip de status compacto. Usado pra:
+ *   - rotular ambiente (production/staging) em listas de keys
+ *   - status de quota (ok/proximo do limite/excedido)
+ *   - tags de plano (Free/Pro/Business)
+ *
+ * Variantes mapeam para os tokens semanticos do tailwind.config.mjs.
+ * `dot` adiciona indicador circular antes do texto (status badges).
+ */
+type Variant = 'neutral' | 'brand' | 'success' | 'warning' | 'danger' | 'info';
+type Size = 'sm' | 'md';
+
+interface Props {
+  variant?: Variant;
+  size?: Size;
+  dot?: boolean;
+  class?: string;
+}
+
+const {
+  variant = 'neutral',
+  size = 'sm',
+  dot = false,
+  class: extraClass,
+} = Astro.props;
+
+// Strings completas (Tailwind so detecta literais — concat dinamico nao funciona).
+const variantClasses: Record<Variant, string> = {
+  neutral: 'bg-slate-800 text-slate-200 ring-slate-700',
+  brand:   'bg-brand-500/15 text-brand-200 ring-brand-500/30',
+  success: 'bg-success-500/15 text-success-200 ring-success-500/30',
+  warning: 'bg-warning-500/15 text-warning-200 ring-warning-500/30',
+  danger:  'bg-danger-500/15 text-danger-200 ring-danger-500/30',
+  info:    'bg-info-500/15 text-info-200 ring-info-500/30',
+};
+
+const dotClasses: Record<Variant, string> = {
+  neutral: 'bg-slate-400',
+  brand:   'bg-brand-400',
+  success: 'bg-success-400',
+  warning: 'bg-warning-400',
+  danger:  'bg-danger-400',
+  info:    'bg-info-400',
+};
+
+const sizeClasses: Record<Size, string> = {
+  sm: 'text-xs px-2 py-0.5',
+  md: 'text-sm px-2.5 py-1',
+};
+
+const classes = [
+  'inline-flex items-center gap-1.5 rounded-full font-medium ring-1 ring-inset',
+  variantClasses[variant],
+  sizeClasses[size],
+  extraClass ?? '',
+].filter(Boolean).join(' ');
+---
+<span class={classes} data-variant={variant}>
+  {dot && <span class={`h-1.5 w-1.5 rounded-full ${dotClasses[variant]}`} aria-hidden="true" />}
+  <slot />
+</span>

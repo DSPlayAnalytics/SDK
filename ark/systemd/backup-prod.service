@@ -1,0 +1,35 @@
+[Unit]
+Description=Backup operacional dsplayground (postgres + keys + grafana + influx config)
+Documentation=file:/opt/portifolio/ark/docs/backup-restore.md
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+# Roda como root porque precisa docker, ler /home/deploy se for o caso, e
+# escrever em /var/lib/backup-prod e /var/log/backup-prod.log.
+User=root
+Group=root
+WorkingDirectory=/opt/portifolio
+ExecStart=/opt/portifolio/ark/scripts/backup-prod.sh
+
+# Saida vai pro journal alem de /var/log/backup-prod.log.
+StandardOutput=journal
+StandardError=journal
+TimeoutStartSec=900
+
+# Hardening — backup precisa de mais que o agent-smoke.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ReadWritePaths=/var/lib/backup-prod /var/log
+ProtectHome=read-only
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+RestrictNamespaces=true
+LockPersonality=true
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,113 @@
+name: Credenciais — reminder de rotacao
+
+# Roda dia 1 de cada mes 09:00 UTC. Le ark/docs/credenciais-rotacoes.yml,
+# calcula next_due (last_rotated + cadence_days) e abre issue se
+# today >= next_due - 7d (incluindo "nunca rotacionada" -> sempre vencida).
+#
+# Procedimento de cada credencial: ark/docs/credenciais-cadence.md.
+on:
+  schedule:
+    - cron: '0 9 1 * *'   # 1o dia do mes
+  workflow_dispatch:       # gatilho manual pra testar
+
+permissions:
+  issues: write
+  contents: read
+
+jobs:
+  reminder:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405  # v6.2.0
+        with:
+          python-version: '3.12'
+      - name: Instalar pyyaml
+        run: pip install pyyaml
+      - name: Verificar credenciais vencidas / proximas a vencer
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+        run: |
+          python3 - <<'PY'
+          import yaml, datetime, json, os, subprocess
+
+          today = datetime.date.today()
+          with open('ark/docs/credenciais-rotacoes.yml') as f:
+              creds = yaml.safe_load(f)
+
+          due = []
+          for c in creds:
+              cadence = datetime.timedelta(days=c['cadence_days'])
+              if c['last_rotated']:
+                  last = c['last_rotated']
+                  if isinstance(last, str):
+                      last = datetime.date.fromisoformat(last)
+                  next_due = last + cadence
+              else:
+                  # Nunca rotacionada — considera vencida hoje.
+                  next_due = today
+              days = (next_due - today).days
+              if days <= 7:
+                  due.append({
+                      'name': c['name'],
+                      'days_until': days,
+                      'critical': c.get('critical', False),
+                      'next_due': next_due.isoformat(),
+                  })
+
+          if not due:
+              print('Nenhuma credencial vencendo nos proximos 7d.')
+              raise SystemExit(0)
+
+          # Monta corpo da issue
+          lines = [
+              '## Rotacoes de credenciais pendentes',
+              '',
+              'Procedimento de cada uma em [ark/docs/credenciais-cadence.md](../tree/main/ark/docs/credenciais-cadence.md).',
+              '',
+              '| Credencial | Status | Vence | Critica |',
+              '|---|---|---|---|',
+          ]
+          for d in due:
+              status = 'NUNCA rotacionada' if d['days_until'] < -360 else (
+                  'VENCIDA' if d['days_until'] < 0 else f"em {d['days_until']}d"
+              )
+              critical = 'sim' if d['critical'] else '-'
+              lines.append(f"| `{d['name']}` | {status} | {d['next_due']} | {critical} |")
+          lines.append('')
+          lines.append('Apos rotacionar, atualizar `last_rotated` em `ark/docs/credenciais-rotacoes.yml` e fechar a issue.')
+
+          body = '\n'.join(lines)
+
+          critical_count = sum(1 for d in due if d['critical'])
+          title = f"[ROTACAO] {len(due)} credencial(is) pendente(s)"
+          if critical_count:
+              title += f" ({critical_count} critica(s))"
+
+          # Cria issue via gh API. Usa o REST API direto pra nao depender do gh CLI
+          # estar instalado.
+          import urllib.request, urllib.error
+          req_body = json.dumps({
+              'title': title,
+              'body': body,
+              'labels': ['security', 'rotacao-credenciais'] + (['P0'] if critical_count else ['P2']),
+          }).encode()
+          req = urllib.request.Request(
+              f"https://api.github.com/repos/{os.environ['REPO']}/issues",
+              data=req_body,
+              headers={
+                  'Authorization': f"Bearer {os.environ['GH_TOKEN']}",
+                  'Accept': 'application/vnd.github+json',
+                  'X-GitHub-Api-Version': '2022-11-28',
+              },
+              method='POST',
+          )
+          try:
+              with urllib.request.urlopen(req) as resp:
+                  out = json.load(resp)
+                  print(f"Issue #{out['number']} criada: {out['html_url']}")
+          except urllib.error.HTTPError as e:
+              print(f"Erro {e.code}: {e.read().decode()}")
+              raise
+          PY

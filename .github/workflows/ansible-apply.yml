@@ -1,0 +1,95 @@
+name: Ansible Apply
+
+# CD de infra: roda `make ansible-apply` automaticamente quando arquivos
+# do Ansible mudam em main. Antes era manual (memoria de drift: editar
+# vault, esquecer de aplicar, container com env antigo). Agora todo
+# merge que toca infra dispara apply + recreate condicional do backend.
+#
+# Coordena com deploy.yml via mesma concurrency group `deploy-production`
+# — apply sempre serializa com rebuild de backend/frontend, evitando race
+# (ex.: deploy.yml recriar backend enquanto apply ainda escreve .env).
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'ark/ansible/**'
+      # Exclude: arquivos que nao afetam o estado aplicado.
+      - '!ark/ansible/**/*.example.yml'
+      - '!ark/ansible/**/*.example.ini'
+      - '!ark/ansible/README.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  apply:
+    name: Ansible apply + recreate condicional
+    runs-on: [self-hosted, production-vps]
+    environment: production
+
+    steps:
+      - name: Apply + recreate
+        run: |
+          set -euo pipefail
+          cd /opt/portifolio
+
+          echo "==> git state antes"
+          git rev-parse --short HEAD
+
+          echo "==> fetch + reset para origin/main"
+          git fetch --prune origin main
+          git reset --hard origin/main
+
+          echo "==> git state apos"
+          git rev-parse --short HEAD
+          git log --oneline -1
+
+          # Hash do .env antes do apply pra detectar mudanca de env.
+          # Se nao existe ainda (primeira run), tratamos como "mudou" pra
+          # forçar recreate.
+          ENV_HASH_BEFORE=$(md5sum backend/.env 2>/dev/null | cut -d' ' -f1 || echo none)
+
+          echo "==> ansible-apply"
+          # Makefile faz `cd ark/ansible && ansible-playbook ...` — necessario
+          # pra ansible.cfg local ser lido (vault_password_file = .vault-password).
+          # A propria role aguarda /health/app no final do playbook, entao se
+          # ansible-apply termina com 0 = backend ja esta saudavel.
+          make -f ark/Makefile ansible-apply
+
+          ENV_HASH_AFTER=$(md5sum backend/.env | cut -d' ' -f1)
+
+          if [ "$ENV_HASH_BEFORE" != "$ENV_HASH_AFTER" ]; then
+            echo "==> backend/.env mudou ($ENV_HASH_BEFORE -> $ENV_HASH_AFTER)"
+            echo "==> force-recreate do backend pra pickup do env novo"
+            # `restart` nao recarrega env_file. Sem isso, container fica com
+            # env antigo ate proximo deploy.yml (~3min de drift) ou intervencao
+            # manual (regressao classica antes deste workflow).
+            docker compose up -d --force-recreate --no-deps backend
+
+            echo "==> aguardando backend saudavel pos-recreate (timeout ~60s)"
+            ok=0
+            for i in $(seq 1 20); do
+              if curl -sf http://127.0.0.1:5000/health/app >/dev/null 2>&1; then
+                ok=1
+                break
+              fi
+              sleep 3
+            done
+
+            if [ "$ok" -ne 1 ]; then
+              echo "::error::Backend nao saudavel apos recreate. Logs:"
+              docker compose logs --tail 100 backend
+              exit 1
+            fi
+            echo "==> backend OK pos-recreate"
+          else
+            echo "==> backend/.env inalterado, sem recreate"
+          fi
+
+          echo "==> ansible-apply concluido"

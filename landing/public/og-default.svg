@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" width="1200" height="630">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0f172a"/>
+      <stop offset="100%" stop-color="#020617"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.2" cy="0.2" r="0.7">
+      <stop offset="0%" stop-color="#2c79e6" stop-opacity="0.35"/>
+      <stop offset="100%" stop-color="#2c79e6" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#7dd3fc"/>
+      <stop offset="100%" stop-color="#2c79e6"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="630" fill="url(#bg)"/>
+  <rect width="1200" height="630" fill="url(#glow)"/>
+  <g transform="translate(80,90)">
+    <rect x="0" y="0" width="64" height="64" rx="14" fill="#2c79e6"/>
+    <text x="32" y="44" font-family="system-ui, -apple-system, sans-serif" font-size="32" font-weight="700" fill="#ffffff" text-anchor="middle">DS</text>
+    <text x="84" y="44" font-family="system-ui, -apple-system, sans-serif" font-size="32" font-weight="600" fill="#e2e8f0">DS Playground Analytics</text>
+  </g>
+  <g transform="translate(80,220)">
+    <text font-family="system-ui, -apple-system, sans-serif" font-size="84" font-weight="800" fill="#ffffff">
+      <tspan x="0" dy="0">Entenda seu site</tspan>
+      <tspan x="0" dy="100" fill="url(#accent)">sem complicar.</tspan>
+    </text>
+  </g>
+  <g transform="translate(80,520)">
+    <text font-family="system-ui, -apple-system, sans-serif" font-size="28" font-weight="500" fill="#94a3b8">
+      Painel pronto · Dados só seus · Dentro da LGPD
+    </text>
+  </g>
+  <g transform="translate(960,540)">
+    <rect x="0" y="0" width="160" height="44" rx="10" fill="#2c79e6"/>
+    <text x="80" y="29" font-family="system-ui, -apple-system, sans-serif" font-size="18" font-weight="600" fill="#ffffff" text-anchor="middle">
+      dsplayground.com.br
+    </text>
+  </g>
+</svg>

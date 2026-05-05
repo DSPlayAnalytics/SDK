@@ -1,0 +1,45 @@
+{
+  "id_registro": "fixture-analytics-sintetico",
+  "app_id": "teste",
+  "ambiente": "production",
+  "timestamp_inicial": 1760000000000,
+  "timestamp_final": 1760000007000,
+  "paginas": {
+    "/": [
+      {
+        "eventos": [
+          { "tipo": "page_view", "timestamp": 1760000000500, "dados": { "page_id": "/", "path": "/", "title": "Home" } },
+          { "tipo": "click", "timestamp": 1760000001000, "dados": { "x": 10, "y": 20, "elemento_id": "botao-primario", "elemento_tipo": "button" } },
+          { "tipo": "click", "timestamp": 1760000002000, "dados": { "x": 30, "y": 40, "elemento_id": "link-contato", "elemento_tipo": "a" } },
+          { "tipo": "touch", "timestamp": 1760000003000, "dados": { "x": 50, "y": 60, "elemento_id": "card-mobile", "elemento_tipo": "div" } },
+          { "tipo": "scroll_depth", "timestamp": 1760000004000, "dados": { "marco": 50, "max_percent": 50 } },
+          { "tipo": "mouse_move", "timestamp": 1760000001100, "dados": { "x": 1, "y": 2 } },
+          { "tipo": "mouse_move", "timestamp": 1760000001200, "dados": { "x": 3, "y": 4 } },
+          { "tipo": "mouse_move", "timestamp": 1760000001300, "dados": { "x": 5, "y": 6 } },
+          { "tipo": "hover", "timestamp": 1760000004500, "dados": { "elemento_id": "hero-title", "elemento_tipo": "h1", "duracao_ms": 2000 } },
+          { "tipo": "element_exposure", "timestamp": 1760000005000, "dados": { "elemento_id": "hero", "duracao_ms": 5000, "percent_visivel_max": 100 } },
+          { "tipo": "web_vital", "timestamp": 1760000005200, "dados": { "nome": "LCP", "valor": 1800, "rating": "good", "id": "v3-lcp-1" } }
+        ],
+        "visualizacoes": 2,
+        "segundos": 12,
+        "timestamp_inicial": 1760000000000,
+        "timestamp_final": 1760000005000
+      }
+    ],
+    "/produto/a": [
+      {
+        "eventos": [
+          { "tipo": "page_view", "timestamp": 1760000005000, "dados": { "page_id": "/produto/a", "path": "/produto/a" } },
+          { "tipo": "click", "timestamp": 1760000005000, "dados": { "x": 70, "y": 80, "elemento_id": "comprar", "elemento_tipo": "button" } },
+          { "tipo": "scroll_depth", "timestamp": 1760000006000, "dados": { "marco": 50, "max_percent": 50 } },
+          { "tipo": "scroll_depth", "timestamp": 1760000006500, "dados": { "marco": 100, "max_percent": 100 } },
+          { "tipo": "element_exposure", "timestamp": 1760000006800, "dados": { "elemento_id": "preco", "duracao_ms": 3000, "percent_visivel_max": 80 } }
+        ],
+        "visualizacoes": 1,
+        "segundos": 8,
+        "timestamp_inicial": 1760000005000,
+        "timestamp_final": 1760000007000
+      }
+    ]
+  }
+}

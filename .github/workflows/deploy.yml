@@ -1,0 +1,106 @@
+name: Deploy Production
+
+# CD automatico via self-hosted runner na VPS (firewall upstream da HostGator
+# bloqueia SSH externo em portas non-standard, entao o runner local puxa jobs
+# via HTTPS outbound). O job roda como o usuario do runner (deploy).
+#
+# Mudancas de infra (roles Ansible, nginx do host, monitoring) continuam
+# exigindo `make -f ark/Makefile ansible-apply` manual.
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: read   # docker compose build precisa baixar @danpqdan/* (GitHub Packages)
+
+concurrency:
+  # Serializa deploys — uma fila ordenada e mais seguro que cancelar meio
+  # caminho (evita parar um rebuild e deixar stack em estado intermediario).
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Pull + rebuild + health check
+    runs-on: [self-hosted, production-vps]
+    environment: production
+    # Dispara se chamou manualmente ou se o CI que disparou terminou verde.
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')
+
+    steps:
+      - name: Pull + rebuild + health
+        # Usa /opt/portifolio diretamente (repo clonado pelo Ansible, owned
+        # por deploy:analytics). Nao usamos actions/checkout porque ele grava
+        # no workspace do runner, nao no repo de producao.
+        env:
+          # Token para baixar SDK privado @danpqdan/* do GitHub Packages
+          # durante `docker compose build frontend`. BuildKit secret no
+          # Dockerfile garante que nao escapa pra layer da imagem.
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_AUTH_TOKEN }}
+        run: |
+          set -euo pipefail
+          cd /opt/portifolio
+
+          echo "==> git state antes"
+          git rev-parse --short HEAD
+
+          echo "==> pre-flight: tree limpa? (proteção vs reset --hard sobrescrever ops manual)"
+          if ! git diff --quiet HEAD || ! git diff --cached --quiet; then
+            echo "::error::Working tree em /opt/portifolio tem mudanças não-comitadas."
+            echo "::error::Operador deve commitar/stashar antes do deploy automatico."
+            git status -sb
+            exit 1
+          fi
+          # Untracked files: tolerar (volumes/dump/log temporarios), mas listar.
+          if [ -n "$(git ls-files --others --exclude-standard)" ]; then
+            echo "::warning::Arquivos untracked detectados (nao bloqueiam deploy):"
+            git ls-files --others --exclude-standard
+          fi
+
+          echo "==> fetch + reset para origin/main"
+          git fetch --prune origin main
+          git reset --hard origin/main
+
+          echo "==> git state apos"
+          git rev-parse --short HEAD
+          git log --oneline -1
+
+          echo "==> rebuild + recreate containers de app (backend + frontend)"
+          # --no-deps mantem influxdb/postgres rodando — so toca o que pode
+          # ter mudado no codigo de app.
+          docker compose up -d --build --force-recreate --no-deps backend frontend
+
+          echo "==> aguardando health do backend (timeout ~60s)"
+          ok=0
+          for i in $(seq 1 20); do
+            if curl -sf http://127.0.0.1:5000/health/app >/dev/null 2>&1; then
+              ok=1
+              break
+            fi
+            sleep 3
+          done
+
+          if [ "$ok" -ne 1 ]; then
+            echo "::error::Backend nao respondeu saudavel em /health/app apos deploy"
+            docker compose logs --tail 100 backend
+            exit 1
+          fi
+          echo "==> health do backend: OK"
+
+          echo "==> smoke no frontend (nginx do container)"
+          code=$(curl -sk -o /dev/null -w '%{http_code}' http://127.0.0.1:3000/)
+          echo "HTTP $code"
+          if [ "$code" != "200" ]; then
+            echo "::error::Frontend nao respondeu 200 em 127.0.0.1:3000"
+            docker compose logs --tail 100 frontend
+            exit 1
+          fi
+
+          echo "==> deploy OK"

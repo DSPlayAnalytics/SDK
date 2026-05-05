@@ -1,0 +1,563 @@
+---
+/**
+ * Onboarding pos-cadastro — wizard de 3 passos:
+ *   1. Pegar publishable key (copiar)
+ *   2. Colar snippet no site (Tabs por plataforma: HTML / React / Next /
+ *      WordPress / Shopify)
+ *   3. Esperar primeiro evento (polling de configuracoes a cada 3s)
+ *
+ * Detecao de "primeiro evento": comparamos eventos_hoje no inicio
+ * (baseline) com leituras posteriores. Se baseline > 0, ja tem dado
+ * — mostra celebracao direto. Pra timeout, paramos polling apos 5min.
+ *
+ * Estado visivel via classe CSS (.js-step-1/2/3-active). hash do URL
+ * sincroniza pra suportar browser back. Ex: /cliente/onboarding#snippet
+ */
+import Base from '~/layouts/Base.astro';
+import Breadcrumbs from '~/components/ui/Breadcrumbs.astro';
+import Stepper from '~/components/ui/Stepper.astro';
+import Tabs from '~/components/ui/Tabs.astro';
+import Button from '~/components/ui/Button.astro';
+import Card from '~/components/ui/Card.astro';
+import EmptyState from '~/components/ui/EmptyState.astro';
+
+const steps = [
+  { id: 'key',     label: 'Pegar a key' },
+  { id: 'snippet', label: 'Colar no site' },
+  { id: 'evento',  label: 'Primeiro evento' },
+];
+
+const platformTabs = [
+  { id: 'html',      label: 'HTML / Wix' },
+  { id: 'react',     label: 'React' },
+  { id: 'next',      label: 'Next.js' },
+  { id: 'wordpress', label: 'WordPress' },
+  { id: 'shopify',   label: 'Shopify' },
+];
+---
+<Base
+  title="Configurando seu site"
+  description="3 passos pra ver seus eventos chegarem."
+  noindex={true}
+>
+  <section class="mx-auto max-w-4xl px-4 py-10 sm:px-6">
+    <Breadcrumbs
+      items={[
+        { href: '/cliente/painel', label: 'Painel' },
+        { label: 'Configurar SDK' },
+      ]}
+      class="mb-4"
+    />
+    <header>
+      <h1 class="text-3xl font-bold text-white">Vamos colocar pra rodar</h1>
+      <p class="mt-1 text-sm text-slate-400">3 passos. Em uns minutos você vê o primeiro evento.</p>
+    </header>
+
+    <!-- Stepper inicia no step 1; JS atualiza ao trocar passo -->
+    <div id="stepper-wrap" class="mt-8" data-current-step="key">
+      <Stepper steps={steps} current="key" />
+    </div>
+
+    <!-- Erro de carga -->
+    <div id="onb-erro" class="mt-8 hidden">
+      <EmptyState
+        variant="danger"
+        icon="⚠️"
+        title="Não foi possível carregar"
+        description="Verifique sua conexão ou faça login de novo."
+        action={{ href: '/cliente/login', label: 'Ir pro login', 'data-cta': 'onb-erro-login' }}
+      />
+    </div>
+
+    <!-- Skeleton -->
+    <div id="onb-loading" class="mt-8 h-48 w-full animate-pulse rounded-xl border border-slate-800 bg-slate-900/40" aria-busy="true"></div>
+
+    <!-- ====== STEP 1: KEY ====== -->
+    <div id="step-key" class="mt-8 hidden">
+      <Card>
+        <h2 class="text-xl font-semibold text-white">1. Pegue sua publishable key</h2>
+        <p class="mt-1 text-sm text-slate-400">
+          Essa é a key que o SDK usa pra te identificar. Cole no <code class="rounded bg-slate-800 px-1 py-0.5 font-mono text-xs">publishableKey</code> ao chamar
+          <code class="rounded bg-slate-800 px-1 py-0.5 font-mono text-xs">iniciarAnalytics()</code>. Trate como senha.
+        </p>
+
+        <div class="mt-6 rounded-lg border border-slate-700/60 bg-slate-900/60 p-4">
+          <div class="flex items-center justify-between gap-2">
+            <span id="onb-key-label" class="text-xs font-medium uppercase tracking-wide text-slate-400">—</span>
+            <button id="onb-copy-key" type="button" class="btn-secondary text-xs" data-cta="onb-copiar-key">Copiar</button>
+          </div>
+          <code
+            id="onb-key-valor"
+            class="mt-3 block break-all rounded bg-slate-950 px-3 py-2 font-mono text-xs text-slate-200"
+          >carregando…</code>
+        </div>
+
+        <div class="mt-6 flex flex-wrap items-center justify-between gap-3">
+          <a href="/cliente/painel" class="text-sm text-slate-400 hover:text-white" data-cta="onb-pular">Pular onboarding</a>
+          <Button id="onb-next-1" variant="primary" data-cta="onb-step1-next">Já copiei →</Button>
+        </div>
+      </Card>
+    </div>
+
+    <!-- ====== STEP 2: SNIPPET ====== -->
+    <div id="step-snippet" class="mt-8 hidden">
+      <Card>
+        <h2 class="text-xl font-semibold text-white">2. Cole no seu site</h2>
+        <p class="mt-1 text-sm text-slate-400">Escolha sua plataforma. O exemplo já vem com sua key.</p>
+
+        <div class="mt-6">
+          <Tabs tabs={platformTabs} ariaLabel="Plataforma">
+            <Fragment slot="html">
+              <div class="space-y-3">
+                <p class="text-sm text-slate-300">Copie e cole dentro de <code class="rounded bg-slate-800 px-1 py-0.5 font-mono text-xs">&lt;head&gt;</code> de todas as páginas.</p>
+                <pre class="overflow-x-auto rounded-lg bg-slate-950 p-4 text-xs text-slate-200"><code id="snippet-html" class="font-mono">carregando…</code></pre>
+                <button type="button" data-snippet="snippet-html" class="js-copy-snippet btn-secondary text-xs" data-cta="onb-copy-html">Copiar snippet</button>
+              </div>
+            </Fragment>
+            <Fragment slot="react">
+              <div class="space-y-3">
+                <p class="text-sm text-slate-300">Use o pacote npm. Inicialize uma vez no entrypoint da app.</p>
+                <pre class="overflow-x-auto rounded-lg bg-slate-950 p-4 text-xs text-slate-200"><code id="snippet-react" class="font-mono">carregando…</code></pre>
+                <button type="button" data-snippet="snippet-react" class="js-copy-snippet btn-secondary text-xs" data-cta="onb-copy-react">Copiar snippet</button>
+              </div>
+            </Fragment>
+            <Fragment slot="next">
+              <div class="space-y-3">
+                <p class="text-sm text-slate-300">Em <code class="rounded bg-slate-800 px-1 py-0.5 font-mono text-xs">app/layout.tsx</code> (App Router) ou <code class="rounded bg-slate-800 px-1 py-0.5 font-mono text-xs">pages/_app.tsx</code> (Pages Router).</p>
+                <pre class="overflow-x-auto rounded-lg bg-slate-950 p-4 text-xs text-slate-200"><code id="snippet-next" class="font-mono">carregando…</code></pre>
+                <button type="button" data-snippet="snippet-next" class="js-copy-snippet btn-secondary text-xs" data-cta="onb-copy-next">Copiar snippet</button>
+              </div>
+            </Fragment>
+            <Fragment slot="wordpress">
+              <div class="space-y-3">
+                <p class="text-sm text-slate-300">Em "Aparência → Personalizar → Código personalizado" ou via plugin "Insert Headers and Footers". Cole no <code class="rounded bg-slate-800 px-1 py-0.5 font-mono text-xs">&lt;head&gt;</code>.</p>
+                <pre class="overflow-x-auto rounded-lg bg-slate-950 p-4 text-xs text-slate-200"><code id="snippet-wordpress" class="font-mono">carregando…</code></pre>
+                <button type="button" data-snippet="snippet-wordpress" class="js-copy-snippet btn-secondary text-xs" data-cta="onb-copy-wordpress">Copiar snippet</button>
+              </div>
+            </Fragment>
+            <Fragment slot="shopify">
+              <div class="space-y-3">
+                <p class="text-sm text-slate-300">Em "Online Store → Themes → Edit code → theme.liquid". Cole logo antes de <code class="rounded bg-slate-800 px-1 py-0.5 font-mono text-xs">&lt;/head&gt;</code>.</p>
+                <pre class="overflow-x-auto rounded-lg bg-slate-950 p-4 text-xs text-slate-200"><code id="snippet-shopify" class="font-mono">carregando…</code></pre>
+                <button type="button" data-snippet="snippet-shopify" class="js-copy-snippet btn-secondary text-xs" data-cta="onb-copy-shopify">Copiar snippet</button>
+              </div>
+            </Fragment>
+          </Tabs>
+        </div>
+
+        <div class="mt-6 flex flex-wrap items-center justify-between gap-3">
+          <button id="onb-back-2" type="button" class="text-sm text-slate-400 hover:text-white" data-cta="onb-step2-back">← voltar</button>
+          <Button id="onb-next-2" variant="primary" data-cta="onb-step2-next">Já colei no site →</Button>
+        </div>
+      </Card>
+    </div>
+
+    <!-- ====== STEP 3: EVENT POLLING ====== -->
+    <div id="step-evento" class="mt-8 hidden">
+      <Card>
+        <h2 class="text-xl font-semibold text-white">3. Esperando o primeiro evento</h2>
+
+        <!-- Polling state -->
+        <div id="onb-aguardando" class="mt-6">
+          <div class="flex items-center gap-3 rounded-lg border border-slate-700/60 bg-slate-900/60 p-4">
+            <svg class="h-5 w-5 animate-spin text-brand-400" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" stroke-opacity="0.25" />
+              <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" stroke-width="3" stroke-linecap="round" />
+            </svg>
+            <p class="text-sm text-slate-300">
+              <span class="font-medium">Aguardando…</span>
+              Pode demorar uns 30 segundos depois de você instalar.
+              Mantenha esta aba aberta — atualizamos sozinhos.
+            </p>
+          </div>
+          <p class="mt-2 text-xs text-slate-500">Verificamos a cada 3 segundos. <span id="onb-poll-counter">0</span> tentativa(s).</p>
+        </div>
+
+        <!-- Timeout (5min) -->
+        <div id="onb-timeout" class="mt-6 hidden">
+          <EmptyState
+            variant="warning"
+            icon="🤔"
+            title="Ainda nada chegou"
+            description="Já se passaram 5 minutos. Confira se você colou o snippet em todas as páginas e se a key está exatamente como copiamos."
+            action={{ label: 'Tentar de novo' }}
+          />
+        </div>
+
+        <!-- Sucesso 🎉 -->
+        <div id="onb-sucesso" class="mt-6 hidden">
+          <div class="rounded-2xl border border-success-500/30 bg-success-500/5 p-8 text-center">
+            <span class="text-5xl" aria-hidden="true">🎉</span>
+            <h3 class="mt-4 text-2xl font-bold text-white">Primeiro evento recebido!</h3>
+            <p
+              id="onb-sucesso-msg"
+              class="mt-2 text-sm text-slate-300"
+            >Você acabou de virar cliente coletando dados de verdade.</p>
+            <div class="mt-6 flex flex-wrap items-center justify-center gap-3">
+              <Button href="/cliente/painel" variant="primary" data-cta="onb-finalizar-painel">Ir pro painel</Button>
+              <Button href="/cliente/configuracoes" variant="secondary" data-cta="onb-finalizar-config">Ver configurações</Button>
+            </div>
+          </div>
+        </div>
+
+        <div class="mt-6 flex justify-start">
+          <button id="onb-back-3" type="button" class="text-sm text-slate-400 hover:text-white" data-cta="onb-step3-back">← voltar pro snippet</button>
+        </div>
+      </Card>
+    </div>
+  </section>
+
+  <script>
+    import { obterConfiguracoes } from '~/lib/api';
+    import { API_URL } from '~/config';
+    import { showToast } from '~/lib/toast';
+
+    type StepId = 'key' | 'snippet' | 'evento';
+    const STEP_IDS: StepId[] = ['key', 'snippet', 'evento'];
+
+    const elLoading = document.getElementById('onb-loading')!;
+    const elErro = document.getElementById('onb-erro')!;
+    const stepperWrap = document.getElementById('stepper-wrap')!;
+    const stepEls: Record<StepId, HTMLElement> = {
+      key: document.getElementById('step-key')!,
+      snippet: document.getElementById('step-snippet')!,
+      evento: document.getElementById('step-evento')!,
+    };
+
+    let publishableKey = '';
+    let baselineEventos = 0;
+    let pollCount = 0;
+    let pollTimer: ReturnType<typeof setInterval> | null = null;
+    const POLL_INTERVAL_MS = 3000;
+    const POLL_MAX_ATTEMPTS = 100; // 5min
+
+    /** Atalho pra emitir evento dogfood — somos cliente do nosso produto.
+     *  __dsplayground vem do Base.astro; se SDK nao carregou, no-op silencioso. */
+    type SDKExtras = {
+      enviarEvento?: (nome: string, props: Record<string, unknown>) => void;
+      trackConversion?: (nome: string, valor?: number, props?: Record<string, unknown>) => void;
+    };
+    function sdk(): SDKExtras | null {
+      return ((window as any).__dsplayground as SDKExtras | undefined) ?? null;
+    }
+
+    function snippetHtml(key: string): string {
+      return `<script src="https://cdn.dsplayground.com.br/sdk/v0/sdk.umd.js"><\/script>
+<script>
+  window.DSPlayground.iniciarAnalytics({
+    publishableKey: '${key}',
+    websocketUrl: 'https://api.dsplayground.com.br',
+  });
+<\/script>`;
+    }
+
+    function snippetReact(key: string): string {
+      return `// 1) instalar
+// npm i @danpqdan/dsplayground-analytics-sdk
+
+// 2) src/main.tsx (ou onde sua app inicia)
+import { iniciarAnalytics } from '@danpqdan/dsplayground-analytics-sdk';
+
+iniciarAnalytics({
+  publishableKey: '${key}',
+  websocketUrl: 'https://api.dsplayground.com.br',
+});`;
+    }
+
+    function snippetNext(key: string): string {
+      return `// app/providers.tsx — Client Component
+'use client';
+import { useEffect } from 'react';
+import { iniciarAnalytics } from '@danpqdan/dsplayground-analytics-sdk';
+
+export function AnalyticsProvider({ children }: { children: React.ReactNode }) {
+  useEffect(() => {
+    iniciarAnalytics({
+      publishableKey: '${key}',
+      websocketUrl: 'https://api.dsplayground.com.br',
+    });
+  }, []);
+  return <>{children}</>;
+}
+
+// app/layout.tsx — envolva o {children}`;
+    }
+
+    function snippetWordpress(key: string): string {
+      return `<!-- Cole no <head> via plugin "Insert Headers and Footers" ou customizer -->
+<script src="https://cdn.dsplayground.com.br/sdk/v0/sdk.umd.js"><\/script>
+<script>
+  window.DSPlayground.iniciarAnalytics({
+    publishableKey: '${key}',
+    websocketUrl: 'https://api.dsplayground.com.br',
+  });
+<\/script>`;
+    }
+
+    function snippetShopify(key: string): string {
+      return `{%- comment -%} layout/theme.liquid antes de </head> {%- endcomment -%}
+<script src="https://cdn.dsplayground.com.br/sdk/v0/sdk.umd.js"><\/script>
+<script>
+  window.DSPlayground.iniciarAnalytics({
+    publishableKey: '${key}',
+    websocketUrl: 'https://api.dsplayground.com.br',
+    extras: { customer_id: '{{ customer.id | default: "" }}' },
+  });
+<\/script>`;
+    }
+
+    function showStep(step: StepId) {
+      // Atualiza visibilidade
+      STEP_IDS.forEach((id) => {
+        stepEls[id].classList.toggle('hidden', id !== step);
+      });
+
+      // Atualiza Stepper. Estrategia simples: reescrever os marcadores
+      // (custo baixo — 3 li). Mantemos a marcacao SSR como fallback.
+      const list = stepperWrap.querySelector('ol');
+      if (list) {
+        const items = list.querySelectorAll<HTMLElement>('li[data-step-id]');
+        const currentIdx = STEP_IDS.indexOf(step);
+        items.forEach((li, idx) => {
+          const isCompleted = idx < currentIdx;
+          const isCurrent = idx === currentIdx;
+          li.dataset.stepState = isCompleted ? 'completed' : isCurrent ? 'current' : 'pending';
+          if (isCurrent) li.setAttribute('aria-current', 'step');
+          else li.removeAttribute('aria-current');
+          // Numero/check
+          const badge = li.firstElementChild as HTMLElement;
+          if (badge) {
+            badge.classList.remove(
+              'bg-brand-500', 'text-white', 'ring-brand-500', 'ring-brand-300', 'shadow-elev-1',
+              'bg-slate-900', 'text-slate-400', 'ring-slate-700',
+            );
+            if (isCompleted) {
+              badge.classList.add('bg-brand-500', 'text-white', 'ring-brand-500');
+              badge.textContent = '✓';
+            } else if (isCurrent) {
+              badge.classList.add('bg-brand-500', 'text-white', 'ring-brand-300', 'shadow-elev-1');
+              badge.textContent = String(idx + 1);
+            } else {
+              badge.classList.add('bg-slate-900', 'text-slate-400', 'ring-slate-700');
+              badge.textContent = String(idx + 1);
+            }
+          }
+          // Label cor
+          const label = badge?.nextElementSibling as HTMLElement | null;
+          if (label) {
+            label.classList.toggle('text-slate-400', !isCompleted && !isCurrent);
+            label.classList.toggle('text-white', isCompleted || isCurrent);
+          }
+          // Conector
+          const connector = label?.nextElementSibling as HTMLElement | null;
+          if (connector) {
+            connector.classList.toggle('bg-brand-500', isCompleted);
+            connector.classList.toggle('bg-slate-700', !isCompleted);
+          }
+        });
+      }
+      stepperWrap.dataset.currentStep = step;
+      history.replaceState(null, '', `#${step}`);
+
+      // Step 3 inicia polling
+      if (step === 'evento') {
+        iniciarPolling();
+      } else {
+        pararPolling();
+      }
+    }
+
+    function pararPolling() {
+      if (pollTimer) {
+        clearInterval(pollTimer);
+        pollTimer = null;
+      }
+    }
+
+    function mostrarSucesso(eventos: number) {
+      pararPolling();
+      document.getElementById('onb-aguardando')!.classList.add('hidden');
+      document.getElementById('onb-timeout')!.classList.add('hidden');
+      document.getElementById('onb-sucesso')!.classList.remove('hidden');
+      document.getElementById('onb-sucesso-msg')!.textContent =
+        `Já tem ${new Intl.NumberFormat('pt-BR').format(eventos)} evento(s) registrado(s) hoje.`;
+
+      // Conversao chave de ativacao — usuario instalou e SDK ta enviando.
+      sdk()?.trackConversion?.('first_event_received', eventos, {
+        polling_attempts: pollCount,
+      });
+      sdk()?.enviarEvento?.('onboarding_primeiro_evento', {
+        eventos_hoje: eventos,
+        tentativas: pollCount,
+      });
+      // Marca step 3 como completed visualmente
+      const list = stepperWrap.querySelector('ol');
+      const item = list?.querySelectorAll<HTMLElement>('li[data-step-id]')[2];
+      if (item) {
+        item.dataset.stepState = 'completed';
+        const badge = item.firstElementChild as HTMLElement | null;
+        if (badge) {
+          badge.classList.remove('ring-brand-300', 'shadow-elev-1');
+          badge.classList.add('ring-brand-500');
+          badge.textContent = '✓';
+        }
+      }
+      showToast('Conexão funcionando!', { variant: 'success' });
+    }
+
+    function mostrarTimeout() {
+      pararPolling();
+      document.getElementById('onb-aguardando')!.classList.add('hidden');
+      document.getElementById('onb-timeout')!.classList.remove('hidden');
+    }
+
+    async function tickPolling() {
+      pollCount++;
+      const counterEl = document.getElementById('onb-poll-counter');
+      if (counterEl) counterEl.textContent = String(pollCount);
+
+      if (pollCount >= POLL_MAX_ATTEMPTS) {
+        mostrarTimeout();
+        return;
+      }
+
+      const r = await obterConfiguracoes({ apiUrl: API_URL });
+      if (!r.ok) {
+        if (r.code === 'NAO_AUTENTICADO') {
+          window.location.href = '/cliente/login?next=/cliente/onboarding';
+          return;
+        }
+        // Sem stop — mantem tentando ate timeout. Logamos pra debug.
+        return;
+      }
+
+      const atual = r.consumo.eventos_hoje;
+      if (atual > baselineEventos) {
+        mostrarSucesso(atual);
+      }
+    }
+
+    function iniciarPolling() {
+      pararPolling();
+      pollCount = 0;
+      // Reset visivel
+      document.getElementById('onb-aguardando')!.classList.remove('hidden');
+      document.getElementById('onb-timeout')!.classList.add('hidden');
+      document.getElementById('onb-sucesso')!.classList.add('hidden');
+      const counterEl = document.getElementById('onb-poll-counter');
+      if (counterEl) counterEl.textContent = '0';
+
+      // tick imediato + interval
+      tickPolling();
+      pollTimer = setInterval(tickPolling, POLL_INTERVAL_MS);
+    }
+
+    function popularSnippets(key: string) {
+      document.getElementById('snippet-html')!.textContent      = snippetHtml(key);
+      document.getElementById('snippet-react')!.textContent     = snippetReact(key);
+      document.getElementById('snippet-next')!.textContent      = snippetNext(key);
+      document.getElementById('snippet-wordpress')!.textContent = snippetWordpress(key);
+      document.getElementById('snippet-shopify')!.textContent   = snippetShopify(key);
+    }
+
+    async function carregarInicial() {
+      const r = await obterConfiguracoes({ apiUrl: API_URL });
+      if (!r.ok) {
+        elLoading.classList.add('hidden');
+        if (r.code === 'NAO_AUTENTICADO') {
+          window.location.href = '/cliente/login?next=/cliente/onboarding';
+          return;
+        }
+        elErro.classList.remove('hidden');
+        return;
+      }
+
+      // Pega primeira key disponivel — ambiente production preferido.
+      const keys = r.publishable_keys;
+      const keyPreferida = keys.find((k) => k.ambiente === 'production') ?? keys[0];
+      if (!keyPreferida) {
+        elLoading.classList.add('hidden');
+        elErro.classList.remove('hidden');
+        document.querySelector('#onb-erro h3')!.textContent = 'Sua conta não tem keys ativas';
+        return;
+      }
+
+      publishableKey = keyPreferida.valor;
+      baselineEventos = r.consumo.eventos_hoje;
+
+      document.getElementById('onb-key-label')!.textContent =
+        `${keyPreferida.nome ?? 'sem nome'} · ${keyPreferida.ambiente}`;
+      document.getElementById('onb-key-valor')!.textContent = publishableKey;
+      popularSnippets(publishableKey);
+
+      elLoading.classList.add('hidden');
+
+      // Step inicial: hash override > step1
+      const hashStep = location.hash.slice(1) as StepId;
+      const initial: StepId = STEP_IDS.includes(hashStep) ? hashStep : 'key';
+      showStep(initial);
+    }
+
+    // Botoes navegacao
+    document.getElementById('onb-next-1')?.addEventListener('click', () => {
+      sdk()?.enviarEvento?.('onboarding_step_concluido', { step: 'key' });
+      showStep('snippet');
+    });
+    document.getElementById('onb-back-2')?.addEventListener('click', () => showStep('key'));
+    document.getElementById('onb-next-2')?.addEventListener('click', () => {
+      sdk()?.enviarEvento?.('onboarding_step_concluido', { step: 'snippet' });
+      showStep('evento');
+    });
+    document.getElementById('onb-back-3')?.addEventListener('click', () => showStep('snippet'));
+
+    // Copiar key
+    document.getElementById('onb-copy-key')?.addEventListener('click', async () => {
+      if (!publishableKey) return;
+      try {
+        await navigator.clipboard.writeText(publishableKey);
+        showToast('Key copiada', { variant: 'success' });
+        sdk()?.enviarEvento?.('onboarding_key_copiada', {});
+      } catch {
+        showToast('Não consegui acessar a área de transferência', { variant: 'error' });
+        sdk()?.enviarEvento?.('onboarding_key_copia_falhou', {});
+      }
+    });
+
+    // Copiar snippet (delegacao por classe)
+    document.querySelectorAll<HTMLButtonElement>('.js-copy-snippet').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        const targetId = btn.dataset.snippet;
+        if (!targetId) return;
+        const codeEl = document.getElementById(targetId);
+        if (!codeEl) return;
+        const plataforma = targetId.replace(/^snippet-/, ''); // snippet-react -> react
+        try {
+          await navigator.clipboard.writeText(codeEl.textContent ?? '');
+          showToast('Snippet copiado', { variant: 'success' });
+          sdk()?.enviarEvento?.('onboarding_snippet_copiado', { plataforma });
+        } catch {
+          showToast('Não consegui acessar a área de transferência', { variant: 'error' });
+          sdk()?.enviarEvento?.('onboarding_snippet_copia_falhou', { plataforma });
+        }
+      });
+    });
+
+    // Botao "Tentar de novo" do timeout
+    document.querySelector('#onb-timeout button')?.addEventListener('click', () => {
+      iniciarPolling();
+    });
+
+    // Pausa polling se aba ficar oculta (poupa rede + bateria)
+    document.addEventListener('visibilitychange', () => {
+      if (stepperWrap.dataset.currentStep !== 'evento') return;
+      if (document.hidden) pararPolling();
+      else iniciarPolling();
+    });
+
+    carregarInicial().catch((e) => {
+      console.error('onboarding: erro inesperado', e);
+      elLoading.classList.add('hidden');
+      elErro.classList.remove('hidden');
+    });
+  </script>
+</Base>

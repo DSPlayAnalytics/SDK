@@ -1,0 +1,69 @@
+---
+- name: Provisionar servidor do portifolio analytics
+  hosts: analytics
+  become: true
+  gather_facts: true
+
+  pre_tasks:
+    - name: Garantir que variaveis sensiveis existem
+      assert:
+        that:
+          - influxdb_token != "trocar-token-real"
+          - influxdb_init_password != "trocar-em-producao"
+          - flask_secret_key != "trocar-em-producao"
+          - admin_api_token | length > 0
+          - postgres_password is defined
+          - postgres_password | length >= 16
+          - postgres_password != "trocar-em-producao"
+          - node_auth_token is defined
+          - node_auth_token | length > 0
+        fail_msg: >
+          Variaveis de producao em group_vars/all.yml ainda estao com valores
+          de exemplo. Obrigatorios: influxdb_token, influxdb_init_password,
+          flask_secret_key, admin_api_token, postgres_password (>=16 chars),
+          node_auth_token (PAT GitHub com read:packages, gerar com `gh auth token`).
+
+  roles:
+    - role: base
+      tags: [base, hardening]
+
+    - role: docker
+      tags: [docker]
+
+    - role: analytics-stack
+      tags: [app, analytics-stack]
+
+    - role: nginx
+      tags: [nginx, proxy]
+
+    - role: monitoring
+      tags: [monitoring]
+      when: habilitar_monitoring | default(true)
+
+    - role: crowdsec
+      tags: [crowdsec, security]
+      when: habilitar_crowdsec | default(true)
+
+  post_tasks:
+    - name: Validar que o backend responde em /health/app via loopback (path canonico)
+      # Pulamos em check mode — uri nao faz HTTP real e backend_health fica
+      # sem .status, quebrando a condicional 'until'. Mesmo padrao das tasks
+      # de health da role analytics-stack apos o fix de 2026-04-22.
+      when: not ansible_check_mode
+      uri:
+        url: http://127.0.0.1:5000/health/app
+        status_code: 200
+      retries: 10
+      delay: 5
+      register: backend_health
+      until: backend_health.status == 200
+
+    - name: Validar que o landing comercial responde em /_health (apex)
+      when: not ansible_check_mode
+      uri:
+        url: http://127.0.0.1:3002/_health
+        status_code: 200
+      retries: 10
+      delay: 5
+      register: landing_health
+      until: landing_health.status == 200

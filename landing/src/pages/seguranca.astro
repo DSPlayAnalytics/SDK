@@ -1,0 +1,166 @@
+---
+import Base from '~/layouts/Base.astro';
+import Badge from '~/components/ui/Badge.astro';
+import Card from '~/components/ui/Card.astro';
+import Button from '~/components/ui/Button.astro';
+
+const camadas = [
+  {
+    icon: '🔐',
+    title: 'TLS de borda',
+    descricao: 'Cloudflare na frente em modo Full (strict). Origin Cert wildcard com validade até 2041, autenticação mTLS opcional pelo Origin Pull.',
+  },
+  {
+    icon: '🛡️',
+    title: 'CrowdSec na borda da app',
+    descricao: 'Detecção comportamental + bouncer nginx. Bloqueia varreduras automatizadas e ataques antes de chegarem no Flask.',
+  },
+  {
+    icon: '🔑',
+    title: 'JWT RS256 pra eventos',
+    descricao: 'Tokens curtos (TTL configurável, 60–600s) assinados em chave RSA — privada nunca sai do backend, pública distribui pra verificar.',
+  },
+  {
+    icon: '🧂',
+    title: 'Senhas com bcrypt',
+    descricao: 'Hash com cost configurável. Sem armazenamento em claro. Brute-force barrado por rate limit no /login.',
+  },
+  {
+    icon: '🍪',
+    title: 'Cookie HttpOnly + Secure',
+    descricao: 'Sessão de cliente em cookie HttpOnly+Secure+SameSite=Strict. Não é acessível via JavaScript — XSS não rouba.',
+  },
+  {
+    icon: '🚪',
+    title: 'Multi-tenant isolado',
+    descricao: 'Cada cliente em bucket separado no InfluxDB. Auth no Postgres com tabela de site/usuário/quota; cross-tenant é arquiteturalmente bloqueado.',
+  },
+];
+
+const lgpd = [
+  {
+    titulo: 'Coleta minimalista',
+    descricao: 'Não capturamos dado pessoal por padrão. IP é descartado após processar geo. User-Agent vira categoria (browser, OS), não string crua.',
+  },
+  {
+    titulo: 'Sem cookie de tracking',
+    descricao: 'Coleta de evento é sem cookie de identificação. Você não precisa de banner de cookie só pra usar o produto.',
+  },
+  {
+    titulo: 'Direito de exportação',
+    descricao: 'Cliente acessa CSV de qualquer dia/cliente em /cliente/exportar. Sem trava de fornecedor.',
+  },
+  {
+    titulo: 'Direito de exclusão',
+    descricao: 'Pedido de exclusão de dados via email. Removemos do InfluxDB e dos backups arquivados em até 5 dias úteis.',
+  },
+  {
+    titulo: 'DPA disponível',
+    descricao: 'Contrato de Tratamento de Dados (DPA) sob solicitação no plano Business. Empresa controla, a gente opera.',
+  },
+  {
+    titulo: 'Servidores no Brasil',
+    descricao: 'Dado fica em jurisdição brasileira. Reduz exposição a ordens estrangeiras e simplifica adequação à LGPD.',
+  },
+];
+
+const auditoria = [
+  'Operações de admin emitem evento [ADMIN-AUDIT] em log dedicado',
+  'Logs de evento estruturados (evento=X chave=valor) — fáceis de grepar e ingerir',
+  'Rate limit + bloqueio do CrowdSec deixam trilha em security.log',
+  'Retenção de logs configurável: 90 dias por padrão, customizável no Business',
+];
+---
+<Base
+  title="Segurança & LGPD"
+  description="Como cuidamos dos seus dados: criptografia em camadas, multi-tenant isolado, auditoria de admin, conformidade LGPD."
+>
+  <section class="relative overflow-hidden">
+    <div class="absolute inset-0 -z-10 bg-gradient-to-b from-brand-950 via-slate-950 to-slate-950"></div>
+    <div class="mx-auto max-w-4xl px-4 py-20 text-center sm:px-6 sm:py-24">
+      <Badge variant="success" dot>Privacidade primeiro</Badge>
+      <h1 class="mt-6 text-display-sm sm:text-display-md text-white">
+        Segurança <span class="bg-gradient-to-r from-brand-300 to-brand-500 bg-clip-text text-transparent">não é detalhe.</span>
+      </h1>
+      <p class="mx-auto mt-6 max-w-2xl text-lg text-slate-300">
+        A gente faz analytics porque acredita que você merece entender seu site sem entregar dados dos seus visitantes em troca. Aqui vai como cuidamos disso, sem floreio.
+      </p>
+    </div>
+  </section>
+
+  <!-- CAMADAS DE SEGURANCA -->
+  <section class="mx-auto max-w-6xl px-4 py-16 sm:px-6">
+    <h2 class="text-2xl font-bold tracking-tight text-white sm:text-3xl">Camadas de proteção</h2>
+    <p class="mt-3 max-w-2xl text-slate-300">Defesa em profundidade — várias camadas independentes. Falhar uma não abre o resto.</p>
+    <div class="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      {camadas.map((c) => (
+        <Card>
+          <span class="text-2xl" aria-hidden="true">{c.icon}</span>
+          <h3 class="mt-3 text-base font-semibold text-white">{c.title}</h3>
+          <p class="mt-2 text-sm text-slate-300">{c.descricao}</p>
+        </Card>
+      ))}
+    </div>
+  </section>
+
+  <!-- LGPD -->
+  <section class="mx-auto max-w-6xl px-4 py-16 sm:px-6">
+    <div class="grid gap-10 lg:grid-cols-[280px_1fr]">
+      <div>
+        <Badge variant="brand">LGPD</Badge>
+        <h2 class="mt-4 text-2xl font-bold tracking-tight text-white sm:text-3xl">Conformidade na prática</h2>
+        <p class="mt-3 text-sm text-slate-300">
+          A LGPD pede tratamento mínimo, transparente e com direitos do titular. A gente desenhou o produto pra isso ser o caminho fácil.
+        </p>
+      </div>
+      <div class="grid gap-4 sm:grid-cols-2">
+        {lgpd.map((item) => (
+          <div class="rounded-xl border border-slate-800 bg-slate-900/40 p-5">
+            <h3 class="text-sm font-semibold text-white">{item.titulo}</h3>
+            <p class="mt-1 text-xs text-slate-400">{item.descricao}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <!-- AUDITORIA -->
+  <section class="mx-auto max-w-4xl px-4 py-16 sm:px-6">
+    <h2 class="text-2xl font-bold tracking-tight text-white sm:text-3xl">Auditoria & rastreabilidade</h2>
+    <p class="mt-3 text-slate-300">Tudo deixa trilha. Quando algo der ruim, dá pra reconstruir o que rolou.</p>
+    <ul class="mt-6 space-y-3">
+      {auditoria.map((linha) => (
+        <li class="flex items-start gap-3 rounded-lg border border-slate-800 bg-slate-900/40 px-4 py-3 text-sm text-slate-200">
+          <span class="text-success-400" aria-hidden="true">✓</span>
+          <span>{linha}</span>
+        </li>
+      ))}
+    </ul>
+  </section>
+
+  <!-- DISCLOSURE -->
+  <section class="mx-auto max-w-3xl px-4 py-16 sm:px-6">
+    <Card>
+      <h2 class="text-xl font-bold text-white">Encontrou uma vulnerabilidade?</h2>
+      <p class="mt-2 text-sm text-slate-300">
+        A gente leva report responsável a sério. Se você achou algo, mande detalhe pra
+        <code class="rounded bg-slate-800 px-1 py-0.5 font-mono text-xs">seguranca@dsplayground.com.br</code>
+        (ou abra issue privada no GitHub). Tempo de resposta em até 72h. Sem retaliação, sem advogado em cima.
+      </p>
+      <p class="mt-2 text-xs text-slate-500">Programa formal de bug bounty no roadmap.</p>
+    </Card>
+  </section>
+
+  <!-- CTA -->
+  <section class="mx-auto max-w-6xl px-4 py-16 sm:px-6">
+    <Card>
+      <div class="flex flex-col items-start gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h2 class="text-2xl font-bold text-white sm:text-3xl">Cuidado com os dados, e é isso.</h2>
+          <p class="mt-1 text-slate-300">Comece grátis e veja como funciona.</p>
+        </div>
+        <Button href="/cliente/cadastro" variant="primary" data-cta="seguranca-cadastro">Criar conta grátis</Button>
+      </div>
+    </Card>
+  </section>
+</Base>

@@ -1,0 +1,49 @@
+{
+  "name": "portifolio",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --mode development",
+    "build": "vite build --mode production",
+    "lint": "eslint .",
+    "preview": "vite preview --mode production",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@danpqdan/dsplayground-analytics-sdk": "^0.4.0",
+    "@react-spring/web": "^10.0.3",
+    "chart.js": "^4.5.1",
+    "react": "^19.2.5",
+    "react-chartjs-2": "^5.3.1",
+    "react-dom": "^19.2.5",
+    "react-icons": "^5.6.0",
+    "react-router-dom": "^7.14.2",
+    "socket.io-client": "^4.8.3",
+    "web-vitals": "^4.2.4"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.4",
+    "@testing-library/jest-dom": "^6.6.3",
+    "@testing-library/react": "^16.3.0",
+    "@testing-library/user-event": "^14.6.1",
+    "@types/node": "^25.6.0",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "@typescript-eslint/eslint-plugin": "^8.59.1",
+    "@typescript-eslint/parser": "^8.59.1",
+    "@vitejs/plugin-react-swc": "^4.3.0",
+    "dotenv": "^17.4.2",
+    "eslint": "^9.39.4",
+    "eslint-plugin-react": "^7.37.5",
+    "eslint-plugin-react-hooks": "^5.2.0",
+    "eslint-plugin-react-refresh": "^0.5.2",
+    "globals": "^16.5.0",
+    "jsdom": "^26.1.0",
+    "typescript-eslint": "^8.59.1",
+    "vite": "^7.3.2",
+    "vite-plugin-dts": "^4.5.4",
+    "vitest": "^3.2.4"
+  }
+}

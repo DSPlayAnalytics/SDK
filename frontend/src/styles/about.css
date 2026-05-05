@@ -1,0 +1,45 @@
+/*
+ * about.css — complementos da página About.
+ * Todas as regras base (.skill-badge, .about-h3-large, etc.) vivem em cards.css.
+ * Aqui ficam apenas ajustes específicos desta página que não cabem lá.
+ */
+
+/*
+ * Bloco avatar + texto em linha para telas muito estreitas (<380px).
+ * Em telas maiores o about-left empilha avatar e texto verticalmente (cards.css).
+ */
+.about-identity {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--spacing-2);
+    width: 100%;
+    text-align: center;
+}
+
+@media (max-width: 379px) {
+    .about-identity {
+        flex-direction: row;
+        text-align: left;
+        gap: var(--spacing-2);
+    }
+
+    .about-identity .avatar {
+        width: 56px;
+        height: 56px;
+        flex-shrink: 0;
+    }
+
+    .about-identity .about-text-center {
+        text-align: left;
+        flex: 1;
+    }
+}
+
+@media (min-width: 768px) {
+    .about-identity {
+        flex-direction: column;
+        align-items: flex-start;
+        text-align: left;
+    }
+}

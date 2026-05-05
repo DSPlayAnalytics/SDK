@@ -1,0 +1,62 @@
+---
+/**
+ * Button — wrapper consistente sobre as classes utilitarias `btn-*`.
+ *
+ * Renderiza `<button>` por default; quando `href` e' passado, vira `<a>`
+ * (CTA-styled link). `data-cta` e' pass-through pra rastreamento via
+ * attachCtaTracking (lib/tracking.ts).
+ */
+type Variant = 'primary' | 'secondary' | 'ghost';
+type Size = 'sm' | 'md';
+
+interface Props {
+  variant?: Variant;
+  size?: Size;
+  type?: 'button' | 'submit' | 'reset';
+  href?: string;
+  id?: string;
+  disabled?: boolean;
+  fullWidth?: boolean;
+  'data-cta'?: string;
+  class?: string;
+}
+
+const {
+  variant = 'primary',
+  size = 'md',
+  type = 'button',
+  href,
+  id,
+  disabled = false,
+  fullWidth = false,
+  class: extraClass,
+  ...rest
+} = Astro.props;
+
+const baseByVariant = {
+  primary: 'btn-primary',
+  secondary: 'btn-secondary',
+  ghost: 'inline-flex items-center justify-center rounded-md px-3 py-1.5 text-sm font-medium text-slate-300 transition hover:bg-slate-800 hover:text-white',
+} as const;
+
+const sizeOverrides = {
+  sm: 'text-xs !px-3 !py-1.5',
+  md: '',
+} as const;
+
+const classes = [
+  baseByVariant[variant],
+  sizeOverrides[size],
+  fullWidth ? 'w-full' : '',
+  extraClass ?? '',
+].filter(Boolean).join(' ');
+---
+{href ? (
+  <a href={href} id={id} class={classes} {...rest}>
+    <slot />
+  </a>
+) : (
+  <button type={type} id={id} class={classes} disabled={disabled} {...rest}>
+    <slot />
+  </button>
+)}

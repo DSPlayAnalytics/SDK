@@ -1,0 +1,197 @@
+# Resource limits: so `mem_limit` (sintaxe legacy v2 honrada por `docker
+# compose up`). CPU NAO limitado — VPS HostGator tem 1 vCPU; qualquer
+# `cpus: > 1.0` falha com "range of CPUs is from 0.01 to 1.00", e
+# fair-share natural do kernel ja distribui o vCPU entre os containers.
+# Numeros conservadores; ajustar ao monitorar uso real via Prometheus.
+#
+# A6 (network isolation) ainda nao aplicado — ver memo de seguranca: requer
+# migracao coordenada do monitoring/crowdsec compose (external network).
+services:
+  influxdb:
+    image: influxdb:2.7
+    container_name: portifolio-influxdb
+    ports:
+      # Acesso publico via nginx → influx.dsplayground.com.br. Sem bypass direto.
+      - "127.0.0.1:8086:8086"
+    environment:
+      DOCKER_INFLUXDB_INIT_MODE: setup
+      DOCKER_INFLUXDB_INIT_USERNAME: admin
+      DOCKER_INFLUXDB_INIT_PASSWORD: ${INFLUXDB_INIT_PASSWORD:?defina em .env}
+      DOCKER_INFLUXDB_INIT_ORG: zen
+      DOCKER_INFLUXDB_INIT_BUCKET: portifolio_prod
+      DOCKER_INFLUXDB_INIT_ADMIN_TOKEN: ${INFLUXDB_TOKEN:?defina em .env}
+    volumes:
+      - influxdb_data:/var/lib/influxdb2
+      - influxdb_config:/etc/influxdb2
+    healthcheck:
+      test: ["CMD", "influx", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    mem_limit: 1g
+    mem_reservation: 512m
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: portifolio-postgres
+    # Acessivel so internamente; backend usa hostname 'postgres'. Nunca exposto na host.
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-portifolio_auth}
+      POSTGRES_USER: ${POSTGRES_USER:-portifolio}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?defina em .env}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-portifolio} -d ${POSTGRES_DB:-portifolio_auth}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    mem_limit: 512m
+    mem_reservation: 256m
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: ./backend
+    container_name: portifolio-backend
+    depends_on:
+      influxdb:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    # Backend so e acessivel via Nginx na host. Nunca 0.0.0.0:5000.
+    ports:
+      - "127.0.0.1:5000:5000"
+    # Fonte unica de verdade: .env gerado pelo Ansible
+    # (ark/ansible/roles/analytics-stack/templates/backend.env.j2).
+    env_file:
+      - ./backend/.env
+    volumes:
+      - ./backend:/app
+      # Volume dedicado para chaves RSA do sdk_jwt. Fora do bind de codigo para
+      # que nunca cai no git, e para persistir entre rebuilds da imagem.
+      - backend_keys:/app/data/keys
+      # Templates de dashboard provisionados por scripts/provisionar_cliente.py.
+      # Read-only — o container nao escreve la, so le e POSTa para Grafana API.
+      - ./ark/monitoring/dashboards:/app/dashboards:ro
+    environment:
+      DASHBOARDS_TEMPLATE_DIR: /app/dashboards
+    mem_limit: 768m
+    mem_reservation: 384m
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        # URLs embutidas no bundle em build time. Em dev local, defaults do
+        # Dockerfile (http://localhost:5000) valem se as vars nao estiverem no .env.
+        VITE_API_URL: ${VITE_API_URL:-http://localhost:5000}
+        VITE_WEBSOCKET_URL: ${VITE_WEBSOCKET_URL:-http://localhost:5000}
+        VITE_DEBUG: ${VITE_DEBUG:-false}
+        # SDK auth: quando setado, o frontend troca pela publishable por JWT
+        # no /sdk-token e os eventos vao pro bucket dedicado do site_id
+        # correspondente. Vazio = SDK roda sem auth (bucket default).
+        VITE_PUBLISHABLE_KEY: ${VITE_PUBLISHABLE_KEY:-}
+      # BuildKit secret para baixar @danpqdan/dsplayground-analytics-sdk do
+      # GitHub Packages (registry privado). Token nao persiste em nenhuma
+      # layer da imagem — exposto apenas durante o RUN npm ci.
+      # Antes de buildar:  export NODE_AUTH_TOKEN=$(gh auth token)
+      secrets:
+        - NODE_AUTH_TOKEN
+    container_name: portifolio-frontend
+    depends_on:
+      - backend
+    # Frontend (portfolio pessoal React 3D) servido por nginx:alpine.
+    # Nginx do host faz proxy para 127.0.0.1:3000 → portifolio.dsplayground.com.br.
+    ports:
+      - "127.0.0.1:3000:80"
+    mem_limit: 128m
+    mem_reservation: 64m
+    restart: unless-stopped
+
+  archiver:
+    build:
+      context: ./backend
+      dockerfile: archiver/Dockerfile
+    container_name: portifolio-archiver
+    # Profile `archiver` = opt-in. `docker compose up -d` NAO sobe esse
+    # service por default. Pra ativar:
+    #   docker compose --profile archiver up -d --build archiver
+    # Motivo: archiver exige R2_* env vars; sem elas crash-loopa. Profile
+    # permite ansible-apply rodar sem se preocupar com vault de R2 vazio.
+    profiles:
+      - archiver
+    depends_on:
+      influxdb:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    # Sidecar — nao expoe portas. APScheduler com cron diario 03:00 UTC.
+    # Reusa backend/.env (compartilha INFLUXDB_*, TENANTS_DATABASE_URL).
+    env_file:
+      - ./backend/.env
+    # Bind do codigo igual o backend pra hot-reload em dev. Em prod o codigo
+    # vem da imagem (COPY no Dockerfile).
+    volumes:
+      - ./backend:/app
+    mem_limit: 512m
+    mem_reservation: 128m
+    restart: unless-stopped
+
+  email-cron:
+    build:
+      context: ./backend
+      dockerfile: archiver/Dockerfile
+    container_name: portifolio-email-cron
+    # Profile `email-cron` = opt-in. Requer RESEND_API_KEY no .env.
+    # Ativar: docker compose --profile email-cron up -d --build email-cron
+    profiles:
+      - email-cron
+    command: ["python", "-m", "scripts.email_cron_main"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    # Sidecar — nao expoe portas. APScheduler com cron diario 07:00 UTC.
+    env_file:
+      - ./backend/.env
+    volumes:
+      - ./backend:/app
+    mem_limit: 256m
+    mem_reservation: 64m
+    restart: unless-stopped
+
+  landing:
+    build:
+      context: ./landing
+      args:
+        # URLs embutidas no bundle Astro em build time. Defaults apontam pra prod.
+        PUBLIC_SITE_URL: ${PUBLIC_SITE_URL:-https://dsplayground.com.br}
+        PUBLIC_API_URL: ${PUBLIC_API_URL:-https://api.dsplayground.com.br}
+        PUBLIC_PUBLISHABLE_KEY: ${PUBLIC_PUBLISHABLE_KEY:-}
+        PUBLIC_DEBUG: ${PUBLIC_DEBUG:-false}
+      # BuildKit secret pra baixar @danpqdan/dsplayground-analytics-sdk do
+      # GitHub Packages — mesmo padrao do frontend.
+      secrets:
+        - NODE_AUTH_TOKEN
+    container_name: portifolio-landing
+    depends_on:
+      - backend
+    # Landing comercial (Astro estatico) servida em apex (dsplayground.com.br).
+    # Nginx do host faz proxy para 127.0.0.1:3002 → dsplayground.com.br.
+    ports:
+      - "127.0.0.1:3002:80"
+    mem_limit: 128m
+    mem_reservation: 64m
+    restart: unless-stopped
+
+secrets:
+  NODE_AUTH_TOKEN:
+    environment: NODE_AUTH_TOKEN
+
+volumes:
+  influxdb_data:
+  influxdb_config:
+  postgres_data:
+  backend_keys:

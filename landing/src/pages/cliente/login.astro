@@ -1,0 +1,97 @@
+---
+import Base from '~/layouts/Base.astro';
+import Button from '~/components/ui/Button.astro';
+import Card from '~/components/ui/Card.astro';
+import FormError from '~/components/ui/FormError.astro';
+import Input from '~/components/ui/Input.astro';
+import Section from '~/components/ui/Section.astro';
+---
+<Base
+  title="Entrar"
+  description="Entre na sua conta e veja seu painel de visitas e desempenho."
+  noindex={true}
+>
+  <Section narrow class="flex min-h-[70vh] flex-col justify-center">
+    <Card>
+      <h1 class="text-2xl font-bold text-white">Entrar</h1>
+      <p class="mt-1 text-sm text-slate-400">Use o email da sua conta.</p>
+
+      <form id="form-login" class="mt-6 space-y-4" novalidate>
+        <Input id="email" type="email" label="Email" autocomplete="email" required placeholder="voce@empresa.com" />
+        <Input id="senha" type="password" label="Senha" autocomplete="current-password" required />
+
+        <FormError id="erro" />
+
+        <Button type="submit" id="submit" fullWidth data-cta="form-login">Entrar</Button>
+        <p class="text-center text-sm text-slate-400">
+          Sem conta? <a href="/cliente/cadastro" class="text-brand-300 hover:text-brand-200">Criar conta grátis</a>
+        </p>
+        <p class="text-center text-sm text-slate-400">
+          <a href="/cliente/esqueci-senha" class="text-brand-300 hover:text-brand-200" data-cta="link-esqueci-senha">Esqueci minha senha</a>
+        </p>
+      </form>
+    </Card>
+  </Section>
+
+  <script>
+    import { login } from '~/lib/api';
+    import { resolverDestinoPosLogin } from '~/lib/redirect';
+    import { API_URL, POS_LOGIN_URL } from '~/config';
+
+    const form = document.getElementById('form-login') as HTMLFormElement | null;
+    const erroBox = document.getElementById('erro')!;
+    const submitBtn = document.getElementById('submit') as HTMLButtonElement | null;
+
+    function mostrarErro(msg: string) {
+      erroBox.textContent = msg;
+      erroBox.classList.remove('hidden');
+    }
+    function limparErro() {
+      erroBox.textContent = '';
+      erroBox.classList.add('hidden');
+    }
+
+    form?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      limparErro();
+      submitBtn!.disabled = true;
+      submitBtn!.textContent = 'Entrando…';
+
+      const fd = new FormData(form);
+      const r = await login(
+        {
+          email: String(fd.get('email') ?? '').trim(),
+          senha: String(fd.get('senha') ?? ''),
+        },
+        { apiUrl: API_URL },
+      );
+
+      const sdk = (window as any).__dsplayground;
+
+      if (r.ok) {
+        sdk?.enviarEvento?.('login_concluido', {
+          site_id: r.user.site_id, papel: r.user.papel,
+        });
+        const destino = resolverDestinoPosLogin(
+          new URL(window.location.href).searchParams,
+          POS_LOGIN_URL,
+        );
+        window.location.href = destino;
+        return;
+      }
+
+      sdk?.enviarEvento?.('formulario_erro', {
+        formulario: 'login', code: r.code, status: r.status,
+      });
+      mostrarErro(
+        r.code === 'CREDENCIAIS_INVALIDAS'
+          ? 'Email ou senha incorretos. Confere e tenta de novo.'
+          : r.code === 'REDE'
+            ? 'Sem internet agora. Tenta de novo.'
+            : 'Não deu pra entrar agora. Tenta de novo, por favor.',
+      );
+      submitBtn!.disabled = false;
+      submitBtn!.textContent = 'Entrar';
+    });
+  </script>
+</Base>

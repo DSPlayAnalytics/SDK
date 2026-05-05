@@ -1,0 +1,139 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  packages: read   # necessario pra npm install de @danpqdan/* (GitHub Packages)
+
+jobs:
+  compose-config:
+    name: docker-compose.yml valido
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
+      - name: Resolver variaveis dummy e validar
+        run: |
+          # compose usa ${VAR} para segredos; CI so precisa garantir que o YAML
+          # e a estrutura sao validos, nao os valores reais.
+          cat > .env <<'EOF'
+          INFLUXDB_INIT_PASSWORD=ci-dummy
+          INFLUXDB_TOKEN=ci-dummy
+          SECRET_KEY=ci-dummy
+          ADMIN_API_TOKEN=ci-dummy
+          POSTGRES_PASSWORD=ci-dummy
+          EOF
+          mkdir -p backend
+          : > backend/.env
+          docker compose config --quiet
+
+  ansible-syntax:
+    name: Ansible playbook syntax
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405  # v6.2.0
+        with:
+          python-version: '3.12'
+      - name: Instalar ansible
+        run: pip install 'ansible-core>=2.16' 'ansible>=9'
+      - name: Copiar group_vars de exemplo (o real e vaulted/gitignored)
+        working-directory: ark/ansible
+        run: cp group_vars/all.example.yml group_vars/all.yml
+      - name: Dummy vault password (CI usa all.example.yml em cleartext)
+        # ansible.cfg aponta vault_password_file para /opt/portifolio/.vault-password,
+        # path que so existe na VPS. No runner do CI, criamos um dummy e
+        # sobrescrevemos via env — syntax-check nao precisa descriptografar nada
+        # porque o all.yml aqui e a versao example em cleartext.
+        run: echo "ci-dummy-not-used-for-decrypt" > /tmp/ansible-vault-pass
+      - name: Syntax check do playbook
+        working-directory: ark/ansible
+        env:
+          ANSIBLE_VAULT_PASSWORD_FILE: /tmp/ansible-vault-pass
+        run: ansible-playbook --syntax-check -i inventory.example.ini playbook.yml
+
+  frontend:
+    name: Frontend (lint + test + build)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e  # v6.4.0
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install (com auth pro GitHub Packages)
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_AUTH_TOKEN }}
+        run: npm ci
+      - run: npm run lint
+      - run: npm run test
+      - run: npm run build
+
+  frontend-docker:
+    name: Frontend (docker build multi-stage)
+    runs-on: ubuntu-latest
+    # Gate contra regressao do Dockerfile: o fix "vite: not found" (NODE_ENV=production
+    # antes do npm ci pulava devDependencies) so quebrou na hora do docker compose up
+    # em producao. Rodar `docker build` aqui pega esse tipo de falha no PR.
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f  # v3
+      - name: Build da imagem frontend (args dummy)
+        uses: docker/build-push-action@bcafcacb16a39f128d818304e6c9c0c18556b85f  # v7.1.0
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_AUTH_TOKEN }}
+        with:
+          context: ./frontend
+          push: false
+          load: false
+          build-args: |
+            VITE_API_URL=http://ci-dummy:5000
+            VITE_WEBSOCKET_URL=http://ci-dummy:5000
+            VITE_DEBUG=false
+          secrets: |
+            NODE_AUTH_TOKEN=${{ secrets.NPM_AUTH_TOKEN }}
+
+  backend:
+    name: Backend (lint + test)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    env:
+      FLASK_ENV: development
+      INFLUXDB_ENABLED: "false"
+      SECRET_KEY: ci-test-key-nao-usar-em-producao
+      ADMIN_API_TOKEN: ci-test-token
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405  # v6.2.0
+        with:
+          python-version: '3.12'
+      - name: Normalizar encoding do requirements.txt (UTF-16 BOM do Windows)
+        run: |
+          if file requirements.txt | grep -qi 'UTF-16'; then
+            iconv -f UTF-16 -t UTF-8 requirements.txt > requirements.utf8.txt
+            mv requirements.utf8.txt requirements.txt
+            echo "requirements.txt convertido UTF-16 → UTF-8"
+          fi
+      - name: Instalar dependencias
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest ruff moto pip-audit
+      - name: pip-audit (falha em qualquer CVE conhecido)
+        # Audita o requirements.txt (nao o ambiente instalado), pra capturar
+        # CVEs antes do pin entrar em prod. Item P1.5 do
+        # ark/docs/seguranca-auditoria-2026-05-02.md.
+        run: pip-audit --strict --requirement requirements.txt
+      - name: Ruff (lint — nao bloqueante ate configurar regras)
+        run: ruff check . || true
+      - name: Pytest (tests sem dependencias externas)
+        run: pytest -x --tb=short

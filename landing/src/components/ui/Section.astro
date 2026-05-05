@@ -1,0 +1,42 @@
+---
+/**
+ * Section — container de pagina com max-width consistente + padding
+ * vertical/horizontal padronizado.
+ *
+ * `narrow={true}` pra forms (max-md), `wide` pra hero (max-6xl, default).
+ */
+interface Props {
+  narrow?: boolean;
+  /** Vertical padding: 'sm' pra blocos densos, 'lg' pra hero/cta. */
+  spacing?: 'sm' | 'md' | 'lg';
+  /** Tag semantica. */
+  as?: 'section' | 'main' | 'div';
+  class?: string;
+}
+
+const {
+  narrow = false,
+  spacing = 'md',
+  as: Tag = 'section',
+  class: extraClass,
+}: Props = Astro.props;
+
+const widthCls = narrow ? 'max-w-md' : 'max-w-6xl';
+
+const SPACING_CLS = {
+  sm: 'py-8 sm:py-12',
+  md: 'py-16 sm:py-20',
+  lg: 'py-20 sm:py-28 lg:py-32',
+} as const;
+const spacingCls = SPACING_CLS[spacing];
+
+const classes = [
+  'mx-auto px-4 sm:px-6',
+  widthCls,
+  spacingCls,
+  extraClass ?? '',
+].filter(Boolean).join(' ');
+---
+<Tag class={classes}>
+  <slot />
+</Tag>

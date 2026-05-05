@@ -1,0 +1,4 @@
+/* Styles specific to Home page */
+.home-header h1 { margin-top: 0; }
+
+.tech-btn svg { width: 28px; height: 28px; border-radius: 6px; }

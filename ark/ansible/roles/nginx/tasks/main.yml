@@ -1,0 +1,83 @@
+---
+# Role nginx — Rocky Linux 9.
+# TLS via Cloudflare Origin Certificate em /etc/ssl/cloudflare-origin/ (validade 2041).
+# Let's Encrypt foi descontinuado em 2026-04-21; certbot nao e mais instalado.
+# Layout Rocky usa /etc/nginx/conf.d/*.conf (sem sites-available).
+
+- name: Instalar Nginx
+  dnf:
+    name:
+      - nginx
+    state: present
+
+- name: Garantir diretorio de snippets
+  file:
+    path: /etc/nginx/snippets
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Copiar ssl.conf de hardening (snippet)
+  copy:
+    src: "{{ playbook_dir }}/../nginx/ssl.conf"
+    dest: /etc/nginx/snippets/ssl.conf
+    owner: root
+    group: root
+    mode: "0644"
+  notify: reload nginx
+
+- name: Copiar cloudflare-real-ip.conf (CF Real-IP restoration)
+  copy:
+    src: "{{ playbook_dir }}/../nginx/cloudflare-real-ip.conf"
+    dest: /etc/nginx/snippets/cloudflare-real-ip.conf
+    owner: root
+    group: root
+    mode: "0644"
+  notify: reload nginx
+
+- name: Garantir diretorio de archive (.bak files fora do conf.d ativo)
+  file:
+    path: /etc/nginx/archive
+    state: directory
+    owner: root
+    group: root
+    mode: "0750"
+
+- name: Mover .bak files antigos de /etc/nginx/conf.d/ para /etc/nginx/archive/
+  shell: |
+    set -eu
+    shopt -s nullglob
+    moved=0
+    for f in /etc/nginx/conf.d/*.bak* /etc/nginx/conf.d/*.conf.bak*; do
+      [ -e "$f" ] || continue
+      mv -n "$f" /etc/nginx/archive/ && moved=1
+    done
+    exit 0
+  args:
+    executable: /bin/bash
+  changed_when: false
+
+- name: Renderizar vhost do portifolio
+  template:
+    src: portifolio.conf.j2
+    dest: /etc/nginx/conf.d/portifolio.conf
+    owner: root
+    group: root
+    mode: "0644"
+  notify: reload nginx
+
+- name: Remover default.conf (se existir da instalacao)
+  file:
+    path: /etc/nginx/conf.d/default.conf
+    state: absent
+  notify: reload nginx
+
+- name: Garantir Nginx ativo
+  # service: requer systemd; em container de teste, valida-se renderizacao
+  # do vhost mas o servico nao sobe. Em prod o nginx do host esta ativo.
+  service:
+    name: nginx
+    state: started
+    enabled: true
+  tags: [systemd]

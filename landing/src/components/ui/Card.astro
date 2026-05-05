@@ -1,0 +1,34 @@
+---
+/**
+ * Card — container padrao com borda e padding consistente.
+ *
+ * `accent`: destaca com borda brand (usado pra "plano popular" em precos).
+ * `padding="tight"` reduz padding pra cards densos (listas).
+ */
+interface Props {
+  accent?: boolean;
+  padding?: 'tight' | 'normal';
+  as?: 'article' | 'div' | 'section' | 'li';
+  class?: string;
+}
+
+const {
+  accent = false,
+  padding = 'normal',
+  as: Tag = 'article',
+  class: extraClass,
+}: Props = Astro.props;
+
+const padCls = padding === 'tight' ? 'p-4' : 'p-6';
+const accentCls = accent ? 'border-brand-400 ring-2 ring-brand-500/40' : '';
+
+const classes = [
+  'rounded-xl border border-slate-800 bg-slate-900/60 backdrop-blur',
+  padCls,
+  accentCls,
+  extraClass ?? '',
+].filter(Boolean).join(' ');
+---
+<Tag class={classes}>
+  <slot />
+</Tag>
