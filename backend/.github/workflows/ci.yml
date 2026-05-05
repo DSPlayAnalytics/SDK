@@ -63,4 +63,6 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt pytest moto
       - name: pytest
-        run: pytest -x --tb=short
+        # test_dashboard_import verifica JSONs em ark/monitoring/dashboards/
+        # — path que so existe no monorepo. Ignorado no repo isolado.
+        run: pytest -x --tb=short --ignore=test_dashboard_import.py
