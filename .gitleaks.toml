@@ -1,0 +1,68 @@
+# gitleaks config do SDK.
+#
+# Usa rules default (200+ patterns: AWS, GCP, GitHub, Stripe, Slack,
+# Twilio, etc.) e adiciona alguns custom relevantes pro nosso ecossistema.
+#
+# Whitelist permite placeholders em README/examples/tests sem falsos
+# positivos: `pk_production_xxxxx` em examples/ e snippets de README sao
+# OBVIAMENTE placeholders.
+
+title = "DS Playground Analytics SDK gitleaks config"
+
+[extend]
+# Herda os rulesets default do gitleaks (sem essa linha, regras built-in
+# nao rodam — so as custom abaixo).
+useDefault = true
+
+# ---- Rules custom ----
+
+[[rules]]
+description = "DS Playground publishable_key (formato pk_<ambiente>_<token>)"
+id = "ds-publishable-key"
+# token tem 32+ chars URL-safe (base64 ou hex). Um placeholder
+# `pk_production_xxxxx` so tem 5 chars de token e nao bate.
+regex = '''pk_(production|development|staging|test)_[A-Za-z0-9_-]{32,}'''
+keywords = ["pk_production_", "pk_development_", "pk_staging_", "pk_test_"]
+
+[[rules]]
+description = "Resend API key"
+id = "resend-api-key"
+regex = '''re_[A-Za-z0-9]{20,}'''
+keywords = ["re_"]
+
+[[rules]]
+description = "Cloudflare R2 access key (AKIA-like)"
+id = "cf-r2-key"
+regex = '''[a-f0-9]{32}'''
+keywords = ["r2", "cloudflarestorage", "R2_ACCESS"]
+
+[[rules]]
+description = "Cloudflare API token"
+id = "cf-api-token"
+regex = '''cfat_[A-Za-z0-9_-]{30,}'''
+keywords = ["cfat_"]
+
+# ---- Allowlist (false positives conhecidos) ----
+
+[allowlist]
+description = "Placeholders, fixtures e docs que nao sao secrets reais"
+paths = [
+  '''node_modules/.*''',
+  '''dist/.*''',
+  '''.*\.lock$''',
+  '''package-lock\.json$''',
+]
+regexes = [
+  # Placeholders em examples e README — explicitos.
+  '''pk_(production|development|staging|test)_xxxxx''',
+  '''pk_(production|development|staging|test)_<[a-z_]+>''',
+  # README mostra estrutura sem token real.
+  '''pk_<ambiente>_<token>''',
+  # GitHub Actions secret references — uso correto.
+  '''secrets\.[A-Z_]+''',
+  '''\$\{\{\s*secrets\.''',
+]
+commits = [
+  # commit-hash:reason — adicionar aqui se precisar pular falso positivo
+  # historico apos confirmacao manual (em vez de re-write history).
+]

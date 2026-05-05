@@ -1,0 +1,4 @@
+# Forca LF em arquivos texto pra evitar CRLF acidental no Windows.
+* text=auto eol=lf
+*.bat text eol=crlf
+*.cmd text eol=crlf

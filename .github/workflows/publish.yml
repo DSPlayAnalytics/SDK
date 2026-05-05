@@ -1,0 +1,48 @@
+name: Publish
+
+on:
+  push:
+    tags: ['v*']
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write   # gh release create/upload precisa write
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          # GitHub Packages — token automatico via permissions: packages: write.
+          registry-url: 'https://npm.pkg.github.com'
+          scope: '@danpqdan'
+
+      - name: Install
+        run: npm ci
+
+      - name: Test + build
+        run: |
+          npm run test
+          npm run build
+
+      - name: Publish no GitHub Packages
+        run: npm publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Criar GitHub Release com bundle UMD anexado
+        # Anexa dist/sdk.umd.js como asset do release pra uso direto via
+        # <script src="https://.../releases/download/v0.X.Y/sdk.umd.js">.
+        # Re-roda em re-tag idempotente: --clobber sobrescreve assets.
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          tag="${GITHUB_REF##*/}"
+          # Cria release se nao existir; ignora erro se ja existe
+          gh release view "$tag" >/dev/null 2>&1 \
+            || gh release create "$tag" --title "$tag" --notes "Ver CHANGELOG.md"
+          gh release upload "$tag" dist/sdk.umd.js dist/sdk.umd.js.map --clobber
