@@ -64,7 +64,6 @@ services:
       GF_SECURITY_ALLOW_EMBEDDING: "true"
     volumes:
       - ./grafana/provisioning:/etc/grafana/provisioning:ro
-      - ./dashboards:/var/lib/grafana/dashboards:ro
       - grafana-data:/var/lib/grafana
     ports:
       - "127.0.0.1:3001:3000"
