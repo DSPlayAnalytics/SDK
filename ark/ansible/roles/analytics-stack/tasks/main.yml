@@ -65,7 +65,7 @@
     dest: "{{ repo_dir }}/backend/.env"
     owner: "{{ deploy_user }}"
     group: analytics
-    mode: "0600"
+    mode: "0640"
 
 - name: Gerar .env do compose (POSTGRES_PASSWORD, INFLUXDB_*)
   template:
