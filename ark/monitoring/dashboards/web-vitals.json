@@ -65,7 +65,7 @@
       "targets": [
         {
           "refId": "A",
-          "query": "from(bucket: \"__BUCKET__\")\n  |> range(start: -24h)\n  |> filter(fn: (r) => r.app_id == \"${__user.login}\")\n  |> filter(fn: (r) => r._measurement == \"web_vitals\" and r._field == \"valor\" and r.nome == \"LCP\")\n  |> group()\n  |> quantile(q: 0.75)"
+          "query": "from(bucket: \"__BUCKET__\")\n  |> range(start: -24h)\n  |> filter(fn: (r) => r.site_slug == \"${__user.login}\")\n  |> filter(fn: (r) => r._measurement == \"web_vitals\" and r._field == \"valor\" and r.nome == \"LCP\")\n  |> group()\n  |> quantile(q: 0.75)"
         }
       ],
       "options": {
@@ -100,7 +100,7 @@
       "targets": [
         {
           "refId": "A",
-          "query": "from(bucket: \"__BUCKET__\")\n  |> range(start: -24h)\n  |> filter(fn: (r) => r.app_id == \"${__user.login}\")\n  |> filter(fn: (r) => r._measurement == \"web_vitals\" and r._field == \"valor\" and r.nome == \"INP\")\n  |> group()\n  |> quantile(q: 0.75)"
+          "query": "from(bucket: \"__BUCKET__\")\n  |> range(start: -24h)\n  |> filter(fn: (r) => r.site_slug == \"${__user.login}\")\n  |> filter(fn: (r) => r._measurement == \"web_vitals\" and r._field == \"valor\" and r.nome == \"INP\")\n  |> group()\n  |> quantile(q: 0.75)"
         }
       ],
       "options": {
@@ -135,7 +135,7 @@
       "targets": [
         {
           "refId": "A",
-          "query": "from(bucket: \"__BUCKET__\")\n  |> range(start: -24h)\n  |> filter(fn: (r) => r.app_id == \"${__user.login}\")\n  |> filter(fn: (r) => r._measurement == \"web_vitals\" and r._field == \"valor\" and r.nome == \"CLS\")\n  |> group()\n  |> quantile(q: 0.75)"
+          "query": "from(bucket: \"__BUCKET__\")\n  |> range(start: -24h)\n  |> filter(fn: (r) => r.site_slug == \"${__user.login}\")\n  |> filter(fn: (r) => r._measurement == \"web_vitals\" and r._field == \"valor\" and r.nome == \"CLS\")\n  |> group()\n  |> quantile(q: 0.75)"
         }
       ],
       "options": {
@@ -171,7 +171,7 @@
       "targets": [
         {
           "refId": "A",
-          "query": "from(bucket: \"__BUCKET__\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r.app_id == \"${__user.login}\")\n  |> filter(fn: (r) => r._measurement == \"web_vitals\" and r._field == \"valor\" and r.nome == \"LCP\")\n  |> filter(fn: (r) => r.device_type != \"bot\")\n  |> group(columns: [\"device_type\"])\n  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)"
+          "query": "from(bucket: \"__BUCKET__\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r.site_slug == \"${__user.login}\")\n  |> filter(fn: (r) => r._measurement == \"web_vitals\" and r._field == \"valor\" and r.nome == \"LCP\")\n  |> filter(fn: (r) => r.device_type != \"bot\")\n  |> group(columns: [\"device_type\"])\n  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)"
         }
       ],
       "fieldConfig": {
@@ -206,7 +206,7 @@
       "targets": [
         {
           "refId": "A",
-          "query": "from(bucket: \"__BUCKET__\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r.app_id == \"${__user.login}\")\n  |> filter(fn: (r) => r._measurement == \"web_vitals\" and r._field == \"valor\" and r.nome == \"INP\")\n  |> filter(fn: (r) => r.device_type != \"bot\")\n  |> group(columns: [\"device_type\"])\n  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)"
+          "query": "from(bucket: \"__BUCKET__\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r.site_slug == \"${__user.login}\")\n  |> filter(fn: (r) => r._measurement == \"web_vitals\" and r._field == \"valor\" and r.nome == \"INP\")\n  |> filter(fn: (r) => r.device_type != \"bot\")\n  |> group(columns: [\"device_type\"])\n  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)"
         }
       ],
       "fieldConfig": {
@@ -234,7 +234,7 @@
       "targets": [
         {
           "refId": "A",
-          "query": "from(bucket: \"__BUCKET__\")\n  |> range(start: -24h)\n  |> filter(fn: (r) => r.app_id == \"${__user.login}\")\n  |> filter(fn: (r) => r._measurement == \"web_vitals\" and r._field == \"valor\")\n  |> filter(fn: (r) => r.device_type != \"bot\")\n  |> group(columns: [\"nome\", \"rating\"])\n  |> count()\n  |> group()\n  |> pivot(rowKey: [\"nome\"], columnKey: [\"rating\"], valueColumn: \"_value\")\n  |> drop(columns: [\"_start\", \"_stop\", \"_field\", \"_measurement\"])"
+          "query": "from(bucket: \"__BUCKET__\")\n  |> range(start: -24h)\n  |> filter(fn: (r) => r.site_slug == \"${__user.login}\")\n  |> filter(fn: (r) => r._measurement == \"web_vitals\" and r._field == \"valor\")\n  |> filter(fn: (r) => r.device_type != \"bot\")\n  |> group(columns: [\"nome\", \"rating\"])\n  |> count()\n  |> group()\n  |> pivot(rowKey: [\"nome\"], columnKey: [\"rating\"], valueColumn: \"_value\")\n  |> drop(columns: [\"_start\", \"_stop\", \"_field\", \"_measurement\"])"
         }
       ],
       "options": {
@@ -303,7 +303,7 @@
       "targets": [
         {
           "refId": "A",
-          "query": "from(bucket: \"__BUCKET__\")\n  |> range(start: -24h)\n  |> filter(fn: (r) => r.app_id == \"${__user.login}\")\n  |> filter(fn: (r) => r._measurement == \"web_vitals\" and r._field == \"valor\" and r.nome == \"LCP\")\n  |> filter(fn: (r) => r.device_type != \"bot\")\n  |> group(columns: [\"page_type\"])\n  |> quantile(q: 0.75)\n  |> sort(columns: [\"_value\"], desc: true)\n  |> limit(n: 10)"
+          "query": "from(bucket: \"__BUCKET__\")\n  |> range(start: -24h)\n  |> filter(fn: (r) => r.site_slug == \"${__user.login}\")\n  |> filter(fn: (r) => r._measurement == \"web_vitals\" and r._field == \"valor\" and r.nome == \"LCP\")\n  |> filter(fn: (r) => r.device_type != \"bot\")\n  |> group(columns: [\"page_type\"])\n  |> quantile(q: 0.75)\n  |> sort(columns: [\"_value\"], desc: true)\n  |> limit(n: 10)"
         }
       ],
       "options": {
