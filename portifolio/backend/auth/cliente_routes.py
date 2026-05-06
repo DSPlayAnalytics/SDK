@@ -279,6 +279,31 @@ def cadastro():
             site.id, slug, erro,
         )
 
+    # Best-effort: email de boas-vindas (nao bloqueia response nem cadastro).
+    try:
+        _obter_email_sender().enviar(
+            destinatario=user.email,
+            assunto=f"Bem-vindo ao dsplayground! Seu site \"{nome_site}\" foi criado",
+            corpo_texto=(
+                f"Olá!\n\n"
+                f"Seu site \"{nome_site}\" foi criado com sucesso no dsplayground.\n\n"
+                f"Estamos configurando seu dashboard de métricas agora. Em alguns instantes "
+                f"você poderá acessar em:\n"
+                f"  https://app.dsplayground.com.br/cliente/metricas\n\n"
+                f"Próximo passo — instalar o SDK:\n"
+                f"  1. Copie sua publishable key em "
+                f"https://dsplayground.com.br/cliente/configuracoes#chaves\n"
+                f"  2. Adicione o snippet ao seu site\n\n"
+                f"Dúvidas? Responda este e-mail.\n\n"
+                f"—\nEquipe dsplayground\nhttps://dsplayground.com.br"
+            ),
+        )
+    except Exception as erro_email:  # noqa: BLE001
+        security_logger.error(
+            "evento=email_boasvindas_falhou site_id=%s motivo=%s",
+            site.id, erro_email,
+        )
+
     resp = make_response(jsonify({
         "status": "success",
         "user": {"id": user.id, "site_id": user.site_id,
@@ -598,16 +623,26 @@ def verificar_magic_link():
     return resp
 
 
+def _api_base() -> str:
+    """URL raiz do proprio backend — usada em links de email (magic-link, reset).
+    Fallback em DASHBOARD_BASE_URL para retrocompat enquanto Ansible nao rotacionar."""
+    return os.environ.get(
+        "API_BASE_URL",
+        os.environ.get("DASHBOARD_BASE_URL", "https://api.dsplayground.com.br"),
+    ).rstrip("/")
+
+
+def _landing_base() -> str:
+    """URL raiz da landing (CF Pages) — usada em redirects para paginas estaticas."""
+    return os.environ.get("LANDING_BASE_URL", "https://dsplayground.com.br").rstrip("/")
+
+
 def _construir_link_verificar(token: str) -> str:
-    base = os.environ.get("DASHBOARD_BASE_URL", "https://dsplayground.com.br")
-    return f"{base.rstrip('/')}/cliente/auth/magic-link/verificar?{urlencode({'t': token})}"
+    return f"{_api_base()}/cliente/auth/magic-link/verificar?{urlencode({'t': token})}"
 
 
 def _construir_link_recuperar(token: str) -> str:
-    """URL no apex (CF Pages serve a pagina de redefinir senha) com token na
-    query string. O backend so valida e expira o token; a pagina e estatica."""
-    base = os.environ.get("DASHBOARD_BASE_URL", "https://dsplayground.com.br")
-    return f"{base.rstrip('/')}/cliente/auth/recuperar-senha/verificar?{urlencode({'t': token})}"
+    return f"{_api_base()}/cliente/auth/recuperar-senha/verificar?{urlencode({'t': token})}"
 
 
 # ============================================================================
@@ -688,19 +723,11 @@ def verificar_recuperar_senha():
         security_logger.info(
             "evento=auth_cliente_reset_token_invalido ip=%s", ip,
         )
-        # Redireciona pra landing com flag de erro pra UX consistente
-        # (pagina mostra "link expirado, peca um novo").
-        base = os.environ.get(
-            "DASHBOARD_BASE_URL", "https://dsplayground.com.br",
-        ).rstrip("/")
-        return redirect(f"{base}/cliente/redefinir-senha?erro=token_invalido", code=302)
+        return redirect(f"{_landing_base()}/cliente/redefinir-senha?erro=token_invalido", code=302)
 
     # Token valido. Redireciona pra form passando o token (vai virar
     # POST /confirmar quando user submeter).
-    base = os.environ.get(
-        "DASHBOARD_BASE_URL", "https://dsplayground.com.br",
-    ).rstrip("/")
-    destino = f"{base}/cliente/redefinir-senha?{urlencode({'t': token})}"
+    destino = f"{_landing_base()}/cliente/redefinir-senha?{urlencode({'t': token})}"
     security_logger.info(
         "evento=auth_cliente_reset_form_aberto user_id=%s ip=%s",
         magic.user_id, ip,
