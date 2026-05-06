@@ -2,4 +2,3 @@ pytest==9.0.3
 pytest-subtests==0.14.1
 ruff==0.11.10
 moto[s3]==5.1.22
-boto3==1.43.1
