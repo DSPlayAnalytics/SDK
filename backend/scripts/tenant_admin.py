@@ -61,9 +61,9 @@ def cmd_create(args: argparse.Namespace) -> int:
     print(f"site criado: id={site.id} slug={site.slug} ambiente={site.ambiente}")
     print(f"bucket_name reservado: {bucket_name}")
     print(f"dominios permitidos: {', '.join(args.dominio) if args.dominio else '(nenhum)'}")
-    print(f"publishable_key (guarde agora, nao sera exibida novamente):")
+    print("publishable_key (guarde agora, nao sera exibida novamente):")
     print(f"  {valor}")
-    print(f"AVISO: o bucket Influx ainda nao existe. Rode:")
+    print("AVISO: o bucket Influx ainda nao existe. Rode:")
     print(f"  python -m scripts.provisionar_cliente --slug {args.slug} "
           f"--nome '{args.nome}' --ambiente {args.ambiente} --plano {args.plano}")
     return 0
@@ -102,7 +102,7 @@ def cmd_show(args: argparse.Namespace) -> int:
     print(f"quota:     eventos/min={quota.eventos_por_minuto} eventos/dia={quota.eventos_por_dia} "
           f"emissoes_jwt/min={quota.emissoes_jwt_por_minuto} retencao_dias={quota.retencao_dias}")
     print(f"consumo hoje: {consumo}")
-    print(f"publishable_keys:")
+    print("publishable_keys:")
     if not keys:
         print("  (nenhuma)")
     else:
@@ -128,7 +128,7 @@ def cmd_create_key(args: argparse.Namespace) -> int:
     _, valor = repo.criar_publishable_key(
         site_id=site.id, ambiente=site.ambiente, nome=args.nome
     )
-    print(f"nova publishable_key (guarde agora):")
+    print("nova publishable_key (guarde agora):")
     print(f"  {valor}")
     return 0
 

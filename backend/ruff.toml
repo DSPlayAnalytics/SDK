@@ -1,0 +1,17 @@
+line-length = 100
+
+[lint]
+# E402 — imports after non-import statements: padrão intencional nos test files
+#         (sys.path.insert) e em imports diferidos em produção (evitar circulares).
+# E701 — multiple statements on one line (colon): usado em tenants_repo.py para
+#         inline-dicts de mapeamento, leitura aceitável no contexto.
+ignore = ["E402", "E701"]
+
+[lint.per-file-ignores]
+# Test files: F401 (unused imports — mocks/fixtures comuns), F841 (variável não
+# usada — resultado de requests descartado intencionalmente), E741 (var `l` em loops).
+"test_*.py"          = ["F401", "F841", "E741"]
+"billing/test_*.py"  = ["F401", "F841", "E741"]
+"archiver/test_*.py" = ["F401", "F841", "E741"]
+# Scripts utilitários: E741 (var `l` em loops de formatação de output).
+"scripts/*.py" = ["E741"]

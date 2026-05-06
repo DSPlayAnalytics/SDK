@@ -1,4 +1,4 @@
-from flask import Blueprint, Flask, jsonify, make_response, request, session
+from flask import Blueprint, Flask, jsonify, make_response, request
 from flask_cors import CORS
 from flask_socketio import SocketIO, emit, disconnect
 from flask_limiter import Limiter
@@ -8,17 +8,13 @@ import os
 import secrets
 import hashlib
 import time
-import jwt
 from datetime import datetime, timedelta
 from collections import defaultdict
-from typing import Dict, List, Optional
 from functools import wraps
-import uuid
 import logging
 import sys
 
 from config import config
-import json
 from influxdb_service import get_influxdb_service
 
 # ==================== CONFIGURAÇÃO DE SEGURANÇA ====================

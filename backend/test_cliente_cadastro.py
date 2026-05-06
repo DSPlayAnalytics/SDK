@@ -78,7 +78,7 @@ class CadastroEndpointTests(unittest.TestCase):
         self.assertTrue(body["user"]["site_id"])
 
     def test_cadastro_cria_site_com_bucket_padrao_cliente_slug(self):
-        r = self.client.post("/cliente/auth/cadastro", json=self._payload())
+        self.client.post("/cliente/auth/cadastro", json=self._payload())
         site = self.tenants.obter_site_por_slug("acme")
         self.assertIsNotNone(site)
         self.assertEqual(site.nome, "ACME Corp")

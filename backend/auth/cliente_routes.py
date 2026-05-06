@@ -33,7 +33,7 @@ import sqlite3
 from typing import Optional
 from urllib.parse import urlencode
 
-from flask import Blueprint, current_app, g, jsonify, make_response, redirect, request
+from flask import Blueprint, jsonify, make_response, redirect, request
 
 from .clientes_users_repo import ClientesUsersRepo
 from .email_sender import EmailSender, criar_sender_padrao

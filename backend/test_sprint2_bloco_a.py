@@ -99,7 +99,7 @@ class StrictBucketRoutingTests(unittest.TestCase):
         """Sites criados via tenant_admin.cmd_create nascem com bucket_name."""
         # Simula o comportamento de cmd_create sem o argparse.
         # (cmd_create chama repo.criar_site com bucket_name=cliente_<slug>.)
-        bucket_name = f"cliente_acme"
+        bucket_name = "cliente_acme"
         site = self.repo.criar_site(
             slug="acme", nome="Acme", ambiente="development", dominios=[],
             plano="free", bucket_name=bucket_name,

@@ -8,11 +8,10 @@ cron 03:00 UTC e mantem processo vivo. Esse e o entrypoint do container
 sidecar (chamado por `main.py`).
 """
 import gzip
-import io
 import logging
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
-from typing import Iterable, List, Optional
+from typing import Iterable, List
 
 logger = logging.getLogger(__name__)
 

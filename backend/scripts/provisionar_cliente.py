@@ -336,11 +336,11 @@ def imprimir(result: ProvisionResult, *, json_out: bool):
     print(f"  grafana_ds     : {result.grafana_ds_name} (uid={result.grafana_ds_uid})")
     print(f"  influx_token   : id={result.influx_token_id} (token nao reexibido)")
     if result.dashboards:
-        print(f"  dashboards     :")
+        print("  dashboards     :")
         for d in result.dashboards:
             print(f"    - {d['arquivo']}: uid={d['uid']} v{d['version']} {d.get('url', '')}")
     if result.publishable_key:
-        print(f"  publishable_key (anote, nao sera reexibida):")
+        print("  publishable_key (anote, nao sera reexibida):")
         print(f"    {result.publishable_key}")
 
 

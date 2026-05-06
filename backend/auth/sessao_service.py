@@ -28,7 +28,6 @@ from .clientes_users_repo import (
     MagicLink,
     Sessao,
     hash_token,
-    normalizar_email,
 )
 
 
