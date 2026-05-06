@@ -131,7 +131,7 @@
       "targets": [
         {
           "refId": "A",
-          "query": "from(bucket: \"__BUCKET__\")\n  |> range(start: -24h)\n  |> filter(fn: (r) => r.site_slug == \"${__user.login}\")\n  |> filter(fn: (r) => r._measurement == \"custom_events\" and r._field == \"ocorrencias\" and r.nome == \"${evento}\")\n  |> keep(columns: [\"session_id\"])\n  |> distinct(column: \"session_id\")\n  |> count()"
+          "query": "from(bucket: \"__BUCKET__\")\n  |> range(start: -24h)\n  |> filter(fn: (r) => r.site_slug == \"${__user.login}\")\n  |> filter(fn: (r) => r._measurement == \"custom_events\" and r._field == \"ocorrencias\" and r.nome == \"${evento}\")\n  |> keep(columns: [\"session_id\"])\n  |> group()\n  |> distinct(column: \"session_id\")\n  |> count()"
         }
       ],
       "options": {
@@ -161,7 +161,7 @@
       "targets": [
         {
           "refId": "A",
-          "query": "from(bucket: \"__BUCKET__\")\n  |> range(start: -24h)\n  |> filter(fn: (r) => r.site_slug == \"${__user.login}\")\n  |> filter(fn: (r) => r._measurement == \"custom_events\" and r._field == \"ocorrencias\" and r.nome == \"${evento}\")\n  |> keep(columns: [\"page_type\"])\n  |> distinct(column: \"page_type\")\n  |> count()"
+          "query": "from(bucket: \"__BUCKET__\")\n  |> range(start: -24h)\n  |> filter(fn: (r) => r.site_slug == \"${__user.login}\")\n  |> filter(fn: (r) => r._measurement == \"custom_events\" and r._field == \"ocorrencias\" and r.nome == \"${evento}\")\n  |> keep(columns: [\"page_type\"])\n  |> group()\n  |> distinct(column: \"page_type\")\n  |> count()"
         }
       ],
       "options": {
