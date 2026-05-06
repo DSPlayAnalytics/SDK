@@ -59,7 +59,8 @@ async function fetchDados(siteId, graficoId, token) {
 
 function Skeleton() {
   return (
-    <div style={{ display:'flex', alignItems:'flex-end', gap:6, height:'100%', padding:'4px 0' }}>
+    <div role="status" style={{ display:'flex', alignItems:'flex-end', gap:6, height:'100%', padding:'4px 0' }}>
+      <span style={{ position:'absolute', width:1, height:1, padding:0, margin:-1, overflow:'hidden', clip:'rect(0,0,0,0)', whiteSpace:'nowrap', borderWidth:0 }}>Carregando</span>
       {SKELETON_ALTS.map((h, i) => (
         <div
           key={i}
@@ -77,9 +78,9 @@ function Skeleton() {
   );
 }
 
-function Estado({ icone, titulo, descricao, cor }) {
+function Estado({ icone, titulo, descricao, cor, role }) {
   return (
-    <div style={{
+    <div role={role} style={{
       display:'flex', flexDirection:'column', alignItems:'center',
       justifyContent:'center', height:'100%', gap:8,
       textAlign:'center', padding:'0 20px',
@@ -241,6 +242,7 @@ export default function EmbedWidget() {
 
       {estado === ESTADO.ERRO_TOKEN && (
         <Estado
+          role="alert"
           icone="🔒"
           titulo="Sessão expirada"
           descricao="Recarregue a página para continuar"
@@ -250,6 +252,7 @@ export default function EmbedWidget() {
 
       {estado === ESTADO.ERRO_REDE && (
         <Estado
+          role="alert"
           icone="⚠️"
           titulo="Não foi possível carregar"
           descricao="Verifique sua conexão e tente novamente"
@@ -259,6 +262,7 @@ export default function EmbedWidget() {
 
       {estado === ESTADO.SEM_DADOS && (
         <Estado
+          role="status"
           icone="📊"
           titulo="Sem dados no período"
           descricao="Quando chegarem eventos, o gráfico aparece aqui"

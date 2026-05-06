@@ -3,6 +3,36 @@
 # Pacotes basicos, firewalld, fail2ban, usuario deploy com sudo NOPASSWD,
 # grupo analytics GID 10001 compartilhado com containers.
 
+# HostGator sobrescreve /etc/yum.repos.d/epel.repo com uma URL de mirror
+# proprio (mirrors.unifiedlayer.com) que fica indisponivel. O pacote
+# epel-release deixa o arquivo canonico em epel.repo.rpmnew (metalink
+# oficial do Fedora). Se o .rpmnew existir, substituimos o arquivo atual.
+- name: Verificar se epel.repo.rpmnew existe
+  stat:
+    path: /etc/yum.repos.d/epel.repo.rpmnew
+  register: _epel_rpmnew
+
+- name: Verificar se epel-testing.repo.rpmnew existe
+  stat:
+    path: /etc/yum.repos.d/epel-testing.repo.rpmnew
+  register: _epel_testing_rpmnew
+
+- name: Corrigir epel.repo quebrado (mirror HostGator)
+  copy:
+    src: /etc/yum.repos.d/epel.repo.rpmnew
+    dest: /etc/yum.repos.d/epel.repo
+    remote_src: true
+    force: true
+  when: _epel_rpmnew.stat.exists
+
+- name: Corrigir epel-testing.repo quebrado (mirror HostGator)
+  copy:
+    src: /etc/yum.repos.d/epel-testing.repo.rpmnew
+    dest: /etc/yum.repos.d/epel-testing.repo
+    remote_src: true
+    force: true
+  when: _epel_testing_rpmnew.stat.exists
+
 - name: Garantir EPEL habilitado (necessario p/ fail2ban, certbot)
   dnf:
     name: epel-release
