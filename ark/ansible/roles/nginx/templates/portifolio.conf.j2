@@ -196,9 +196,8 @@ server {
 # ============== embed.{{ dominio }}: widget de iframe (Fase 1 dogfood) ==============
 # Subdominio dedicado pra widget React isolado. Serve o mesmo bundle do
 # portifolio.{{ dominio }} (container portifolio-frontend) mas restringe
-# o path a `/widget/*` e troca o `X-Frame-Options: SAMEORIGIN` herdado do
-# ssl.conf por `Content-Security-Policy: frame-ancestors` permitindo embed
-# de qualquer host sob {{ dominio }}.
+# o path a `/widget/*` e usa `Content-Security-Policy: frame-ancestors`
+# permitindo embed de qualquer host sob {{ dominio }}.
 #
 # Auth do widget: token JWT na URL (?token=...), validado por /embed/dados
 # em api.{{ dominio }}. Cookie cliente_session NAO entra aqui — SameSite=Strict.
@@ -224,9 +223,8 @@ server {
     }
 
     # Widget React em /widget/<site_id>/<grafico_id>. Re-emite headers de
-    # seguranca aqui pra substituir o `X-Frame-Options: SAMEORIGIN` do
-    # ssl.conf por CSP `frame-ancestors` (semantica do nginx: add_header
-    # do filho sobrescreve TODOS herdados do pai).
+    # seguranca explicitamente: nginx nao herda server-level add_headers
+    # quando o location define os proprios (semantica nginx).
     location /widget/ {
         add_header X-Content-Type-Options "nosniff"                    always;
         add_header Referrer-Policy        "strict-origin-when-cross-origin" always;
