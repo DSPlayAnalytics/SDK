@@ -41,17 +41,21 @@
 
 **Hardening Grafana Viewer (sprint 1 extra, 2026-04-27):** `GF_USERS_VIEWERS_CAN_EDIT=false`, `GF_EXPLORE_ENABLED=false`, `GF_SNAPSHOTS_EXTERNAL_ENABLED=false` em `ark/monitoring/docker-compose.monitoring.yml`. Validado: `curl -H 'X-WEBAUTH-USER:<id>' /api/dashboards/home` retorna `canEdit:false canSave:false canAdmin:false`.
 
-**Proposto — sprint 2:**
+**Sprint 2 — implementado (2026-05-05 audit):**
 
-- **Quota enforcement**: backend rejeita evento com `analytics_error code=QUOTA_EXCEDIDA` quando `consumo_diario.eventos > quotas.eventos_por_dia`. Hoje so incrementa, nao rejeita.
-- **Cardinalidade enforcement**: contador `(bucket, tag) -> set(values)` em memoria + Postgres; rejeita ponto + log `[SECURITY] cardinalidade_excedida` quando passa do limite do plano.
-- Email diario com counts agregados de rejeicoes (1x/dia, nao 1x/evento).
-- Email alert pro cliente em 80% e 95% da cardinalidade do plano.
-- Tags derivadas server-side: `device_type` (do User-Agent), `pais` (GeoIP do IP), `referrer_dominio` (do header Referer).
-- **Org-per-cliente fim-a-fim no Grafana**: o `provisionar_cliente.py` ja cria a org, mas usuarios do `auth.proxy` continuam caindo na "Main Org". Falta logica no `/gate` (ou script de membership) que adiciona o user a org certa idempotente via Grafana API.
-- 4 dashboards out-of-the-box provisionados na org do cliente: Web Vitals, Engajamento, Funil, Event Explorer.
-- Container `analytics-archiver`: cron diario que exporta `[now-retencao-1d, now-retencao]` em line protocol comprimido pra `/var/backups/analytics/<slug>/YYYY-MM-DD.lp.gz`.
-- Endpoint `GET /cliente/exportar?inicio=...&fim=...` com signed URL (nginx X-Accel-Redirect).
+- **Quota enforcement** ✅ — `servico_ingestao.py:268` rejeita com `code=QUOTA_EXCEDIDA`; `_quota_excedida()` consulta `tenants_repo.consumo_hoje()` vs `quota.eventos_por_dia`.
+- **Cardinalidade enforcement** ✅ — `ingestao/cardinalidade.py`; `TrackerCardinalidade.verificar_e_registrar()` rejeita com `code=CARDINALIDADE_EXCEDIDA`; alertas em 80% e 95%.
+- Tags derivadas server-side ✅ — `device_type` (User-Agent), `referrer_dominio` (Referer). GeoIP (`pais`) pendente.
+- **Org-per-cliente Grafana** ✅ — `GrafanaSyncService.garantir_membership()` em `auth/grafana_sync.py:52` com cache TTL 1h; chamado em best-effort no `/gate` via `_sincronizar_grafana_org()`.
+- **4 dashboards out-of-the-box** ✅ — `ark/monitoring/dashboards/`: `engajamento.json`, `event-explorer.json`, `page-views.json`, `web-vitals.json`.
+- **`analytics-archiver`** ✅ — `backend/archiver/main.py` com APScheduler cron diario; exporta para Cloudflare R2.
+- **Email de boas-vindas pos-cadastro** ✅ — adicionado em `cliente_routes.py:/cadastro` (2026-05-05); best-effort, nao bloqueia o 201.
+
+**Pendente:**
+
+- Email diario com counts de rejeicoes de quota/cardinalidade (1x/dia, nao 1x/evento).
+- GeoIP para tag `pais` (falta biblioteca + integração no validador).
+- Endpoint `GET /cliente/exportar` com signed URL (archiver existe, rota REST nao exposta).
 - Validacao end-to-end em `ark/teste-ambiente-a` (Docker) e `teste-ambiente-b` (Vagrant).
 
 **Pendente — proximas sprints (v2/v3):**
@@ -675,6 +679,6 @@ Health checks adicionados:
 ### 23.7 Pendencias
 
 - Migrar `app_id` do payload pra ser derivado de `site.id` server-side (hoje cliente envia, mas pode mentir — backend ja valida contra `sites.id`, mas remover do payload elimina o passo).
-- E-mail de boas-vindas pos-cadastro (estrutura ja existe via Resend em §12 — falta template e trigger).
+- E-mail de boas-vindas pos-cadastro ✅ implementado em 2026-05-05 (best-effort, `cliente_routes.py:/cadastro`).
 - Dogfood: gerar a publishable key da landing apos primeiro deploy completo.
 - DNS Cloudflare: criar registro `portifolio.dsplayground.com.br` apontando pro mesmo IP da apex (proxiado, laranja). Hoje so a apex resolve.

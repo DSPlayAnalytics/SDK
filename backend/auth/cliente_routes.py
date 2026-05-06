@@ -279,6 +279,31 @@ def cadastro():
             site.id, slug, erro,
         )
 
+    # Best-effort: envia email de boas-vindas. Falha nao bloqueia o cadastro.
+    try:
+        dashboard_url = os.environ.get(
+            "DASHBOARD_REDIRECT",
+            f"{_landing_base()}/cliente/metricas",
+        )
+        _obter_email_sender().enviar(
+            destinatario=email,
+            assunto="Bem-vindo ao DSPlayground Analytics",
+            corpo_texto=(
+                f"Ola!\n\n"
+                f"Seu site '{nome_site}' (slug: {slug}) foi cadastrado com sucesso.\n\n"
+                f"Acesse seu dashboard de metricas em:\n{dashboard_url}\n\n"
+                f"Para comecar a coletar dados, instale o SDK no seu site:\n"
+                f"https://dsplayground.com.br/docs/sdk\n\n"
+                f"Se tiver duvidas, responda este email.\n\n"
+                f"— Equipe DSPlayground"
+            ),
+        )
+    except Exception as erro:  # noqa: BLE001
+        logger.warning(
+            "evento=boas_vindas_email_falhou site_id=%s slug=%s motivo=%s",
+            site.id, slug, erro,
+        )
+
     resp = make_response(jsonify({
         "status": "success",
         "user": {"id": user.id, "site_id": user.site_id,
