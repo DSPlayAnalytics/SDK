@@ -3,9 +3,9 @@
 filenames:
   - /var/log/backend/security.log
 labels:
-  type: portifolio-backend
+  type: dsplay-backend
 ---
-# Logs do Nginx (acesso e erro)
+# Logs do vhost portifolio.dsplayground.com.br (portfolio pessoal React 3D)
 filenames:
   - /var/log/nginx/portifolio.access.log
 labels:
@@ -16,24 +16,35 @@ filenames:
 labels:
   type: nginx-error
 ---
-# Logs do vhost da API (api.dsplayground.com.br)
+# Logs do vhost api.dsplayground.com.br
 filenames:
-  - /var/log/nginx/portifolio.api.access.log
+  - /var/log/nginx/dsplay-api.access.log
 labels:
   type: nginx
 ---
 filenames:
-  - /var/log/nginx/portifolio.api.error.log
+  - /var/log/nginx/dsplay-api.error.log
 labels:
   type: nginx-error
 ---
-# Logs do vhost do frontend
+# Logs do vhost app.dsplayground.com.br (dashboard logado)
 filenames:
-  - /var/log/nginx/portifolio.frontend.access.log
+  - /var/log/nginx/dsplay-app.access.log
 labels:
   type: nginx
 ---
 filenames:
-  - /var/log/nginx/portifolio.frontend.error.log
+  - /var/log/nginx/dsplay-app.error.log
+labels:
+  type: nginx-error
+---
+# Logs do vhost embed.dsplayground.com.br (widget iframe)
+filenames:
+  - /var/log/nginx/dsplay-embed.access.log
+labels:
+  type: nginx
+---
+filenames:
+  - /var/log/nginx/dsplay-embed.error.log
 labels:
   type: nginx-error

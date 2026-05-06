@@ -1,28 +1,23 @@
 services:
   crowdsec:
     image: crowdsecurity/crowdsec:v1.6.11
-    container_name: portifolio-crowdsec
+    container_name: dsplay-crowdsec
     restart: unless-stopped
     environment:
       COLLECTIONS: "crowdsecurity/http-cve crowdsecurity/linux crowdsecurity/nginx"
-      CUSTOM_HOSTNAME: portifolio-crowdsec
+      CUSTOM_HOSTNAME: dsplay-crowdsec
     volumes:
       - ./config/acquis.yaml:/etc/crowdsec/acquis.yaml:ro
-      # Parser em s01-parse (faz grok no Line.Raw). Arquivo direto sob stage,
-      # sem subdir de autor (autor so vale para itens do hub).
       - ./parsers/backend-analytics.yaml:/etc/crowdsec/parsers/s01-parse/backend-analytics.yaml:ro
       - ./scenarios/admin-auth-abuse.yaml:/etc/crowdsec/scenarios/admin-auth-abuse.yaml:ro
       - ./scenarios/analytics-flood.yaml:/etc/crowdsec/scenarios/analytics-flood.yaml:ro
-      # logs do backend e nginx (ajustar caminhos em producao)
       - /var/log/nginx:/var/log/nginx:ro
       - ../../backend/security.log:/var/log/backend/security.log:ro
       - crowdsec-db:/var/lib/crowdsec/data
       - crowdsec-config:/etc/crowdsec
     ports:
-      # LAPI e Agent comm so no loopback — nenhum bouncer remoto precisa
-      # acessar estes endpoints. Expor em 0.0.0.0 abre registro nao-autorizado.
-      - "127.0.0.1:6060:6060"   # Local API + metrics
-      - "127.0.0.1:8080:8080"   # Agent comm
+      - "127.0.0.1:6060:6060"
+      - "127.0.0.1:8080:8080"
     healthcheck:
       test: ["CMD", "cscli", "lapi", "status"]
       interval: 30s
@@ -30,13 +25,13 @@ services:
       retries: 3
       start_period: 30s
     networks:
-      - portifolio-app
+      - dsplay-app
 
 volumes:
   crowdsec-db:
   crowdsec-config:
 
 networks:
-  portifolio-app:
+  dsplay-app:
     external: true
-    name: portifolio_default
+    name: dsplay_default

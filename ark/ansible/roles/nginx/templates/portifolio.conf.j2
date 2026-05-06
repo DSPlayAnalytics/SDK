@@ -16,19 +16,19 @@ log_format api_no_query '$remote_addr - $remote_user [$time_local] '
                         '"$http_referer" "$http_user_agent" '
                         'rt=$request_time';
 
-upstream portifolio_backend {
+upstream dsplay_backend {
     server 127.0.0.1:5000;
     keepalive 32;
 }
 
 # Portfolio pessoal (React 3D — Home/Projects/About)
-upstream portifolio_frontend {
+upstream dsplay_frontend {
     server 127.0.0.1:3000;
     keepalive 16;
 }
 
 # Grafana (dashboard self-service do cliente) — ver ark/docs/dashboard-cliente.md
-upstream portifolio_grafana {
+upstream dsplay_grafana {
     server 127.0.0.1:3001;
     keepalive 8;
 }
@@ -67,8 +67,8 @@ server {
     include             /etc/nginx/snippets/ssl.conf;
 
     client_max_body_size 1m;
-    access_log /var/log/nginx/portifolio-app.access.log;
-    error_log  /var/log/nginx/portifolio-app.error.log warn;
+    access_log /var/log/nginx/dsplay-app.access.log;
+    error_log  /var/log/nginx/dsplay-app.error.log warn;
 
     # Raiz do app — placeholder ate UI propria existir.
     # Por enquanto manda pro dashboard direto. Quando dsplayground-app entrar
@@ -100,7 +100,7 @@ server {
         # o nginx strippa o prefixo, Grafana recebe `/`, e como
         # GF_SERVER_SERVE_FROM_SUB_PATH=true + root_url=app.X/cliente/metricas/,
         # ele redireciona 301 pro root_url completo — loop infinito.
-        proxy_pass http://portifolio_grafana;
+        proxy_pass http://dsplay_grafana;
         proxy_http_version 1.1;
         proxy_set_header Host              $host;
         proxy_set_header X-Real-IP         $remote_addr;
@@ -117,7 +117,7 @@ server {
 
     location = /__cliente_auth_gate {
         internal;
-        proxy_pass http://portifolio_backend/cliente/auth/gate;
+        proxy_pass http://dsplay_backend/cliente/auth/gate;
         proxy_pass_request_body off;
         proxy_set_header Content-Length "";
         proxy_set_header Host              $host;
@@ -154,7 +154,7 @@ server {
     add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' https://api.{{ dominio }} wss://api.{{ dominio }}; frame-ancestors 'self'; base-uri 'self'; form-action 'self'" always;
 
     location / {
-        proxy_pass http://portifolio_frontend;
+        proxy_pass http://dsplay_frontend;
         proxy_http_version 1.1;
         proxy_set_header Host              $host;
         proxy_set_header X-Real-IP         $remote_addr;
@@ -176,7 +176,7 @@ server {
     location /api/ {
         rewrite ^/api/(.*)$ /$1 break;
         limit_req zone=analytics_edge burst=40 nodelay;
-        proxy_pass http://portifolio_backend;
+        proxy_pass http://dsplay_backend;
         proxy_http_version 1.1;
         proxy_set_header Host              $host;
         proxy_set_header X-Real-IP         $remote_addr;
@@ -206,8 +206,8 @@ server {
     include             /etc/nginx/snippets/ssl.conf;
 
     client_max_body_size 1m;
-    access_log /var/log/nginx/portifolio-embed.access.log;
-    error_log  /var/log/nginx/portifolio-embed.error.log warn;
+    access_log /var/log/nginx/dsplay-embed.access.log;
+    error_log  /var/log/nginx/dsplay-embed.error.log warn;
 
     # Bloqueio total de qualquer path que NAO seja /widget/*. Evita usar o
     # subdominio como vetor pra outras paginas da SPA portfolio.
@@ -226,7 +226,7 @@ server {
             "frame-ancestors 'self' https://*.{{ dominio }} https://{{ dominio }}; default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self' https://api.{{ dominio }}; img-src 'self' data:; font-src 'self' data:"
             always;
 
-        proxy_pass http://portifolio_frontend;
+        proxy_pass http://dsplay_frontend;
         proxy_http_version 1.1;
         proxy_set_header Host              $host;
         proxy_set_header X-Real-IP         $remote_addr;
@@ -246,7 +246,7 @@ server {
             "frame-ancestors 'self' https://*.{{ dominio }} https://{{ dominio }}; default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self' https://api.{{ dominio }}; img-src 'self' data:; font-src 'self' data:"
             always;
 
-        proxy_pass http://portifolio_frontend;
+        proxy_pass http://dsplay_frontend;
         proxy_http_version 1.1;
         proxy_set_header Host $host;
     }
@@ -274,8 +274,8 @@ server {
     # Usa log_format api_no_query (definido no http{} no topo deste arquivo)
     # pra omitir query string — widget embed passa ?token=<JWT> ali e nao
     # queremos persistir tokens no access.log.
-    access_log /var/log/nginx/portifolio-api.access.log api_no_query;
-    error_log  /var/log/nginx/portifolio-api.error.log warn;
+    access_log /var/log/nginx/dsplay-api.access.log api_no_query;
+    error_log  /var/log/nginx/dsplay-api.error.log warn;
 
     # CSP estrito: a API so retorna JSON, nao deve carregar nada.
     add_header Content-Security-Policy "default-src 'none'; frame-ancestors 'none'; base-uri 'none'" always;
@@ -292,7 +292,7 @@ server {
     # contra brute force. Defesa em profundidade vs limiter no Flask.
     location = /cliente/auth/login {
         limit_req zone=cliente_auth burst=5 nodelay;
-        proxy_pass http://portifolio_backend;
+        proxy_pass http://dsplay_backend;
         proxy_http_version 1.1;
         proxy_set_header Host              $host;
         proxy_set_header X-Real-IP         $remote_addr;
@@ -303,7 +303,7 @@ server {
     # Idem para magic-link e cadastro: fluxos de autenticacao escritos.
     location = /cliente/auth/magic-link/solicitar {
         limit_req zone=cliente_auth burst=3 nodelay;
-        proxy_pass http://portifolio_backend;
+        proxy_pass http://dsplay_backend;
         proxy_http_version 1.1;
         proxy_set_header Host              $host;
         proxy_set_header X-Real-IP         $remote_addr;
@@ -313,7 +313,7 @@ server {
 
     location = /cliente/auth/cadastro {
         limit_req zone=cliente_auth burst=3 nodelay;
-        proxy_pass http://portifolio_backend;
+        proxy_pass http://dsplay_backend;
         proxy_http_version 1.1;
         proxy_set_header Host              $host;
         proxy_set_header X-Real-IP         $remote_addr;
@@ -325,7 +325,7 @@ server {
     # com burst 10 cobre concorrencia entre paginas mas barra brute force.
     location = /auth/sdk-token {
         limit_req zone=cliente_auth burst=10 nodelay;
-        proxy_pass http://portifolio_backend;
+        proxy_pass http://dsplay_backend;
         proxy_http_version 1.1;
         proxy_set_header Host              $host;
         proxy_set_header X-Real-IP         $remote_addr;
@@ -336,7 +336,7 @@ server {
     location / {
         limit_req zone=analytics_edge burst=40 nodelay;
 
-        proxy_pass http://portifolio_backend;
+        proxy_pass http://dsplay_backend;
         proxy_http_version 1.1;
         proxy_set_header Host              $host;
         proxy_set_header X-Real-IP         $remote_addr;

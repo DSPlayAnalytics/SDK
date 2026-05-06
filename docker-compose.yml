@@ -1,19 +1,31 @@
-# Trava o nome do projeto Docker independente do diretorio de clone.
-# Critico: monitoring e CrowdSec referenciam `portifolio_default` como
-# external network — mudar o nome quebraria essas stacks.
-name: portifolio
+# NOTA DE MIGRAÇÃO VPS (Fase 2):
+# Ao mover de /opt/portifolio (danpqdan/portifolio) para /opt/dsplay
+# (danpqdan/dsplay), os volumes Docker mudam de prefixo:
+#
+#   portifolio_influxdb_data   → dsplay_influxdb_data
+#   portifolio_influxdb_config → dsplay_influxdb_config
+#   portifolio_postgres_data   → dsplay_postgres_data
+#   portifolio_backend_keys    → dsplay_backend_keys
+#
+# Copiar antes de subir os novos containers:
+#   for vol in influxdb_data influxdb_config postgres_data backend_keys; do
+#     docker volume create dsplay_${vol}
+#     docker run --rm \
+#       -v portifolio_${vol}:/from \
+#       -v dsplay_${vol}:/to \
+#       alpine sh -c "cp -av /from/. /to/"
+#   done
+#
+# A rede `dsplay_default` é criada automaticamente na primeira subida.
+# Após copiar os volumes e subir a nova stack, atualizar monitoring e
+# crowdsec (que referenciam dsplay_default como external network) e
+# reiniciá-los: make -f ark/Makefile monitoring-up && crowdsec-up
 
-# Resource limits: so `mem_limit` (sintaxe legacy v2 honrada por `docker
-# compose up`). CPU NAO limitado — VPS HostGator tem 1 vCPU; qualquer
-# `cpus: > 1.0` falha com "range of CPUs is from 0.01 to 1.00", e
-# fair-share natural do kernel ja distribui o vCPU entre os containers.
-# Numeros conservadores; ajustar ao monitorar uso real via Prometheus.
 services:
   influxdb:
     image: influxdb:2.7
-    container_name: portifolio-influxdb
+    container_name: dsplay-influxdb
     ports:
-      # Acesso publico via nginx → influx.dsplayground.com.br. Sem bypass direto.
       - "127.0.0.1:8086:8086"
     environment:
       DOCKER_INFLUXDB_INIT_MODE: setup
@@ -36,8 +48,7 @@ services:
 
   postgres:
     image: postgres:16-alpine
-    container_name: portifolio-postgres
-    # Acessivel so internamente; backend usa hostname 'postgres'. Nunca exposto na host.
+    container_name: dsplay-postgres
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-portifolio_auth}
       POSTGRES_USER: ${POSTGRES_USER:-portifolio}
@@ -56,26 +67,19 @@ services:
   backend:
     build:
       context: ./backend
-    container_name: portifolio-backend
+    container_name: dsplay-backend
     depends_on:
       influxdb:
         condition: service_healthy
       postgres:
         condition: service_healthy
-    # Backend so e acessivel via Nginx na host. Nunca 0.0.0.0:5000.
     ports:
       - "127.0.0.1:5000:5000"
-    # Fonte unica de verdade: .env gerado pelo Ansible
-    # (ark/ansible/roles/analytics-stack/templates/backend.env.j2).
     env_file:
       - ./backend/.env
     volumes:
       - ./backend:/app
-      # Volume dedicado para chaves RSA do sdk_jwt. Fora do bind de codigo para
-      # que nunca cai no git, e para persistir entre rebuilds da imagem.
       - backend_keys:/app/data/keys
-      # Templates de dashboard provisionados por scripts/provisionar_cliente.py.
-      # Read-only — o container nao escreve la, so le e POSTa para Grafana API.
       - ./ark/monitoring/dashboards:/app/dashboards:ro
     environment:
       DASHBOARDS_TEMPLATE_DIR: /app/dashboards
@@ -85,8 +89,6 @@ services:
 
   frontend:
     build:
-      # Frontend (portfolio pessoal React 3D) vive em portifolio/frontend/
-      # dentro do monorepo — unico servico com contexto fora da raiz.
       context: ./portifolio/frontend
       args:
         VITE_API_URL: ${VITE_API_URL:-http://localhost:5000}
@@ -95,7 +97,7 @@ services:
         VITE_PUBLISHABLE_KEY: ${VITE_PUBLISHABLE_KEY:-}
       secrets:
         - NODE_AUTH_TOKEN
-    container_name: portifolio-frontend
+    container_name: dsplay-frontend
     depends_on:
       - backend
     ports:
@@ -108,7 +110,7 @@ services:
     build:
       context: ./backend
       dockerfile: archiver/Dockerfile
-    container_name: portifolio-archiver
+    container_name: dsplay-archiver
     profiles:
       - archiver
     depends_on:
@@ -128,7 +130,7 @@ services:
     build:
       context: ./backend
       dockerfile: archiver/Dockerfile
-    container_name: portifolio-email-cron
+    container_name: dsplay-email-cron
     profiles:
       - email-cron
     command: ["python", "-m", "scripts.email_cron_main"]
@@ -153,7 +155,7 @@ services:
         PUBLIC_DEBUG: ${PUBLIC_DEBUG:-false}
       secrets:
         - NODE_AUTH_TOKEN
-    container_name: portifolio-landing
+    container_name: dsplay-landing
     depends_on:
       - backend
     ports:

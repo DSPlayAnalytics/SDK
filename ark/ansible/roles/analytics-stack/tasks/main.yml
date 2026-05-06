@@ -87,7 +87,7 @@
 
 - name: Garantir volume backend_keys existente (chaves RSA do sdk_jwt)
   community.docker.docker_volume:
-    name: portifolio_backend_keys
+    name: dsplay_backend_keys
     state: present
   become_user: "{{ deploy_user }}"
 
@@ -97,7 +97,7 @@
   # for recriado (down -v), esta task reaplica o owner.
   command: >
     docker run --rm
-    -v portifolio_backend_keys:/mnt
+    -v dsplay_backend_keys:/mnt
     alpine:3.19
     chown -R 10001:10001 /mnt
   become_user: "{{ deploy_user }}"
@@ -156,7 +156,7 @@
 - name: Aguardar Postgres pronto pra aceitar comandos administrativos
   when: not ansible_check_mode
   ansible.builtin.shell: |
-    docker exec portifolio-postgres pg_isready -U "{{ postgres_user }}" -d "{{ postgres_db }}" -q
+    docker exec dsplay-postgres pg_isready -U "{{ postgres_user }}" -d "{{ postgres_db }}" -q
   register: pg_ready
   retries: 10
   delay: 3
@@ -171,7 +171,7 @@
     - not ansible_check_mode
     - pg_ready.rc | default(1) == 0
   community.docker.docker_container_exec:
-    container: portifolio-postgres
+    container: dsplay-postgres
     # community.docker >=5 espera `argv:` para lista; `command:` e str.
     # Passar lista em `command` faz o modulo serializar como "[psql,...]"
     # e o OCI falha com "executable file not found".
@@ -207,7 +207,7 @@
     - not ansible_check_mode
     - pg_ready.rc | default(1) == 0
   community.docker.docker_container_exec:
-    container: portifolio-postgres
+    container: dsplay-postgres
     argv:
       - psql
       - -U
