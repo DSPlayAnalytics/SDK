@@ -205,6 +205,92 @@ def _executar_provisionamento(*, slug: str, nome: str, plano: str,
         )
 
 
+def _enviar_boas_vindas(*, email: str, nome_site: str, dashboard_url: str,
+                        landing_url: str, site_id: str) -> None:
+    """Envia email de boas-vindas apos cadastro bem-sucedido.
+
+    Nao expoe slug, site_id nem detalhes internos. O campo `nome_site` e o
+    unico dado do cadastro incluido no corpo — nome publico que o proprio
+    cliente escolheu.
+    """
+    corpo_texto = (
+        f"Olá,\n\n"
+        f"Sua conta no DSPlayground Analytics foi criada com sucesso.\n"
+        f"A partir de agora você pode acompanhar em tempo real as métricas\n"
+        f"do seu site \"{nome_site}\" diretamente pelo seu dashboard.\n\n"
+        f"ACESSE SEU DASHBOARD\n"
+        f"{dashboard_url}\n\n"
+        f"PRIMEIROS PASSOS\n\n"
+        f"1. Instale o SDK\n"
+        f"   npm install @dsplayground-analytics/sdk\n\n"
+        f"2. Obtenha sua chave publicável\n"
+        f"   No dashboard, acesse Configurações > Chaves de API.\n"
+        f"   A chave tem o formato pk_production_...\n\n"
+        f"3. Inicialize no seu site\n"
+        f"   import {{ DSPlaySDK }} from '@dsplayground-analytics/sdk'\n"
+        f"   const sdk = new DSPlaySDK({{ publishableKey: 'pk_production_...' }})\n\n"
+        f"DOCUMENTAÇÃO E EXEMPLOS\n"
+        f"Guia de instalação: {landing_url}/docs/instalacao\n"
+        f"Referência da API:  {landing_url}/docs/referencia\n"
+        f"Exemplos prontos:   {landing_url}/docs/exemplos\n\n"
+        f"SUPORTE\n"
+        f"Dúvidas ou problemas? Responda este e-mail ou acesse:\n"
+        f"{landing_url}/suporte\n\n"
+        f"Atenciosamente,\n"
+        f"Equipe DSPlayground Analytics\n"
+        f"dsplayground.com.br\n"
+    )
+
+    corpo_html = (
+        "<!DOCTYPE html>"
+        "<html lang='pt-BR'><head><meta charset='UTF-8'>"
+        "<meta name='viewport' content='width=device-width,initial-scale=1'>"
+        "<title>Bem-vindo ao DSPlayground Analytics</title></head>"
+        "<body style='font-family:Arial,sans-serif;color:#1a1a1a;max-width:600px;margin:0 auto;padding:24px'>"
+        "<h1 style='font-size:22px;margin-bottom:4px'>Sua conta está ativa</h1>"
+        "<p style='color:#555;margin-top:0'>DSPlayground Analytics</p>"
+        "<hr style='border:none;border-top:1px solid #e5e5e5;margin:20px 0'>"
+        f"<p>Olá,</p>"
+        f"<p>Sua conta foi criada com sucesso. A partir de agora você pode acompanhar "
+        f"em tempo real as métricas do seu site <strong>{nome_site}</strong> diretamente "
+        f"pelo seu dashboard.</p>"
+        f"<p style='margin:24px 0'>"
+        f"<a href='{dashboard_url}' "
+        f"style='background:#2563eb;color:#fff;padding:12px 24px;border-radius:6px;"
+        f"text-decoration:none;font-weight:bold'>Acessar meu dashboard</a></p>"
+        "<h2 style='font-size:16px;margin-top:32px'>Primeiros passos</h2>"
+        "<ol style='padding-left:20px;line-height:1.8'>"
+        "<li><strong>Instale o SDK</strong><br>"
+        "<code style='background:#f4f4f4;padding:2px 6px;border-radius:3px'>"
+        "npm install @dsplayground-analytics/sdk</code></li>"
+        "<li><strong>Obtenha sua chave publicável</strong><br>"
+        "No dashboard, acesse <em>Configurações &gt; Chaves de API</em>.</li>"
+        "<li><strong>Inicialize no seu site</strong><br>"
+        "<code style='background:#f4f4f4;padding:2px 6px;border-radius:3px'>"
+        "new DSPlaySDK({ publishableKey: 'pk_production_...' })</code></li>"
+        "</ol>"
+        "<h2 style='font-size:16px;margin-top:32px'>Documentação e exemplos</h2>"
+        "<ul style='padding-left:20px;line-height:1.8'>"
+        f"<li><a href='{landing_url}/docs/instalacao'>Guia de instalação</a></li>"
+        f"<li><a href='{landing_url}/docs/referencia'>Referência da API</a></li>"
+        f"<li><a href='{landing_url}/docs/exemplos'>Exemplos prontos</a></li>"
+        "</ul>"
+        "<hr style='border:none;border-top:1px solid #e5e5e5;margin:32px 0 16px'>"
+        "<p style='font-size:13px;color:#888'>"
+        "Dúvidas? Responda este e-mail ou acesse "
+        f"<a href='{landing_url}/suporte' style='color:#2563eb'>{landing_url}/suporte</a>.<br>"
+        "DSPlayground Analytics &mdash; dsplayground.com.br</p>"
+        "</body></html>"
+    )
+
+    _obter_email_sender().enviar(
+        destinatario=email,
+        assunto=f"Bem-vindo ao DSPlayground Analytics — {nome_site}",
+        corpo_texto=corpo_texto,
+        corpo_html=corpo_html,
+    )
+
+
 # ---------- endpoints ----------
 
 
@@ -281,22 +367,14 @@ def cadastro():
 
     # Best-effort: envia email de boas-vindas. Falha nao bloqueia o cadastro.
     try:
-        dashboard_url = os.environ.get(
-            "DASHBOARD_REDIRECT",
-            f"{_landing_base()}/cliente/metricas",
-        )
-        _obter_email_sender().enviar(
-            destinatario=email,
-            assunto="Bem-vindo ao DSPlayground Analytics",
-            corpo_texto=(
-                f"Ola!\n\n"
-                f"Seu site '{nome_site}' (slug: {slug}) foi cadastrado com sucesso.\n\n"
-                f"Acesse seu dashboard de metricas em:\n{dashboard_url}\n\n"
-                f"Para comecar a coletar dados, instale o SDK no seu site:\n"
-                f"https://dsplayground.com.br/docs/sdk\n\n"
-                f"Se tiver duvidas, responda este email.\n\n"
-                f"— Equipe DSPlayground"
-            ),
+        landing = _landing_base()
+        dashboard_url = os.environ.get("DASHBOARD_REDIRECT", f"{landing}/cliente/metricas")
+        _enviar_boas_vindas(
+            email=email,
+            nome_site=nome_site,
+            dashboard_url=dashboard_url,
+            landing_url=landing,
+            site_id=site.id,
         )
     except Exception as erro:  # noqa: BLE001
         logger.warning(
