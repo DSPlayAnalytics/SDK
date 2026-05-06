@@ -18,6 +18,7 @@
  * `js-chart-state-*` ou trocar via attribute `data-state`.
  */
 type State = 'loading' | 'ready' | 'empty' | 'error';
+type Height = 'sm' | 'md' | 'lg' | 'xl';
 
 interface Action {
   href?: string;
@@ -33,7 +34,7 @@ interface Props {
   emptyTitle?: string;
   emptyDescription?: string;
   action?: Action;       // header action (ex: "ver tudo")
-  height?: 'sm' | 'md' | 'lg';
+  height?: Height;
   class?: string;
 }
 
@@ -49,10 +50,11 @@ const {
   class: extraClass,
 } = Astro.props;
 
-const heightClass: Record<NonNullable<Props['height']>, string> = {
+const heightClass: Record<Height, string> = {
   sm: 'h-40',
   md: 'h-64',
   lg: 'h-80',
+  xl: 'h-[540px]',
 };
 ---
 <section

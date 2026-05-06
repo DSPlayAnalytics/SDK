@@ -133,3 +133,13 @@
     border-color: var(--color-slate-700, currentColor);
   }
 }
+
+/* Esconde scrollbar visualmente mantendo a funcionalidade de scroll.
+ * Util em listas horizontais de tabs/chips que precisam rolar em mobile
+ * sem mostrar barra feia. */
+@utility no-scrollbar {
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}

@@ -111,18 +111,34 @@ import EmptyState from '~/components/ui/EmptyState.astro';
         </div>
       </section>
 
-      <!-- CHART 24h — pendencia de endpoint backend -->
-      <ChartCard
-        title="Eventos por hora"
-        subtitle="Últimas 24 horas"
-        state="empty"
-        emptyTitle="Em breve neste painel"
-        emptyDescription="Endpoint /cliente/metricas/serie ainda em desenvolvimento. Por enquanto, gráficos completos no Grafana."
-        action={{ href: 'https://app.dsplayground.com.br', label: 'Abrir no Grafana', 'data-cta': 'painel-grafana' }}
-        height="lg"
-      >
-        <canvas id="js-chart-24h" aria-label="Gráfico de eventos por hora"></canvas>
-      </ChartCard>
+      <!-- CHART — Grafana embutido via iframe. O cliente_session cookie
+           (Domain=dsplayground.com.br) viaja automaticamente para app.X,
+           o nginx faz auth_request e injeta X-WEBAUTH-USER, Grafana autentica.
+           GF_SECURITY_ALLOW_EMBEDDING=true no compose + proxy_hide_header
+           X-Frame-Options no nginx permitem o embed. -->
+      <div id="js-chart-card-container">
+        <ChartCard
+          title="Painel de analytics"
+          subtitle="Suas métricas em tempo real"
+          state="loading"
+          emptyTitle="Sem dados ainda"
+          emptyDescription="Instale o SDK no seu site para começar a ver métricas aqui."
+          errorMessage="Não foi possível carregar o painel. Abra o Grafana diretamente."
+          action={{ href: 'https://app.dsplayground.com.br/cliente/metricas', label: 'Abrir completo', 'data-cta': 'painel-grafana' }}
+          height="xl"
+        >
+          <div id="js-embed-wrapper" class="h-full hidden">
+            <iframe
+              id="js-grafana-iframe"
+              title="Painel de analytics"
+              width="100%"
+              height="100%"
+              loading="lazy"
+              style="border:none;display:block;border-radius:4px;"
+            ></iframe>
+          </div>
+        </ChartCard>
+      </div>
 
       <!-- ATIVIDADE RECENTE — pendencia tambem -->
       <section aria-label="Atividade recente">
@@ -180,6 +196,34 @@ import EmptyState from '~/components/ui/EmptyState.astro';
     const elErro = document.getElementById('painel-erro')!;
     const elConteudo = document.getElementById('painel-conteudo')!;
     const elSubheader = document.getElementById('painel-subheader')!;
+
+    // --- Grafana embed (iframe direto, sem JWT) ---
+    // O cookie cliente_session (Domain=dsplayground.com.br) é enviado
+    // automaticamente ao iframe em app.dsplayground.com.br. O nginx faz
+    // auth_request + injeta X-WEBAUTH-USER; Grafana autentica via auth.proxy.
+    // Requer GF_SECURITY_ALLOW_EMBEDDING=true no Grafana e proxy_hide_header
+    // X-Frame-Options no nginx — ver ark/monitoring/docker-compose.monitoring.yml
+    // e ark/ansible/roles/nginx/templates/portifolio.conf.j2.
+    const GRAFANA_BASE = 'https://app.dsplayground.com.br/cliente/metricas';
+    const GRAFANA_DASHBOARD = 'portifolio-page-views';
+
+    function setChartState(state: 'loading' | 'ready' | 'empty' | 'error') {
+      const container = document.getElementById('js-chart-card-container');
+      if (!container) return;
+      (['loading', 'ready', 'empty', 'error'] as const).forEach((s) => {
+        const el = container.querySelector(`.js-chart-state-${s}`);
+        if (el) el.classList.toggle('hidden', s !== state);
+      });
+    }
+
+    function carregarEmbed(_siteId: string) {
+      const iframe = document.getElementById('js-grafana-iframe') as HTMLIFrameElement | null;
+      const wrapper = document.getElementById('js-embed-wrapper');
+      if (!iframe || !wrapper) return;
+      iframe.src = `${GRAFANA_BASE}/d/${GRAFANA_DASHBOARD}?kiosk=1&theme=dark&from=now-24h&to=now&refresh=30s`;
+      wrapper.classList.remove('hidden');
+      setChartState('ready');
+    }
 
     function fmtNumero(n: number): string {
       return new Intl.NumberFormat('pt-BR').format(n);
@@ -282,6 +326,9 @@ import EmptyState from '~/components/ui/EmptyState.astro';
 
       elLoading.classList.add('hidden');
       elConteudo.classList.remove('hidden');
+
+      // Carrega embed chart em background (nao bloqueia KPIs).
+      carregarEmbed(r.site.id);
 
       // Live polling — refresh discreto a cada 30s. Mantem KPIs vivos
       // sem WebSocket reverso (SDK so envia pra cima). Pausa quando aba

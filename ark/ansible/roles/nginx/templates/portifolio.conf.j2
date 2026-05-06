@@ -95,6 +95,14 @@ server {
 
         error_page 401 = @cliente_nao_autenticado;
 
+        # Permite embedding em iframe a partir do apex (landing CF Pages).
+        # GF_SECURITY_ALLOW_EMBEDDING=true no Grafana remove o seu proprio
+        # X-Frame-Options; proxy_hide_header garante que nenhum residual
+        # chegue ao browser mesmo em versoes futuras do Grafana.
+        # frame-ancestors restringe a embedding apenas aos subdominios proprios.
+        proxy_hide_header X-Frame-Options;
+        add_header Content-Security-Policy "frame-ancestors 'self' https://{{ dominio }} https://*.{{ dominio }}" always;
+
         # IMPORTANTE: proxy_pass SEM trailing `/` — preserva o path original
         # `/cliente/metricas/...` quando passa pro Grafana. Com trailing `/`
         # o nginx strippa o prefixo, Grafana recebe `/`, e como
