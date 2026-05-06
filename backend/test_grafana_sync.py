@@ -32,19 +32,31 @@ def _client_mock():
     m.get_user_by_login.return_value = {"id": 7, "login": "site-uuid"}
     m.add_org_user.return_value = True  # adicionado pela primeira vez
     m.set_user_current_org.return_value = None
+    m.remove_org_user.return_value = True  # removido do Main Org
     return m
 
 
 class GarantirMembershipTests(unittest.TestCase):
     def test_sucesso_chama_add_e_set_current(self):
         client = _client_mock()
-        svc = GrafanaSyncService(client)
+        svc = GrafanaSyncService(client, main_org_id=1)
         ok = svc.garantir_membership("site-uuid", "cliente_acme")
         self.assertTrue(ok)
         client.get_org_by_name.assert_called_once_with("cliente_acme")
         client.get_user_by_login.assert_called_once_with("site-uuid")
         client.add_org_user.assert_called_once_with(42, login="site-uuid", role="Viewer")
         client.set_user_current_org.assert_called_once_with(7, 42)
+        # Passo 5: remove do Main Org (id=1) para isolar o tenant.
+        client.remove_org_user.assert_called_once_with(1, 7)
+
+    def test_remove_do_main_org_nao_acontece_quando_target_e_main_org(self):
+        """Se target_org_id == main_org_id, nao deve chamar remove (evita auto-expulsao)."""
+        client = _client_mock()
+        client.get_org_by_name.return_value = {"id": 1, "name": "Main Org"}
+        svc = GrafanaSyncService(client, main_org_id=1)
+        ok = svc.garantir_membership("site-uuid", "Main Org")
+        self.assertTrue(ok)
+        client.remove_org_user.assert_not_called()
 
     def test_cache_hit_evita_chamadas_grafana(self):
         client = _client_mock()

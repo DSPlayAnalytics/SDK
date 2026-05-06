@@ -112,6 +112,18 @@ class GrafanaSyncService:
         # qual org renderizar quando o user abre o dashboard.
         self._client.set_user_current_org(user_id, target_org_id)
 
+        # 5) Remove do Main Org para eliminar a troca de contexto indevida.
+        # auth.proxy coloca todo user novo no Main Org automaticamente;
+        # sem esta remocao o cliente consegue alternar pra org errada e
+        # ver folders/dashboards de outros tenants (mesmo que vazios hoje).
+        # Skip quando o org alvo ja e o Main Org (nao removeria a si mesmo).
+        if target_org_id != self._main_org_id:
+            removido = self._client.remove_org_user(self._main_org_id, user_id)
+            logger.info(
+                "evento=grafana_sync_main_org_removido login=%s user_id=%d removido=%s",
+                login, user_id, removido,
+            )
+
         logger.info(
             "evento=grafana_sync_ok login=%s org=%s user_id=%d adicionado=%s",
             login, org_name, user_id, adicionado,
