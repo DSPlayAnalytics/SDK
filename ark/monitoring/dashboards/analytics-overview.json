@@ -27,23 +27,23 @@
       "targets": [
         {
           "refId": "A",
-          "query": "from(bucket: \"portifolio_dev\")\n  |> range(start: -24h)\n  |> filter(fn: (r) => r.site_id == \"${__user.login}\")\n  |> filter(fn: (r) => r._measurement == \"page_analytics\" and r._field == \"visualizacoes\")\n  |> sum()\n  |> group()\n  |> sum()\n  |> rename(columns: {_value: \"Visualizacoes\"})"
+          "query": "from(bucket: \"portifolio_dev\")\n  |> range(start: -24h)\n  |> filter(fn: (r) => r.app_id == \"${__user.login}\")\n  |> filter(fn: (r) => r._measurement == \"page_analytics\" and r._field == \"visualizacoes\")\n  |> sum()\n  |> group()\n  |> sum()\n  |> rename(columns: {_value: \"Visualizacoes\"})"
         },
         {
           "refId": "B",
-          "query": "from(bucket: \"portifolio_dev\")\n  |> range(start: -24h)\n  |> filter(fn: (r) => r.site_id == \"${__user.login}\")\n  |> filter(fn: (r) => r._measurement == \"page_analytics\" and r._field == \"cliques\")\n  |> sum()\n  |> group()\n  |> sum()\n  |> rename(columns: {_value: \"Cliques\"})"
+          "query": "from(bucket: \"portifolio_dev\")\n  |> range(start: -24h)\n  |> filter(fn: (r) => r.app_id == \"${__user.login}\")\n  |> filter(fn: (r) => r._measurement == \"page_analytics\" and r._field == \"cliques\")\n  |> sum()\n  |> group()\n  |> sum()\n  |> rename(columns: {_value: \"Cliques\"})"
         },
         {
           "refId": "C",
-          "query": "from(bucket: \"portifolio_dev\")\n  |> range(start: -24h)\n  |> filter(fn: (r) => r.site_id == \"${__user.login}\")\n  |> filter(fn: (r) => r._measurement == \"page_analytics\" and r._field == \"scrolls\")\n  |> sum()\n  |> group()\n  |> sum()\n  |> rename(columns: {_value: \"Scrolls\"})"
+          "query": "from(bucket: \"portifolio_dev\")\n  |> range(start: -24h)\n  |> filter(fn: (r) => r.app_id == \"${__user.login}\")\n  |> filter(fn: (r) => r._measurement == \"page_analytics\" and r._field == \"scrolls\")\n  |> sum()\n  |> group()\n  |> sum()\n  |> rename(columns: {_value: \"Scrolls\"})"
         },
         {
           "refId": "D",
-          "query": "from(bucket: \"portifolio_dev\")\n  |> range(start: -24h)\n  |> filter(fn: (r) => r.site_id == \"${__user.login}\")\n  |> filter(fn: (r) => r._measurement == \"page_analytics\" and r._field == \"hovers\")\n  |> sum()\n  |> group()\n  |> sum()\n  |> rename(columns: {_value: \"Hovers\"})"
+          "query": "from(bucket: \"portifolio_dev\")\n  |> range(start: -24h)\n  |> filter(fn: (r) => r.app_id == \"${__user.login}\")\n  |> filter(fn: (r) => r._measurement == \"page_analytics\" and r._field == \"hovers\")\n  |> sum()\n  |> group()\n  |> sum()\n  |> rename(columns: {_value: \"Hovers\"})"
         },
         {
           "refId": "E",
-          "query": "from(bucket: \"portifolio_dev\")\n  |> range(start: -24h)\n  |> filter(fn: (r) => r.site_id == \"${__user.login}\")\n  |> filter(fn: (r) => r._measurement == \"page_analytics\" and r._field == \"mouse_moves\")\n  |> sum()\n  |> group()\n  |> sum()\n  |> rename(columns: {_value: \"Mouse moves\"})"
+          "query": "from(bucket: \"portifolio_dev\")\n  |> range(start: -24h)\n  |> filter(fn: (r) => r.app_id == \"${__user.login}\")\n  |> filter(fn: (r) => r._measurement == \"page_analytics\" and r._field == \"mouse_moves\")\n  |> sum()\n  |> group()\n  |> sum()\n  |> rename(columns: {_value: \"Mouse moves\"})"
         }
       ],
       "options": {
@@ -75,7 +75,7 @@
       "description": "Soma de cliques por page_type em janelas de 5min. Group antes de aggregateWindow consolida sessoes diferentes na mesma serie.",
       "targets": [
         {
-          "query": "from(bucket: \"portifolio_dev\")\n  |> range(start: -1h)\n  |> filter(fn: (r) => r.site_id == \"${__user.login}\")\n  |> filter(fn: (r) => r._measurement == \"page_analytics\" and r._field == \"cliques\")\n  |> group(columns: [\"page_type\"])\n  |> aggregateWindow(every: 5m, fn: sum, createEmpty: false)",
+          "query": "from(bucket: \"portifolio_dev\")\n  |> range(start: -1h)\n  |> filter(fn: (r) => r.app_id == \"${__user.login}\")\n  |> filter(fn: (r) => r._measurement == \"page_analytics\" and r._field == \"cliques\")\n  |> group(columns: [\"page_type\"])\n  |> aggregateWindow(every: 5m, fn: sum, createEmpty: false)",
           "refId": "A"
         }
       ],
@@ -102,7 +102,7 @@
       "description": "Soma de permanencia_segundos por janela de 5min e por page_type. permanencia_segundos no SDK e a duracao do batch (~5s), entao soma representa o tempo total agregado de todas as sessoes ativas naquela janela.",
       "targets": [
         {
-          "query": "from(bucket: \"portifolio_dev\")\n  |> range(start: -24h)\n  |> filter(fn: (r) => r.site_id == \"${__user.login}\")\n  |> filter(fn: (r) => r._measurement == \"page_analytics\" and r._field == \"permanencia_segundos\")\n  |> group(columns: [\"page_type\"])\n  |> aggregateWindow(every: 5m, fn: sum, createEmpty: false)",
+          "query": "from(bucket: \"portifolio_dev\")\n  |> range(start: -24h)\n  |> filter(fn: (r) => r.app_id == \"${__user.login}\")\n  |> filter(fn: (r) => r._measurement == \"page_analytics\" and r._field == \"permanencia_segundos\")\n  |> group(columns: [\"page_type\"])\n  |> aggregateWindow(every: 5m, fn: sum, createEmpty: false)",
           "refId": "A"
         }
       ],
@@ -127,7 +127,7 @@
       "datasource": { "type": "influxdb", "uid": "InfluxDB" },
       "targets": [
         {
-          "query": "from(bucket: \"portifolio_dev\")\n  |> range(start: -24h)\n  |> filter(fn: (r) => r.site_id == \"${__user.login}\")\n  |> filter(fn: (r) => r._measurement == \"page_analytics\")\n  |> filter(fn: (r) => r._field == \"cliques\" or r._field == \"hovers\" or r._field == \"mouse_moves\" or r._field == \"toques\" or r._field == \"exposicoes\" or r._field == \"custom_events\")\n  |> group(columns: [\"_field\", \"page_type\"])\n  |> sum()",
+          "query": "from(bucket: \"portifolio_dev\")\n  |> range(start: -24h)\n  |> filter(fn: (r) => r.app_id == \"${__user.login}\")\n  |> filter(fn: (r) => r._measurement == \"page_analytics\")\n  |> filter(fn: (r) => r._field == \"cliques\" or r._field == \"hovers\" or r._field == \"mouse_moves\" or r._field == \"toques\" or r._field == \"exposicoes\" or r._field == \"custom_events\")\n  |> group(columns: [\"_field\", \"page_type\"])\n  |> sum()",
           "refId": "A"
         }
       ],
