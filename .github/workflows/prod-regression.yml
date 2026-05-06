@@ -1,0 +1,221 @@
+name: Prod Security Regression
+
+# Gate contra repeticao do incidente 2026-04-21: backend rodou como Werkzeug
+# dev server com debugger ativo e assets do debugger vazaram publicamente via
+# nginx. Esses checks falham se a regressao voltar.
+
+on:
+  schedule:
+    - cron: '17 3 * * *'  # 03:17 UTC diario
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - docker-compose.yml
+      - ark/ansible/**
+      - backend/app.py
+      - portifolio/frontend/Dockerfile
+      - portifolio/frontend/docker-nginx.conf
+
+permissions:
+  contents: read
+
+jobs:
+  debugger-leak:
+    name: Werkzeug debugger nao vazou
+    runs-on: ubuntu-latest
+    env:
+      HOST: https://api.dsplayground.com.br
+    steps:
+      - name: debugger.js publico → conteudo do debugger nao retorna
+        run: |
+          # Em prod o backend roda gunicorn — nao tem Werkzeug debugger.
+          # Hit no path do debugger pode retornar 200 (rota / do backend),
+          # 404 (path nao matcha) ou 502/503 (backend reiniciando). O sinal
+          # de regressao real e o BODY conter assinaturas do Werkzeug, nao
+          # apenas o status code. Falsos positivos (502 transitorio durante
+          # CD) eram bloqueadores antes desta mudanca.
+          body=$(curl -sk "${HOST}/?__debugger__=yes&cmd=resource&f=debugger.js")
+          if echo "$body" | grep -qE 'Werkzeug|__debugger__|debugger\.js'; then
+            echo "::error::REGRESSAO: Werkzeug debugger acessivel publicamente. FLASK_ENV provavelmente voltou para development."
+            echo "$body" | head -c 500
+            exit 1
+          fi
+          echo "OK: backend nao expoe Werkzeug debugger"
+
+      - name: /console publico → deve ser !=200
+        run: |
+          code=$(curl -sk -o /dev/null -w '%{http_code}' "${HOST}/console")
+          echo "HTTP $code"
+          if [ "$code" = "200" ]; then
+            echo "::error::REGRESSAO: /console publicamente acessivel."
+            exit 1
+          fi
+
+      - name: Health endpoint responde 200
+        run: |
+          # Path canonico (sem /api/). Subdominio api.X proxia direto pro
+          # backend, que escuta em /health/app. Apex /api/health/app tambem
+          # funciona (nginx strippa o prefixo).
+          code=$(curl -sk -o /dev/null -w '%{http_code}' "${HOST}/health/app")
+          echo "HTTP $code"
+          if [ "$code" != "200" ]; then
+            echo "::error::Backend nao respondeu saudavel em /health/app (HTTP $code)."
+            exit 1
+          fi
+
+      - name: FLASK_ENV=production (sinal via campo ambiente do health)
+        run: |
+          # Antes esse check usava presenca/ausencia do prefixo /api/ na URL
+          # (em dev nao tinha prefixo, em prod tinha). Como removemos essa
+          # diferenca, o sinal canonico agora e o campo `ambiente` retornado
+          # pelo proprio /health/app. Em prod precisa ser exatamente "production".
+          body=$(curl -sk "${HOST}/health/app")
+          echo "$body"
+          if ! echo "$body" | grep -q '"ambiente": *"production"'; then
+            echo "::error::REGRESSAO: /health/app nao reporta ambiente=production. Backend rodando em FLASK_ENV nao-prod?"
+            exit 1
+          fi
+
+  apex-landing-producao:
+    name: Apex serve landing Astro estatica (CF Pages)
+    runs-on: ubuntu-latest
+    env:
+      APEX: https://dsplayground.com.br
+    steps:
+      - name: Apex nao serve Vite dev server
+        run: |
+          # @vite/client so aparece em dev server. Em prod (Astro estatico
+          # ou Vite build) nao deve existir. Vale tanto pra CF Pages quanto
+          # pra qualquer fallback container nginx:alpine.
+          body=$(curl -sk "${APEX}/")
+          if echo "$body" | grep -q '@vite/client'; then
+            echo "::error::REGRESSAO: dsplayground.com.br esta servindo Vite dev server (@vite/client detectado)."
+            exit 1
+          fi
+          echo "OK: sem @vite/client"
+
+      - name: Bundle estatico (Astro /_astro/* ou Vite /assets/*) responde 200
+        run: |
+          # Apex hoje e CF Pages servindo Astro -> /_astro/<hash>.{js,css}
+          # Se um dia voltar pra Vite (fallback container), aceita /assets/ tambem.
+          body=$(curl -sk "${APEX}/")
+          asset=$(echo "$body" | grep -oE '/(_astro|assets)/[a-zA-Z0-9._-]+\.(js|css)' | head -1)
+          if [ -z "$asset" ]; then
+            echo "::error::Nenhum /_astro/* ou /assets/* encontrado no index.html — bundle estatico nao servido."
+            exit 1
+          fi
+          echo "Asset detectado: $asset"
+          code=$(curl -sk -o /dev/null -w '%{http_code}' "${APEX}${asset}")
+          echo "HTTP $code"
+          if [ "$code" != "200" ]; then
+            echo "::error::Asset ${asset} retornou HTTP $code (esperado 200)."
+            exit 1
+          fi
+
+  portifolio-producao:
+    name: Portfolio React 3D servido estatico (Vite build)
+    runs-on: ubuntu-latest
+    env:
+      PORTFOLIO: https://portifolio.dsplayground.com.br
+    steps:
+      - name: portifolio.X nao serve Vite dev server
+        run: |
+          body=$(curl -sk "${PORTFOLIO}/")
+          if echo "$body" | grep -q '@vite/client'; then
+            echo "::error::REGRESSAO: portifolio.X esta servindo Vite dev server."
+            exit 1
+          fi
+          echo "OK: sem @vite/client"
+
+      - name: Bundle Vite em /assets/ responde 200
+        run: |
+          body=$(curl -sk "${PORTFOLIO}/")
+          asset=$(echo "$body" | grep -oE '/assets/[a-zA-Z0-9._-]+\.(js|css)' | head -1)
+          if [ -z "$asset" ]; then
+            echo "::error::Nenhum /assets/*.js|css em portifolio.X — bundle nao servido."
+            exit 1
+          fi
+          echo "Asset detectado: $asset"
+          code=$(curl -sk -o /dev/null -w '%{http_code}' "${PORTFOLIO}${asset}")
+          echo "HTTP $code"
+          if [ "$code" != "200" ]; then
+            echo "::error::Asset ${asset} retornou HTTP $code (esperado 200)."
+            exit 1
+          fi
+
+  metrics-leak:
+    name: /metrics nao vaza publicamente
+    runs-on: ubuntu-latest
+    env:
+      API: https://api.dsplayground.com.br
+      PORTFOLIO: https://portifolio.dsplayground.com.br
+    steps:
+      - name: api.X /metrics deve ser bloqueado (nginx deny)
+        run: |
+          code=$(curl -sk -o /dev/null -w '%{http_code}' "${API}/metrics")
+          echo "HTTP ${code} em ${API}/metrics"
+          if [ "$code" = "200" ]; then
+            echo "::error::REGRESSAO: api.X/metrics esta acessivel publicamente. nginx precisa de location = /metrics { deny all; }"
+            exit 1
+          fi
+          echo "OK: api.X/metrics bloqueado (HTTP ${code})"
+
+      - name: portifolio.X /api/metrics deve ser bloqueado
+        run: |
+          code=$(curl -sk -o /dev/null -w '%{http_code}' "${PORTFOLIO}/api/metrics")
+          echo "HTTP ${code} em ${PORTFOLIO}/api/metrics"
+          if [ "$code" = "200" ]; then
+            echo "::error::REGRESSAO: portifolio.X/api/metrics esta acessivel publicamente."
+            exit 1
+          fi
+          echo "OK: portifolio.X/api/metrics bloqueado (HTTP ${code})"
+
+  app-x-cliente-fallback:
+    name: app.X /cliente/* fora de /metricas redireciona pro apex
+    runs-on: ubuntu-latest
+    env:
+      APP: https://app.dsplayground.com.br
+      APEX: https://dsplayground.com.br
+    steps:
+      - name: app.X /cliente/configuracoes -> 302 apex
+        run: |
+          status=$(curl -sk -o /dev/null -w '%{http_code}' "${APP}/cliente/configuracoes")
+          target=$(curl -sk -o /dev/null -w '%{redirect_url}' "${APP}/cliente/configuracoes")
+          echo "HTTP ${status} -> ${target}"
+          if [ "$status" != "302" ] && [ "$status" != "301" ]; then
+            echo "::error::REGRESSAO: app.X/cliente/configuracoes nao redireciona (HTTP ${status}). Verificar nginx vhost app.X."
+            exit 1
+          fi
+          case "$target" in
+            "${APEX}"/cliente/configuracoes*)
+              echo "OK: redirect aponta pra apex"
+              ;;
+            *)
+              echo "::error::Redirect aponta pra ${target} (esperado apex/cliente/configuracoes)."
+              exit 1
+              ;;
+          esac
+
+      - name: app.X /cliente/exportar -> 302 apex (smoke duplo)
+        run: |
+          status=$(curl -sk -o /dev/null -w '%{http_code}' "${APP}/cliente/exportar")
+          target=$(curl -sk -o /dev/null -w '%{redirect_url}' "${APP}/cliente/exportar")
+          echo "HTTP ${status} -> ${target}"
+          if [ "$status" != "302" ] && [ "$status" != "301" ]; then
+            echo "::error::app.X/cliente/exportar nao redireciona (HTTP ${status})."
+            exit 1
+          fi
+
+      - name: app.X /cliente/metricas/ NAO redireciona (continua proxy pro Grafana)
+        run: |
+          status=$(curl -sk -o /dev/null -w '%{http_code}' "${APP}/cliente/metricas/")
+          echo "HTTP ${status}"
+          target=$(curl -sk -o /dev/null -w '%{redirect_url}' "${APP}/cliente/metricas/")
+          case "$target" in
+            *"/cliente/metricas/"*)
+              echo "::error::REGRESSAO: /cliente/metricas/ esta caindo no fallback (redirect pra ${target}). Specificity quebrada."
+              exit 1
+              ;;
+          esac
+          echo "OK: /cliente/metricas/ nao caiu no fallback (target='${target}')"

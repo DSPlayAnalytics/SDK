@@ -5,8 +5,8 @@
 # Nada em all.example.yml deve ser segredo real.
 
 deploy_user: deploy
-repo_url: https://github.com/danpqdan/portifolio.git
-repo_dir: /opt/portifolio
+repo_url: https://github.com/danpqdan/dsplay.git
+repo_dir: /opt/dsplay
 repo_branch: main
 
 # === Aplicacao ===
