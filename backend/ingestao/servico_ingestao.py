@@ -49,7 +49,16 @@ def _registrar_metric_evento_rejeitado(code: str) -> None:
         obter_metrics().eventos_rejeitados(code=code)
     except Exception:
         pass
+from ingestao.rejeicoes_diarias import obter_contador as _obter_contador_rejeicoes
 from ingestao.validador import validar_payload
+
+
+def _incrementar_rejeicao_diaria(site_id, tipo: str) -> None:
+    """Best-effort: falha silenciosa para nao derrubar o caminho de ingestao."""
+    try:
+        _obter_contador_rejeicoes().incrementar(site_id, tipo)
+    except Exception:
+        pass
 
 logger = logging.getLogger('analytics.ingestao')
 
@@ -269,6 +278,7 @@ class ServicoIngestao:
             emitir_log(logger, logging.WARNING, 'rejeitado_quota_excedida',
                        session_id=session_id, id_registro=id_registro, site_id=site_id)
             _registrar_metric_evento_rejeitado("QUOTA_EXCEDIDA")
+            _incrementar_rejeicao_diaria(site_id, "QUOTA_EXCEDIDA")
             return ResumoIngestao(
                 status='error',
                 id_registro=id_registro,
@@ -464,6 +474,7 @@ class ServicoIngestao:
                    site_id=site_id, plano=plano, limite=limite,
                    total=total, tag_dominante=tag_dominante)
         _registrar_metric_evento_rejeitado("CARDINALIDADE_EXCEDIDA")
+        _incrementar_rejeicao_diaria(site_id, "CARDINALIDADE_EXCEDIDA")
         return ResumoIngestao(
             status='error',
             id_registro=id_registro,

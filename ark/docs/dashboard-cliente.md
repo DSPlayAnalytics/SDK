@@ -51,11 +51,11 @@
 - **`analytics-archiver`** ✅ — `backend/archiver/main.py` com APScheduler cron diario; exporta para Cloudflare R2.
 - **Email de boas-vindas pos-cadastro** ✅ — adicionado em `cliente_routes.py:/cadastro` (2026-05-05); best-effort, nao bloqueia o 201.
 
-**Pendente:**
+**Implementado em 2026-05-05 (audit + sprint final):**
 
-- Email diario com counts de rejeicoes de quota/cardinalidade (1x/dia, nao 1x/evento).
-- GeoIP para tag `pais` (falta biblioteca + integração no validador).
-- Endpoint `GET /cliente/exportar` com signed URL (archiver existe, rota REST nao exposta).
+- Email diario de rejeicoes ✅ — `ingestao/rejeicoes_diarias.py` + background task em `app.py` (06:00 UTC); admins recebem resumo de QUOTA_EXCEDIDA e CARDINALIDADE_EXCEDIDA 1x/dia.
+- GeoIP (`pais`) ✅ — `ingestao/derivacoes.py:extrair_pais()` via header `CF-IPCountry` (Cloudflare injecta em prod; 'unknown' em dev sem CF).
+- Endpoint `GET /cliente/exportar` ✅ — blueprint `archiver/routes.py` registrado em `app.py` linhas 607-636; condicional em R2_ACCOUNT_ID/R2_ACCESS_KEY_ID/R2_SECRET_ACCESS_KEY configurados.
 - Validacao end-to-end em `ark/teste-ambiente-a` (Docker) e `teste-ambiente-b` (Vagrant).
 
 **Pendente — proximas sprints (v2/v3):**

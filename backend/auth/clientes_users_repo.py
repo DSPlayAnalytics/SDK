@@ -89,6 +89,7 @@ class ClientesUsersRepo(Protocol):
     def obter_user(self, user_id: str) -> Optional[ClienteUser]: ...
     def obter_user_por_email(self, email: str) -> Optional[ClienteUser]: ...
     def obter_user_por_site(self, site_id: str) -> Optional[ClienteUser]: ...
+    def listar_emails_admin_por_site(self, site_id: str) -> list[str]: ...
     def registrar_login(self, user_id: str) -> None: ...
     def desativar_user(self, user_id: str) -> None: ...
     def atualizar_senha_hash(self, user_id: str, senha_hash: str) -> None: ...
@@ -175,6 +176,15 @@ class SqliteClientesUsersRepo:
                 (site_id,),
             ).fetchone()
         return _row_to_user(row) if row else None
+
+    def listar_emails_admin_por_site(self, site_id: str) -> list[str]:
+        with self._connect() as conn:
+            rows = conn.execute(
+                "SELECT email FROM clientes_users "
+                "WHERE site_id = ? AND papel = 'admin' AND ativo = 1",
+                (site_id,),
+            ).fetchall()
+        return [r["email"] for r in rows]
 
     def registrar_login(self, user_id):
         agora = _iso(datetime.now(timezone.utc))
@@ -412,6 +422,16 @@ class PostgresClientesUsersRepo:
             )
             row = cur.fetchone()
         return _dict_to_user(row) if row else None
+
+    def listar_emails_admin_por_site(self, site_id: str) -> list[str]:
+        with self._conn() as conn, conn.cursor() as cur:
+            cur.execute(
+                "SELECT email FROM clientes_users "
+                "WHERE site_id = %s AND papel = 'admin' AND ativo = true",
+                (site_id,),
+            )
+            rows = cur.fetchall()
+        return [r["email"] for r in rows]
 
     def registrar_login(self, user_id):
         with self._conn() as conn, conn.cursor() as cur:

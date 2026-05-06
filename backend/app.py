@@ -1266,6 +1266,103 @@ def handle_analytics_data(data):
         log_safe(security_logger, 'error', f"[ERROR] Erro interno analytics de {session_id}: {str(e)}")
         emit("analytics_error", {"status": "error", "code": "INTERNAL_ERROR", "message": "Erro interno do servidor"})
 
+# ==================== EMAIL DIÁRIO DE REJEIÇÕES ====================
+# Roda uma vez por dia às 06:00 UTC. Envia resumo de QUOTA_EXCEDIDA e
+# CARDINALIDADE_EXCEDIDA para os admins de cada site afetado.
+# Fonte dos contadores: ingestao.rejeicoes_diarias (in-memory, reset após envio).
+
+def _segundos_ate_proxima_hora_utc(hora_alvo: int) -> float:
+    """Segundos até a próxima ocorrência de hora_alvo:00:00 UTC."""
+    from datetime import datetime, timezone
+    agora = datetime.now(timezone.utc)
+    proxima = agora.replace(hour=hora_alvo, minute=0, second=0, microsecond=0)
+    if proxima <= agora:
+        from datetime import timedelta
+        proxima += timedelta(days=1)
+    return (proxima - agora).total_seconds()
+
+
+def _enviar_email_rejeicoes(site_id: str, contagens: dict) -> None:
+    """Envia email de resumo de rejeições para os admins do site."""
+    try:
+        emails = _clientes_users_repo.listar_emails_admin_por_site(site_id)
+    except Exception as e:
+        log_safe(security_logger, 'warning',
+                 f"[EMAILER] falha ao buscar admins site_id={site_id} erro={e}")
+        return
+
+    if not emails:
+        return
+
+    site = None
+    try:
+        site = _tenants_repo_singleton.obter_site(site_id)
+    except Exception:
+        pass
+
+    nome_site = site.nome if site else site_id
+    landing = os.environ.get("LANDING_BASE_URL", "https://dsplayground.com.br")
+    dashboard = os.environ.get("DASHBOARD_REDIRECT", f"{landing}/cliente/metricas")
+
+    quota_count = contagens.get("QUOTA_EXCEDIDA", 0)
+    card_count = contagens.get("CARDINALIDADE_EXCEDIDA", 0)
+    total = quota_count + card_count
+
+    corpo_texto = (
+        f"Relatório diário de eventos rejeitados — {nome_site}\n\n"
+        f"No último período, {total} evento(s) foram rejeitados pelo servidor:\n\n"
+        + (f"  • Cota diária excedida:        {quota_count} evento(s)\n" if quota_count else "")
+        + (f"  • Cardinalidade excedida:      {card_count} evento(s)\n" if card_count else "")
+        + f"\nIsso não afeta os dados já coletados — apenas os eventos acima\n"
+        f"foram descartados porque o limite do plano atual foi atingido.\n\n"
+        f"O QUE FAZER\n"
+        f"Acesse seu dashboard para verificar o consumo atual:\n"
+        f"{dashboard}\n\n"
+        f"Para aumentar sua cota ou cardinalidade, faça upgrade do plano em:\n"
+        f"{landing}/cliente/configuracoes?tab=faturamento\n\n"
+        f"Este resumo é enviado uma vez por dia, apenas quando há rejeições.\n\n"
+        f"Atenciosamente,\n"
+        f"Equipe DSPlayground Analytics\n"
+        f"dsplayground.com.br\n"
+    )
+
+    from auth.email_sender import criar_sender_padrao as _criar_sender
+    sender = _criar_sender()
+    for email in emails:
+        try:
+            sender.enviar(
+                destinatario=email,
+                assunto=f"[DSPlayground] {total} evento(s) rejeitado(s) hoje — {nome_site}",
+                corpo_texto=corpo_texto,
+            )
+        except Exception as e:
+            log_safe(security_logger, 'warning',
+                     f"[EMAILER] falha ao enviar rejeicoes site_id={site_id} email={email} erro={e}")
+
+
+def _emailer_rejeicoes_diarias():
+    """Background task: envia emails de rejeição 1×/dia às 06:00 UTC."""
+    from ingestao.rejeicoes_diarias import obter_contador as _obter_contador
+    hora_envio = int(os.environ.get("EMAILER_REJEICOES_HORA_UTC", "6"))
+
+    while True:
+        espera = _segundos_ate_proxima_hora_utc(hora_envio)
+        socketio.sleep(espera)
+
+        snapshot = _obter_contador().obter_e_resetar()
+        if not snapshot:
+            continue
+
+        log_safe(security_logger, 'info',
+                 f"[EMAILER] rodando rejeicoes_diarias sites={len(snapshot)}")
+        for site_id, contagens in snapshot.items():
+            _enviar_email_rejeicoes(site_id, contagens)
+
+
+socketio.start_background_task(_emailer_rejeicoes_diarias)
+log_safe(security_logger, 'info', "[SUCCESS] Emailer de rejeicoes diarias iniciado (06:00 UTC)")
+
+
 # ==================== INICIALIZAÇÃO ====================
 
 if __name__ == "__main__":
