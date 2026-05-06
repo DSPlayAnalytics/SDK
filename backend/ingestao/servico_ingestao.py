@@ -293,7 +293,7 @@ class ServicoIngestao:
                 backpressure_hint=backpressure,
             )
 
-        bucket_destino, motivo_bucket = self._resolver_bucket(
+        bucket_destino, site_slug, motivo_bucket = self._resolver_bucket(
             site_id, session_id, id_registro,
         )
         if motivo_bucket == 'site_sem_bucket':
@@ -341,6 +341,7 @@ class ServicoIngestao:
             device_type=device_type, pais=pais, referrer_dominio=referrer_dominio,
             user_id=user_id, user_bucket=user_bucket,
             group_id=group_id, group_bucket=group_bucket,
+            site_slug=site_slug,
         )
 
         resumo = ResumoIngestao(
@@ -515,32 +516,39 @@ class ServicoIngestao:
                        site_id=site_id, motivo=str(erro))
 
     def _resolver_bucket(self, site_id: Optional[str], session_id: str,
-                         id_registro: Optional[str]) -> tuple[Optional[str], Optional[str]]:
-        """Retorna (bucket_name, motivo).
+                         id_registro: Optional[str]
+                         ) -> tuple[Optional[str], Optional[str], Optional[str]]:
+        """Retorna (bucket_name, site_slug, motivo).
 
-        - (bucket_name, None)        : site tem bucket dedicado, escreve la.
-        - (None, None)               : site_id=None ou sem cache (legacy/dev) — bucket default.
-        - (None, 'site_sem_bucket')  : site identificado mas SEM bucket; chamador
-                                       deve rejeitar (leak prevention).
-        - (None, 'sites_cache_erro') : repo ou cache falhou; chamador escolhe se
-                                       degrada (escolhi: degrada para default).
+        - (bucket, slug, None)        : site provisionado, escreve no bucket dele.
+        - (None, None, None)          : site_id=None ou sem cache (legacy/dev) — bucket default.
+        - (None, None, 'site_sem_bucket')  : site identificado mas SEM bucket; chamador
+                                             deve rejeitar (leak prevention).
+        - (None, None, 'sites_cache_erro') : repo ou cache falhou; chamador escolhe se
+                                             degrada (escolhi: degrada para default).
+
+        site_slug e o trust-anchor de tenant (= site.slug do Postgres). Server-side,
+        nao confiavel via SDK. Propagado pra Influx como tag `site_slug` em
+        `_aplicar_identidade`, e usado por filtros multi-tenant em dashboards
+        Grafana via `r.site_slug == "${__user.login}"`.
         """
         if not site_id:
-            return None, None
+            return None, None, None
         if not self.sites_cache:
-            return None, None
+            return None, None, None
         try:
-            bucket = self.sites_cache.obter_bucket(site_id)
+            site = self.sites_cache.obter_site(site_id)
         except Exception as erro:
             emitir_log(logger, logging.ERROR, 'sites_cache_erro',
                        session_id=session_id, id_registro=id_registro,
                        site_id=site_id, motivo=str(erro))
-            return None, 'sites_cache_erro'
+            return None, None, 'sites_cache_erro'
+        bucket = site.bucket_name if site else None
         if not bucket:
             emitir_log(logger, logging.WARNING, 'site_sem_bucket',
                        session_id=session_id, id_registro=id_registro, site_id=site_id)
-            return None, 'site_sem_bucket'
-        return bucket, None
+            return None, None, 'site_sem_bucket'
+        return bucket, site.slug, None
 
     def _persistir_com_resiliencia(
         self,
@@ -557,6 +565,7 @@ class ServicoIngestao:
         user_bucket: Optional[str] = None,
         group_id: Optional[str] = None,
         group_bucket: Optional[str] = None,
+        site_slug: Optional[str] = None,
     ) -> None:
         """Persistencia em InfluxDB nao deve derrubar a ingestao.
 
@@ -582,6 +591,7 @@ class ServicoIngestao:
             "user_bucket": user_bucket,
             "group_id": group_id,
             "group_bucket": group_bucket,
+            "site_slug": site_slug,
         }
         try:
             metricas = create_temporal_metric_from_heatmap(

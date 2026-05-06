@@ -233,8 +233,11 @@ class GateIntegracaoSyncTests(unittest.TestCase):
         self._login()
         r = self.test_client.get("/cliente/auth/gate")
         # Sync falhou mas /gate retornou 200 + header — cookie vale.
+        # X-WEBAUTH-USER e o slug do site (resolvido via _tenants_repo,
+        # independente da Grafana API). Valor compativel com o filtro
+        # `r.site_slug == "${__user.login}"` dos dashboards.
         self.assertEqual(r.status_code, 200)
-        self.assertEqual(r.headers.get("X-WEBAUTH-USER"), self.site_id)
+        self.assertEqual(r.headers.get("X-WEBAUTH-USER"), "acme")
 
     def test_gate_sem_grafana_sync_configurado_nao_chama_nada(self):
         from auth import cliente_routes as mod

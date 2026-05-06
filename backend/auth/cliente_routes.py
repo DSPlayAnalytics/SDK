@@ -600,9 +600,16 @@ def configuracoes():
 def gate():
     """Endpoint do nginx `auth_request`. Nao retorna body util — so codigo + headers.
 
-    Sucesso: 200 + header `X-WEBAUTH-USER: <site_id>` que o nginx propaga
+    Sucesso: 200 + header `X-WEBAUTH-USER: <slug>` que o nginx propaga
     pro Grafana (auth.proxy confia nele e cria/mapeia o user).
     Falha:   401. Nginx aborta a requisicao.
+
+    O valor do header e o `site.slug` (nao o site_id UUID). Razao:
+      - dashboards Grafana usam filter `r.site_slug == "${__user.login}"`
+        pra isolamento multi-tenant em embed; `${__user.login}` resolve do
+        X-WEBAUTH-USER. Se mandassemos o UUID, a comparacao com a tag
+        `site_slug` (= site.slug, gravada server-side em InfluxDB) nao casaria.
+      - slug e estavel, legivel e ja unico (constraint do Postgres).
 
     Sprint 2 — sincroniza membership na org `cliente_<slug>` em best-effort
     (cache TTL 1h). Falha de sync NAO derruba o /gate; cookie ainda eh valido.
@@ -615,26 +622,34 @@ def gate():
     security_logger.info(
         "evento=auth_cliente_gate_ok site_id=%s user_id=%s", user.site_id, user.id,
     )
-    _sincronizar_grafana_org(user.site_id)
+    slug = _sincronizar_grafana_org(user.site_id)
     resp = make_response("", 200)
-    resp.headers["X-WEBAUTH-USER"] = user.site_id
+    # Fallback pro site_id quando o repo nao resolve (sync desabilitado em
+    # dev sem Grafana, ou erro transitorio): cookie ainda e valido, e Grafana
+    # nem renderiza pra site sem org provisionada.
+    resp.headers["X-WEBAUTH-USER"] = slug or user.site_id
     resp.headers["X-WEBAUTH-PAPEL"] = user.papel
     return resp
 
 
-def _sincronizar_grafana_org(site_id: str) -> None:
-    """Best-effort: garante user na org cliente_<slug>. No-op se nao configurado."""
-    if _grafana_sync is None or _tenants_repo is None:
-        return
+def _sincronizar_grafana_org(site_id: str) -> Optional[str]:
+    """Best-effort: garante user na org cliente_<slug>. Retorna o slug
+    pra que o /gate use como X-WEBAUTH-USER. None se nao configurado/erro.
+    """
+    if _tenants_repo is None:
+        return None
     try:
         site = _tenants_repo.obter_site(site_id)
     except Exception as erro:
         logger.warning("evento=grafana_sync_lookup_falhou site_id=%s motivo=%s", site_id, erro)
-        return
+        return None
     if site is None or not site.slug:
-        return
-    org_name = f"cliente_{site.slug}"
-    _grafana_sync.garantir_membership(login=site_id, org_name=org_name)
+        return None
+    if _grafana_sync is not None:
+        org_name = f"cliente_{site.slug}"
+        # login no Grafana = slug (mesmo valor que vai como X-WEBAUTH-USER).
+        _grafana_sync.garantir_membership(login=site.slug, org_name=org_name)
+    return site.slug
 
 
 @cliente_auth_bp.route("/magic-link/solicitar", methods=["POST"])

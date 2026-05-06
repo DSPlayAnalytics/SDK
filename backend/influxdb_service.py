@@ -112,6 +112,9 @@ class TemporalMetric:
     user_bucket: Optional[str] = None
     group_id: Optional[str] = None
     group_bucket: Optional[str] = None
+    # Tenant trust-anchor: derivado server-side do publishable_key (= site.slug).
+    # Diferente de app_id, que vem do SDK e nao serve pra security/RLS.
+    site_slug: Optional[str] = None
 
 
 @dataclass
@@ -135,6 +138,7 @@ class WebVitalMetric:
     user_bucket: Optional[str] = None
     group_id: Optional[str] = None
     group_bucket: Optional[str] = None
+    site_slug: Optional[str] = None
 
 
 @dataclass
@@ -156,6 +160,7 @@ class CustomEventMetric:
     user_bucket: Optional[str] = None
     group_id: Optional[str] = None
     group_bucket: Optional[str] = None
+    site_slug: Optional[str] = None
 
 
 @dataclass
@@ -181,6 +186,7 @@ class ConversionEventMetric:
     user_bucket: Optional[str] = None
     group_id: Optional[str] = None
     group_bucket: Optional[str] = None
+    site_slug: Optional[str] = None
 
 
 # Nomes de eventos SDK internos que NAO devem entrar nos pipelines de storage.
@@ -195,6 +201,9 @@ def _aplicar_identidade(point, metric) -> "Point":
     Decisao D1 opcao C:
       - user_bucket / group_bucket -> TAG (256 bins, cardinalidade controlada).
       - user_id / group_id -> FIELD (cardinalidade zero, exibicao/JOIN).
+      - site_slug -> TAG (trust-anchor de tenant; resolvido server-side do
+        publishable_key, NAO do payload SDK; usado por filtros multi-tenant
+        em dashboards Grafana via `r.site_slug == "${__user.login}"`).
 
     None nao e gravado — preserva forward-compat com Pontos antigos
     (queries Flux com `r.user_bucket` so retornam linhas que tem o tag).
@@ -207,6 +216,8 @@ def _aplicar_identidade(point, metric) -> "Point":
         point = point.field("user_id", metric.user_id)
     if metric.group_id:
         point = point.field("group_id", metric.group_id)
+    if getattr(metric, "site_slug", None):
+        point = point.tag("site_slug", metric.site_slug)
     return point
 
 
@@ -709,7 +720,8 @@ def create_temporal_metric_from_heatmap(session_id: str, heatmap_data: dict,
                                       user_id: Optional[str] = None,
                                       user_bucket: Optional[str] = None,
                                       group_id: Optional[str] = None,
-                                      group_bucket: Optional[str] = None) -> List[TemporalMetric]:
+                                      group_bucket: Optional[str] = None,
+                                      site_slug: Optional[str] = None) -> List[TemporalMetric]:
     """Agrega contagens por tipo de evento em metricas temporais (uma por pagina)."""
     metrics: List[TemporalMetric] = []
 
@@ -751,6 +763,7 @@ def create_temporal_metric_from_heatmap(session_id: str, heatmap_data: dict,
             user_bucket=user_bucket,
             group_id=group_id,
             group_bucket=group_bucket,
+            site_slug=site_slug,
         ))
 
     return metrics
@@ -763,7 +776,8 @@ def create_web_vitals_from_heatmap(session_id: str, heatmap_data: dict,
                                    user_id: Optional[str] = None,
                                    user_bucket: Optional[str] = None,
                                    group_id: Optional[str] = None,
-                                   group_bucket: Optional[str] = None) -> List[WebVitalMetric]:
+                                   group_bucket: Optional[str] = None,
+                                   site_slug: Optional[str] = None) -> List[WebVitalMetric]:
     resultado: List[WebVitalMetric] = []
 
     paginas = {}
@@ -806,6 +820,7 @@ def create_web_vitals_from_heatmap(session_id: str, heatmap_data: dict,
                 user_bucket=user_bucket,
                 group_id=group_id,
                 group_bucket=group_bucket,
+                site_slug=site_slug,
             ))
 
     return resultado
@@ -818,7 +833,8 @@ def create_custom_events_from_heatmap(session_id: str, heatmap_data: dict,
                                       user_id: Optional[str] = None,
                                       user_bucket: Optional[str] = None,
                                       group_id: Optional[str] = None,
-                                      group_bucket: Optional[str] = None) -> List[CustomEventMetric]:
+                                      group_bucket: Optional[str] = None,
+                                      site_slug: Optional[str] = None) -> List[CustomEventMetric]:
     resultado: List[CustomEventMetric] = []
 
     paginas = {}
@@ -864,6 +880,7 @@ def create_custom_events_from_heatmap(session_id: str, heatmap_data: dict,
                 user_bucket=user_bucket,
                 group_id=group_id,
                 group_bucket=group_bucket,
+                site_slug=site_slug,
             ))
 
     return resultado
@@ -875,6 +892,7 @@ def create_conversion_events_from_heatmap(session_id: str, heatmap_data: dict,
                                           referrer_dominio: str = None,
                                           user_id: str = None, user_bucket: str = None,
                                           group_id: str = None, group_bucket: str = None,
+                                          site_slug: Optional[str] = None,
                                           ) -> List[ConversionEventMetric]:
     """Extrai eventos comerciais (__purchase/__signup/__conversion) do heatmap."""
     resultado: List[ConversionEventMetric] = []
@@ -944,6 +962,7 @@ def create_conversion_events_from_heatmap(session_id: str, heatmap_data: dict,
                 user_bucket=user_bucket,
                 group_id=group_id,
                 group_bucket=group_bucket,
+                site_slug=site_slug,
             ))
 
     return resultado
