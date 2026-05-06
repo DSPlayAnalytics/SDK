@@ -27,6 +27,7 @@
 | Cliente HTTP tipado (cadastro/login) | `landing/src/lib/api.ts` + `api.test.ts` | ✅ 2026-04-29 |
 | Tracking de CTAs e eventos (cadastro/login/erro) | `landing/src/lib/tracking.ts` + `tracking.test.ts` | ✅ 2026-04-29 |
 | Ansible: var `node_auth_token` + landing health + canonical `/health/app` | `ark/ansible/...` | ✅ 2026-04-29 |
+| Auto-provisionamento pós-cadastro (bucket Influx + org/datasource Grafana + dashboards) | `backend/auth/cliente_routes.py` (`_provisionar_pos_cadastro`) | ✅ 2026-05-05 |
 | CLI admin de users | `backend/scripts/dashboard_user_admin.py` | ✅ |
 | Dashboard analytics-overview corrigido (4 paineis) | `ark/monitoring/grafana/dashboards/analytics-overview.json` | ✅ |
 | Anti-abuse com TTL + skip de IPs privados | `backend/app.py` | ✅ |
@@ -500,14 +501,14 @@ sempre derivada do `user.site_id -> tenants_repo.obter_site(...).slug`, nunca do
 # Pre-requisitos: backup atualizado dos 3 volumes Docker (postgres_data,
 # influxdb_data, grafana_data) + clone fresco do repo na nova VPS.
 
-# 1. Restaurar volumes
-docker volume create portifolio_postgres_data
-docker run --rm -v portifolio_postgres_data:/dst -v /backup:/src alpine \
+# 1. Restaurar volumes (projeto compose usa prefixo dsplay_)
+docker volume create dsplay_postgres_data
+docker run --rm -v dsplay_postgres_data:/dst -v /backup:/src alpine \
   sh -c 'cd /dst && tar xzf /src/postgres_data.tar.gz'
 # repetir para influxdb_data, grafana_data
 
 # 2. Subir stack
-cd /opt/portifolio && docker compose up -d
+cd /opt/dsplay && docker compose up -d
 make -f ark/Makefile monitoring-up
 
 # 3. Validar: cada bucket Influx tem dados, Grafana tem datasources
@@ -521,9 +522,9 @@ Cenario onde so o volume do Grafana corrompeu. Tokens InfluxDB que estavam la **
 ```bash
 # 1. Pra cada site provisionado, revogar tokens antigos do Influx:
 #    (lista todos os tokens com "InfluxDB" no description e revoga)
-docker exec portifolio-influxdb influx auth list \
+docker exec dsplay-influxdb influx auth list \
   --json | jq -r '.[] | select(.description | contains("cliente_")) | .id' \
-  | xargs -I{} docker exec portifolio-influxdb influx auth delete --id {}
+  | xargs -I{} docker exec dsplay-influxdb influx auth delete --id {}
 
 # 2. Re-provisionar tudo (script idempotente):
 backend/scripts/provisionar_cliente.py --recovery --all
@@ -562,7 +563,7 @@ Os tokens do Grafana continuam validos (datasources tem token plaintext em secur
 
 ```bash
 # 1. Revogar token no Influx
-docker exec portifolio-influxdb influx auth delete --id <token_id>
+docker exec dsplay-influxdb influx auth delete --id <token_id>
 # 2. Gerar novo + atualizar datasource Grafana via API
 backend/scripts/provisionar_cliente.py --rotate-token --site <slug>
 # 3. Auditoria: pesquisar `evento=` em security.log buscando uso suspeito.
@@ -580,9 +581,9 @@ Decisao tomada em 2026-04-29: separar **portfolio pessoal** do **produto comerci
 
 | Hostname | Conteudo | Container | Porta loopback |
 |---|---|---|---|
-| `dsplayground.com.br` (apex) | Landing comercial (Astro estatico) — produto, preços, cadastro, login | `portifolio-landing` (nginx:alpine + dist/) | 3002 |
-| `portifolio.dsplayground.com.br` | Portfolio pessoal do Daniel (React 3D — Home/Projects/About) | `portifolio-frontend` (nginx:alpine + Vite bundle) | 3000 |
-| `api.dsplayground.com.br` | Backend Flask + Socket.IO (paths canonicos sem `/api/`) | `portifolio-backend` | 5000 |
+| `dsplayground.com.br` (apex) | Landing comercial (Astro estatico) — produto, preços, cadastro, login | `dsplay-landing` (nginx:alpine + dist/) | 3002 |
+| `portifolio.dsplayground.com.br` | Portfolio pessoal do Daniel (React 3D — Home/Projects/About) | `dsplay-frontend` (nginx:alpine + Vite bundle) | 3000 |
+| `api.dsplayground.com.br` | Backend Flask + Socket.IO (paths canonicos sem `/api/`) | `dsplay-backend` | 5000 |
 
 Apex tambem rota `/cliente/metricas/*` (auth_request -> Grafana via X-WEBAUTH-USER) e `/api/*` (rewrite strippa o prefix antes do proxy_pass pro backend). Vhosts em `ark/ansible/roles/nginx/templates/portifolio.conf.j2` com espelho em `ark/nginx/portifolio.conf`.
 
@@ -616,21 +617,32 @@ Apex tambem rota `/cliente/metricas/*` (auth_request -> Grafana via X-WEBAUTH-US
 
 **Testes**: `backend/test_cliente_cadastro.py` cobre happy path, bucket `cliente_<slug>`, papel admin, dup email/slug, validacao de payload completa (8 testes).
 
-### 23.4 Provisionamento pos-cadastro (gap atual)
+### 23.4 Provisionamento pos-cadastro (implementado em 2026-05-05)
 
-O cadastro hoje cria APENAS `sites` + `clientes_users`. **Nao cria** ainda:
-- Bucket InfluxDB `cliente_<slug>` (sec. 19) — quando o primeiro evento chega, o `SitesCache` resolve `bucket_name` mas ninguem cria o bucket no Influx.
-- Org Grafana `cliente_<slug>` (sec. 13) — `auth.proxy` continua caindo na Main Org.
-- Datasource Influx no Grafana com token escopado (sec. 13).
-- Publishable key inicial (sec. 19) — admin precisa rodar `tenant_admin.py create-key` manual.
+O handler de `/cadastro` chama `_provisionar_pos_cadastro()` ao final, que spawna uma
+`threading.Thread(daemon=True)` com `_executar_provisionamento()`. Esta funcao constroi
+um `argparse.Namespace` artificial e chama `provisionar()` de `scripts/provisionar_cliente.py`,
+criando em sequencia:
 
-**Mitigacao curto prazo**: ate o trigger pos-cadastro existir, o admin roda manualmente:
+1. Bucket InfluxDB `cliente_<slug>` com retencao do plano.
+2. Token InfluxDB escopado ao bucket (read-only para Grafana).
+3. Org Grafana `cliente_<slug>`.
+4. Datasource Influx na org com o token gerado.
+5. Dashboards out-of-the-box (templates de `ark/monitoring/dashboards/`).
+6. Publishable key default no Postgres.
+
+**Estrategia best-effort**: cadastro retorna 201 mesmo se provisionamento falhar.
+Falhas sao logadas em `security.log` com `evento=provisionamento_falhou` (CrowdSec parseia).
+Admin reconcilia com:
 ```bash
 docker compose exec backend python scripts/provisionar_cliente.py \
     --slug <slug> --nome "<Nome>" --plano free
 ```
 
-**Solucao permanente (proximo sprint)**: chamar `provisionar_cliente.py` como subprocess no proprio handler de `/cadastro`, ou enfileirar via threading (sem bloquear o response). Decidir entre best-effort (cadastro retorna 201 mesmo se provisionamento falhar — admin reconcilia depois) ou strict (cadastro 5xx se Influx/Grafana fora). Recomendado best-effort com reconciliacao via cron.
+**Testes**: `CadastroTriggerProvisionamentoTests` em `test_cliente_cadastro.py` cobre:
+- Dispatch correto de kwargs (slug, nome, plano, ambiente, site_id).
+- Cadastro retorna 201 mesmo com provisionamento lancando excecao.
+- Payload invalido NAO dispara provisionamento.
 
 ### 23.5 Eventos do landing (dogfood)
 
@@ -662,7 +674,6 @@ Health checks adicionados:
 
 ### 23.7 Pendencias
 
-- Trigger automatico de `provisionar_cliente.py` no handler de `/cadastro` (gap de §23.4).
 - Migrar `app_id` do payload pra ser derivado de `site.id` server-side (hoje cliente envia, mas pode mentir — backend ja valida contra `sites.id`, mas remover do payload elimina o passo).
 - E-mail de boas-vindas pos-cadastro (estrutura ja existe via Resend em §12 — falta template e trigger).
 - Dogfood: gerar a publishable key da landing apos primeiro deploy completo.

@@ -111,12 +111,43 @@ class CadastroEndpointTests(unittest.TestCase):
             self.assertEqual(r.status_code, 400, f"campo ausente: {falta}")
 
     def test_cadastro_slug_invalido_retorna_400(self):
-        for slug_ruim in ("Acme Corp", "acme!", "AC", "", "a" * 100):
+        slugs_invalidos = [
+            "Acme Corp",   # espaço e maiúsculas
+            "acme!",       # símbolo especial
+            "AC",          # 2 chars (mínimo é 3)
+            "A",           # 1 char
+            "",            # vazio
+            "a" * 100,     # longo demais (>32)
+            "-acme",       # inicia com hífen
+            "acme-",       # termina com hífen
+            "açai",        # Unicode — ç não é [a-z0-9]
+            "café",        # Unicode — é não é [a-z0-9]
+            "naïve",       # Unicode — ï não é [a-z0-9]
+            "acme_corp",   # underscore não permitido
+            "acme.corp",   # ponto não permitido
+        ]
+        for slug_ruim in slugs_invalidos:
             r = self.client.post(
                 "/cliente/auth/cadastro",
                 json=self._payload(slug=slug_ruim),
             )
             self.assertEqual(r.status_code, 400, f"slug invalido aceito: {slug_ruim!r}")
+
+    def test_cadastro_slug_valido_boundary_retorna_201(self):
+        casos = [
+            ("abc", "abc@acme.com"),          # 3 chars — mínimo válido
+            ("a" * 32, "long@acme.com"),       # 32 chars — máximo válido
+            ("acme-corp", "hyphen@acme.com"),  # hífen no meio
+            ("a1b2c3", "alnum@acme.com"),      # alfanumérico misto
+            ("a--b", "dblhyphen@acme.com"),    # hífen duplo (aceito pela spec atual)
+        ]
+        for slug, email in casos:
+            r = self.client.post(
+                "/cliente/auth/cadastro",
+                json=self._payload(slug=slug, email=email,
+                                   nome_site=f"Site {slug}"),
+            )
+            self.assertEqual(r.status_code, 201, f"slug valido rejeitado: {slug!r}")
 
     def test_cadastro_email_invalido_retorna_400(self):
         for email_ruim in ("nao-tem-arroba", "x@", "@y.com", ""):
