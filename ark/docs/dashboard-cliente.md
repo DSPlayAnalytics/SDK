@@ -29,7 +29,6 @@
 | Ansible: var `node_auth_token` + landing health + canonical `/health/app` | `ark/ansible/...` | ✅ 2026-04-29 |
 | Auto-provisionamento pós-cadastro (bucket Influx + org/datasource Grafana + dashboards) | `backend/auth/cliente_routes.py` (`_provisionar_pos_cadastro`) | ✅ 2026-05-05 |
 | CLI admin de users | `backend/scripts/dashboard_user_admin.py` | ✅ |
-| Dashboard analytics-overview corrigido (4 paineis) | `ark/monitoring/grafana/dashboards/analytics-overview.json` | ✅ |
 | Anti-abuse com TTL + skip de IPs privados | `backend/app.py` | ✅ |
 | Reaper de sessoes Socket.IO zombies | `backend/app.py` | ✅ |
 | Schema `sites.bucket_name` + migracao idempotente | `backend/auth/schema*.sql` + `tenants_repo.py` | ✅ sprint 1 |

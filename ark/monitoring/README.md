@@ -36,18 +36,16 @@ environment:
 
 E precisam tambem estar no `ark/monitoring/.env` (gitignored). Token deve **bater com o que o container InfluxDB foi inicializado** — volume `portifolio_influxdb_data` guarda o token na primeira subida; mudar `.env` depois nao re-inicializa o banco.
 
-### Dashboard base — `dashboards/analytics-overview.json`
+### Dashboards base — `dashboards/*.json`
 
-4 paineis sobre o measurement `page_analytics` (single measurement do schema atual):
+Provisionados automaticamente em toda org de tenant via `redo_dashboards.py`:
+`page-views`, `engajamento`, `web-vitals`, `event-explorer`. Cada um foca em um
+recorte (visitas, interacao, performance, eventos custom). Templates usam o
+placeholder `__BUCKET__` que e substituido pelo bucket do tenant na importacao.
 
-| Painel | Tipo | O que mostra |
-|---|---|---|
-| 1 — Eventos ingeridos (24h) | stat (5 metricas) | Visualizacoes, Cliques, Scrolls, Hovers, Mouse moves — totais via `sum()` |
-| 2 — Cliques por pagina (1h) | timeseries stacked bars | `cliques` agrupado por `page_type`, janelas de 5min |
-| 3 — Tempo total na pagina (24h) | timeseries lines | `permanencia_segundos` somado por janela de 5min, por `page_type` (NAO usar `mean` — `permanencia_segundos` e duracao do batch ~5s, soma agrega tempo real) |
-| 4 — Engajamento por pagina | bargauge gradient | `cliques`/`hovers`/`mouse_moves`/`toques`/`exposicoes`/`custom_events` × `page_type`, com `displayName: ${__field.labels._field} · ${__field.labels.page_type}` |
-
-**Padrao Flux importante**: sempre `group(columns: ["page_type"])` ANTES de `aggregateWindow(fn: sum)`. Inverter resulta em uma serie por `session_id` com valores 0 — visualmente confuso.
+**Padrao Flux importante**: sempre `group(columns: ["<tag>"])` ANTES de
+`aggregateWindow(fn: sum)`. Inverter resulta em uma serie por `session_id`
+com valores 0 — visualmente confuso.
 
 ### Auth.proxy do Grafana
 
