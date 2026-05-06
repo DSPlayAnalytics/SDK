@@ -215,11 +215,11 @@
       }
     },
     {
-      "title": "$evento timeline (soma por $breakdown)",
+      "title": "Linha do tempo de $evento por $breakdown",
       "type": "timeseries",
       "gridPos": { "h": 10, "w": 24, "x": 0, "y": 5 },
       "datasource": { "type": "influxdb", "uid": "__DATASOURCE_UID__" },
-      "description": "Cliente trocou $breakdown? Series novas aparecem automatico. Janela auto-escala com timeRange.",
+      "description": "Total de disparos de $evento agrupados por $breakdown ao longo do periodo selecionado.",
       "targets": [
         {
           "refId": "A",
@@ -242,7 +242,7 @@
       }
     },
     {
-      "title": "Top 10 valores de $breakdown para $evento (24h)",
+      "title": "Top 10 $breakdown com mais $evento (24h)",
       "type": "bargauge",
       "gridPos": { "h": 10, "w": 12, "x": 0, "y": 15 },
       "datasource": { "type": "influxdb", "uid": "__DATASOURCE_UID__" },
