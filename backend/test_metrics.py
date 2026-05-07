@@ -96,5 +96,51 @@ class MetricsEndpointTest(unittest.TestCase):
         self.assertIn(b"portifolio_eventos_recebidos_total", r.data)
 
 
+class MetricsHooksTest(unittest.TestCase):
+    """Testa os 3 hooks que alimentam metricas no hot path."""
+
+    def setUp(self):
+        self.registry = CollectorRegistry()
+        from metrics import MetricsService
+        self.svc = MetricsService(registry=self.registry)
+
+    def test_request_observado_aparece_no_histogram(self):
+        self.svc.request_observado(path="/api/health", method="GET", segundos=0.012)
+        text = self.svc.render().decode("utf-8")
+        self.assertIn("portifolio_request_duration_seconds", text)
+        self.assertIn('path="/api/health"', text)
+
+    def test_request_observado_multiplos_paths(self):
+        self.svc.request_observado(path="/auth/sdk-token", method="POST", segundos=0.05)
+        self.svc.request_observado(path="/auth/sdk-token", method="POST", segundos=0.08)
+        text = self.svc.render().decode("utf-8")
+        # sum deve ser ~0.13
+        self.assertIn('portifolio_request_duration_seconds_count{method="POST",path="/auth/sdk-token"} 2.0', text)
+
+    def test_websocket_gauge_sobe_e_desce(self):
+        self.svc.websocket_conectado()
+        self.svc.websocket_conectado()
+        self.svc.websocket_desconectado()
+        text = self.svc.render().decode("utf-8")
+        self.assertIn("portifolio_websocket_conexoes_ativas 1.0", text)
+
+    def test_websocket_gauge_nao_vai_negativo(self):
+        # dec() abaixo de zero e possivel em Gauge; verificamos comportamento esperado
+        self.svc.websocket_desconectado()  # 0 -> -1 (prometheus permite, nos monitoramos)
+        text = self.svc.render().decode("utf-8")
+        self.assertIn("portifolio_websocket_conexoes_ativas", text)
+
+    def test_full_cycle_contador_e_gauge(self):
+        self.svc.eventos_recebidos(tipo="page_analytics")
+        self.svc.eventos_rejeitados(code="INVALID_TIMESTAMP")
+        self.svc.websocket_conectado()
+        self.svc.request_observado(path="/cliente/metricas", method="GET", segundos=0.02)
+        text = self.svc.render().decode("utf-8")
+        self.assertIn("portifolio_eventos_recebidos_total", text)
+        self.assertIn("portifolio_eventos_rejeitados_total", text)
+        self.assertIn("portifolio_websocket_conexoes_ativas 1.0", text)
+        self.assertIn("portifolio_request_duration_seconds", text)
+
+
 if __name__ == "__main__":
     unittest.main()

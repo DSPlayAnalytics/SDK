@@ -509,6 +509,28 @@ limiter.exempt(app.view_functions['prometheus_metrics'])
 log_safe(security_logger, 'info', "[SUCCESS] Metrics Prometheus em /metrics")
 
 
+# Hook de latencia HTTP — observa duracao de cada request (exceto /metrics e /health).
+@app.before_request
+def _metrics_antes():
+    import flask
+    flask.g._metrics_t0 = time.monotonic()
+
+
+@app.after_request
+def _metrics_depois(response):
+    import flask
+    t0 = getattr(flask.g, '_metrics_t0', None)
+    if t0 is not None:
+        path = request.path
+        if path not in ('/metrics', '/health', '/api/health'):
+            _metrics_service.request_observado(
+                path=path,
+                method=request.method,
+                segundos=time.monotonic() - t0,
+            )
+    return response
+
+
 # /auth/sdk-token chamado por todo browser que carrega landing publica —
 # default flask-limiter (50/h) bate em segundos com handful de page loads.
 # Defesa real e em camadas: nginx zone=cliente_auth (10r/s burst 10, applied no
@@ -1158,6 +1180,7 @@ def handle_connect(auth=None):
         disconnect()
         return
 
+    _metrics_service.websocket_conectado()
     emit("connection_response", {
         "status": "connected",
         "session_token": session_token,
@@ -1183,6 +1206,7 @@ def handle_disconnect():
         del active_sessions[session_id]
     if session_id in temporal_stats_cache["active_sessions"]:
         del temporal_stats_cache["active_sessions"][session_id]
+    _metrics_service.websocket_desconectado()
 
 
 # Background reaper de sessoes zombies. Roda a cada 30s, remove sessoes
