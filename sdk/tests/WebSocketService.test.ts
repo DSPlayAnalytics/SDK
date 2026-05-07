@@ -267,6 +267,91 @@ describe('WebSocketService', () => {
     expect(modulo.WebSocketService.getDeadLetter()).toHaveLength(0);
   });
 
+  it('Onda 3 — backpressure slow dobra o intervalo de envio', async () => {
+    const servico = await carregarServicoConfigurado();
+
+    const envio = servico.sendAnalyticsData(criarDadosAnalytics());
+    await vi.advanceTimersByTimeAsync(0);
+    const socket = socketsCriados[0];
+    socket.trigger('connect');
+    await vi.advanceTimersByTimeAsync(0);
+    // ACK com backpressure_hint=slow
+    socket.trigger('analytics_received', { status: 'success', backpressure_hint: 'slow' });
+    await envio;
+
+    const status = servico.getConnectionStatus();
+    expect(status.backpressure).toBe('slow');
+    expect(status.intervalMs).toBeGreaterThan(5000); // intervalo aumentou
+  });
+
+  it('Onda 3 — backpressure stop pausa drenagem ate pausarAte', async () => {
+    const servico = await carregarServicoConfigurado();
+
+    const envio = servico.sendAnalyticsData(criarDadosAnalytics());
+    await vi.advanceTimersByTimeAsync(0);
+    const socket = socketsCriados[0];
+    socket.trigger('connect');
+    await vi.advanceTimersByTimeAsync(0);
+    socket.trigger('analytics_received', { status: 'success', backpressure_hint: 'stop' });
+    await envio;
+
+    // Enfileira outro item — drenagem deve ser bloqueada por stop
+    servico.sendAnalyticsData(criarDadosAnalytics('segundo'));
+    await vi.advanceTimersByTimeAsync(0);
+
+    const status = servico.getConnectionStatus();
+    expect(status.backpressure).toBe('stop');
+    // fila nao foi drenada (item ainda pendente)
+    expect(await servico.tamanhoFilaOffline()).toBeGreaterThan(0);
+  });
+
+  it('Onda 3 — schema_error dispara onSchemaIncompativel', async () => {
+    const modulo = await import('../src');
+    const chamadas: Array<{ serverMin: string; cliente: string }> = [];
+
+    modulo.WebSocketService.configurar({
+      ...configuracaoComStorageMemoria(),
+      onSchemaIncompativel: (info) => chamadas.push(info),
+    });
+
+    void modulo.WebSocketService.connect();
+    await vi.advanceTimersByTimeAsync(0);
+    const socket = socketsCriados[0];
+    socket.trigger('schema_error', {
+      code: 'UNSUPPORTED_SCHEMA',
+      min_client_schema: '2.0',
+      server_schema_version: '2.0',
+    });
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(chamadas).toHaveLength(1);
+    expect(chamadas[0].serverMin).toBe('2.0');
+  });
+
+  it('Onda 3 — connection_response com min_client_schema superior dispara callback', async () => {
+    const modulo = await import('../src');
+    const chamadas: Array<{ serverMin: string; cliente: string }> = [];
+
+    modulo.WebSocketService.configurar({
+      ...configuracaoComStorageMemoria(),
+      onSchemaIncompativel: (info) => chamadas.push(info),
+    });
+
+    void modulo.WebSocketService.connect();
+    await vi.advanceTimersByTimeAsync(0);
+    const socket = socketsCriados[0];
+    socket.trigger('connect');
+    socket.trigger('connection_response', {
+      server_schema_version: '9.9',
+      min_client_schema: '9.0',
+      server_time: Date.now(),
+    });
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(chamadas).toHaveLength(1);
+    expect(chamadas[0].serverMin).toBe('9.0');
+  });
+
   it('falha de storage no enfileirar: retorna false, emite analytics:enqueue_failed, nao vira unhandled rejection', async () => {
     const modulo = await import('../src');
 

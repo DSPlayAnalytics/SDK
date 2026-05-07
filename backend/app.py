@@ -1130,12 +1130,33 @@ def handle_connect(auth=None):
     # handshake, devolvemos o ultimo id_registro aceito para aquela sessao logica,
     # permitindo ao SDK descartar itens da fila ja processados.
     analytics_session_id = None
+    schema_cliente = None
     if isinstance(auth, dict):
         analytics_session_id = auth.get('analytics_session_id')
+        schema_cliente = auth.get('schema_version')
     last_id = last_at = None
     if analytics_session_id:
         from ingestao.idempotencia import obter_registro_ultimo
         last_id, last_at = obter_registro_ultimo().obter(analytics_session_id)
+
+    # Onda 3 — negociacao de schema version no handshake Socket.IO.
+    from auth.routes import SCHEMA_VERSION_SERVIDOR, SCHEMA_VERSION_MINIMO_CLIENTE, _versao_menor_que
+    schema_incompativel = (
+        schema_cliente is not None
+        and _versao_menor_que(schema_cliente, SCHEMA_VERSION_MINIMO_CLIENTE)
+    )
+    if schema_incompativel:
+        log_safe(security_logger, 'warning',
+                 f"[SECURITY] handshake rejeitado code=UNSUPPORTED_SCHEMA "
+                 f"schema_cliente={schema_cliente} minimo={SCHEMA_VERSION_MINIMO_CLIENTE}")
+        emit("schema_error", {
+            "code": "UNSUPPORTED_SCHEMA",
+            "message": f"Schema {schema_cliente} inferior ao minimo {SCHEMA_VERSION_MINIMO_CLIENTE}",
+            "server_schema_version": SCHEMA_VERSION_SERVIDOR,
+            "min_client_schema": SCHEMA_VERSION_MINIMO_CLIENTE,
+        })
+        disconnect()
+        return
 
     emit("connection_response", {
         "status": "connected",
@@ -1146,7 +1167,9 @@ def handle_connect(auth=None):
         "server_time": int(time.time() * 1000),
         "last_received_id_registro": last_id,
         "last_received_at": last_at,
-        "security_level": "high" if auth_claims else "legacy"
+        "security_level": "high" if auth_claims else "legacy",
+        "server_schema_version": SCHEMA_VERSION_SERVIDOR,
+        "min_client_schema": SCHEMA_VERSION_MINIMO_CLIENTE,
     })
 
 @socketio.on("disconnect")
