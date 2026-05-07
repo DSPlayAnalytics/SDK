@@ -154,6 +154,22 @@ Grupo compartilhado **`analytics` GID 10001** e a ponte host↔container. Nao mu
 
 **Apos qualquer `Edit`/`Write` em arquivo sob `/opt/portifolio/` rodar `chown deploy:analytics <arquivo>`** — senao o container bate `EACCES` no runtime.
 
+## DNS Cloudflare — registros necessarios
+
+Todos os subdominios abaixo apontam para `129.121.55.29` (VPS HostGator) com **Proxy status = Proxied (nuvem laranja)**.
+O CF Origin Cert wildcard (ate 2041) so e valido quando o trafego passa pela edge Cloudflare — nunca deixar cinza em producao.
+Documentacao detalhada em `ark/ambiente-c/dns-cloudflare.md`.
+
+| Type | Name | Destino | Proxy | Servico |
+|---|---|---|---|---|
+| A | `portifolio` | `129.121.55.29` | Proxied | Frontend React 3D (porta 3000) |
+| A | `app` | `129.121.55.29` | Proxied | Grafana c/ auth.proxy (porta 3001) |
+| A | `api` | `129.121.55.29` | Proxied | Backend Flask / Socket.IO (porta 5000) |
+| A | `grafana` | `129.121.55.29` | Proxied | Grafana admin direto (porta 3001) |
+| A | `influx` | `129.121.55.29` | Proxied | InfluxDB (porta 8086) |
+
+> `dsplayground.com.br` apex e `www` ficam no CF Pages (landing Astro) — nao apontam para a VPS.
+
 ## Seguranca — o que NAO fazer
 
 - **Nao expor `5000` (backend), `3000` (frontend), `8086` (InfluxDB), `3001` (Grafana) nem `5432` (Postgres) publicamente**. Em prod so Nginx acessa — bindings estao em `127.0.0.1:<porta>` (ou sem publish no caso do Postgres).

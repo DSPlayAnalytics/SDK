@@ -28,6 +28,17 @@ Criar em **Websites → dsplayground.com.br → DNS → Records → Add record**
 |---|---|---|---|---|
 | A | `@` (ou `dsplayground.com.br`) | `129.121.55.29` | **DNS only** (nuvem cinza) | Auto |
 | A | `www` | `129.121.55.29` | **DNS only** (nuvem cinza) | Auto |
+| A | `portifolio` | `129.121.55.29` | **Proxied** (nuvem laranja) | Auto |
+| A | `app` | `129.121.55.29` | **Proxied** (nuvem laranja) | Auto |
+| A | `api` | `129.121.55.29` | **Proxied** (nuvem laranja) | Auto |
+| A | `grafana` | `129.121.55.29` | **Proxied** (nuvem laranja) | Auto |
+| A | `influx` | `129.121.55.29` | **Proxied** (nuvem laranja) | Auto |
+
+> **portifolio.dsplayground.com.br** e o frontend React 3D (portfolio pessoal) servido pelo
+> container `portifolio-frontend` em `127.0.0.1:3000`. Nao e a landing comercial — essa vive
+> no CF Pages (`dsplayground.com.br` apex). Subdominios `app`, `api`, `grafana`, `influx`
+> devem sempre ser **Proxied** (laranja) para que o CF Origin Cert wildcard (ate 2041)
+> seja valido no TLS. Nunca cinza em producao.
 
 ### Por que "DNS only" inicialmente
 
