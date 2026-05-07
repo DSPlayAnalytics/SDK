@@ -26,6 +26,7 @@ interface ConfigSdk {
   storageFila?: StorageFila;
   publishableKey?: string;
   backendBaseUrl?: string; // URL HTTP do backend (default: derivada de websocketUrl)
+  onSchemaIncompativel?: (info: { serverMin: string; cliente: string }) => void;
 }
 
 const LOTE_DRENAGEM = 5;
@@ -71,6 +72,7 @@ class WebSocketService {
   private ambiente: Ambiente | null = null;
   private debug: boolean = false;
   private configurado: boolean = false;
+  private onSchemaIncompativel: ConfigSdk['onSchemaIncompativel'] = undefined;
 
   private authClient: AuthClient | null = null;
   private analyticsSessionId: string | null = null;
@@ -94,6 +96,7 @@ class WebSocketService {
     this.realtimeIntervalBaseMs = config.intervaloEnvioMs ?? 5000;
     this.realtimeIntervalAtualMs = this.realtimeIntervalBaseMs;
     this.configurado = true;
+    this.onSchemaIncompativel = config.onSchemaIncompativel;
 
     const storage = config.storageFila ?? criarStorageFila();
     const limite = config.limiteFilaOffline ?? 500;
@@ -112,6 +115,7 @@ class WebSocketService {
           if (this.debug) {
             console.error(`[sdk] schema ${cliente} abaixo do minimo servidor ${serverMin}`);
           }
+          this.onSchemaIncompativel?.({ serverMin, cliente });
         },
       });
       void this._sincronizarPosAuth();
@@ -205,6 +209,7 @@ class WebSocketService {
     const auth: Record<string, unknown> = {};
     if (token) auth.token = token;
     if (this.analyticsSessionId) auth.analytics_session_id = this.analyticsSessionId;
+    auth.schema_version = SDK_SCHEMA_VERSION;
 
     return new Promise<boolean>((resolve) => {
       try {
@@ -238,8 +243,24 @@ class WebSocketService {
           last_received_id_registro?: string | null;
           last_received_at?: number | null;
           server_time?: number;
+          server_schema_version?: string;
+          min_client_schema?: string;
         }) => {
           this._registrarResyncDoConnect(resp);
+        });
+
+        this.socket.once('schema_error', (err: {
+          code: string;
+          server_schema_version?: string;
+          min_client_schema?: string;
+        }) => {
+          if (this.debug) {
+            console.error(`[sdk] schema incompativel: servidor minimo ${err.min_client_schema}, cliente ${SDK_SCHEMA_VERSION}`);
+          }
+          this.onSchemaIncompativel?.({
+            serverMin: err.min_client_schema ?? 'desconhecido',
+            cliente: SDK_SCHEMA_VERSION,
+          });
         });
 
         this.socket.on('disconnect', (reason: string) => {
@@ -268,6 +289,8 @@ class WebSocketService {
     last_received_id_registro?: string | null;
     last_received_at?: number | null;
     server_time?: number;
+    server_schema_version?: string;
+    min_client_schema?: string;
   }): Promise<void> {
     if (resp.server_time) {
       const skew = resp.server_time - Date.now();
@@ -277,6 +300,12 @@ class WebSocketService {
       } else {
         this.serverTimeSkewMs = 0;
       }
+    }
+    if (resp.min_client_schema && resp.min_client_schema > SDK_SCHEMA_VERSION) {
+      if (this.debug) {
+        console.error(`[sdk] schema ${SDK_SCHEMA_VERSION} abaixo do minimo ${resp.min_client_schema}`);
+      }
+      this.onSchemaIncompativel?.({ serverMin: resp.min_client_schema, cliente: SDK_SCHEMA_VERSION });
     }
     if (resp.last_received_at && this.fila) {
       const removidos = await this.fila.descartarAteTimestamp(resp.last_received_at);
