@@ -131,7 +131,7 @@
       "targets": [
         {
           "refId": "A",
-          "query": "from(bucket: \"__BUCKET__\")\n  |> range(start: -24h)\n  |> filter(fn: (r) => r.site_slug == \"${__user.login}\")\n  |> filter(fn: (r) => r._measurement == \"custom_events\" and r._field == \"ocorrencias\" and r.nome == \"${evento}\")\n  |> keep(columns: [\"session_id\"])\n  |> distinct(column: \"session_id\")\n  |> count()"
+          "query": "from(bucket: \"__BUCKET__\")\n  |> range(start: -24h)\n  |> filter(fn: (r) => r.site_slug == \"${__user.login}\")\n  |> filter(fn: (r) => r._measurement == \"custom_events\" and r._field == \"ocorrencias\" and r.nome == \"${evento}\")\n  |> keep(columns: [\"session_id\"])\n  |> group()\n  |> distinct(column: \"session_id\")\n  |> count()"
         }
       ],
       "options": {
@@ -161,7 +161,7 @@
       "targets": [
         {
           "refId": "A",
-          "query": "from(bucket: \"__BUCKET__\")\n  |> range(start: -24h)\n  |> filter(fn: (r) => r.site_slug == \"${__user.login}\")\n  |> filter(fn: (r) => r._measurement == \"custom_events\" and r._field == \"ocorrencias\" and r.nome == \"${evento}\")\n  |> keep(columns: [\"page_type\"])\n  |> distinct(column: \"page_type\")\n  |> count()"
+          "query": "from(bucket: \"__BUCKET__\")\n  |> range(start: -24h)\n  |> filter(fn: (r) => r.site_slug == \"${__user.login}\")\n  |> filter(fn: (r) => r._measurement == \"custom_events\" and r._field == \"ocorrencias\" and r.nome == \"${evento}\")\n  |> keep(columns: [\"page_type\"])\n  |> group()\n  |> distinct(column: \"page_type\")\n  |> count()"
         }
       ],
       "options": {
@@ -215,20 +215,20 @@
       }
     },
     {
-      "title": "$evento timeline (soma por $breakdown)",
+      "title": "Linha do tempo de $evento por $breakdown",
       "type": "timeseries",
       "gridPos": { "h": 10, "w": 24, "x": 0, "y": 5 },
       "datasource": { "type": "influxdb", "uid": "__DATASOURCE_UID__" },
-      "description": "Cliente trocou $breakdown? Series novas aparecem automatico. Janela auto-escala com timeRange.",
+      "description": "Total de disparos de $evento agrupados por $breakdown ao longo do periodo selecionado.",
       "targets": [
         {
           "refId": "A",
-          "query": "from(bucket: \"__BUCKET__\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r.site_slug == \"${__user.login}\")\n  |> filter(fn: (r) => r._measurement == \"custom_events\" and r._field == \"ocorrencias\" and r.nome == \"${evento}\")\n  |> group(columns: [\"${breakdown}\"])\n  |> aggregateWindow(every: v.windowPeriod, fn: sum, createEmpty: false)"
+          "query": "from(bucket: \"__BUCKET__\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r.site_slug == \"${__user.login}\")\n  |> filter(fn: (r) => r._measurement == \"custom_events\" and r._field == \"ocorrencias\" and r.nome == \"${evento}\")\n  |> rename(columns: {\"${breakdown}\": \"breakdown\"})\n  |> group(columns: [\"breakdown\"])\n  |> aggregateWindow(every: v.windowPeriod, fn: sum, createEmpty: false)"
         }
       ],
       "fieldConfig": {
         "defaults": {
-          "displayName": "${__field.labels.${breakdown}}",
+          "displayName": "${__field.labels.breakdown}",
           "unit": "short",
           "color": { "mode": "palette-classic" },
           "custom": {
@@ -242,7 +242,7 @@
       }
     },
     {
-      "title": "Top 10 valores de $breakdown para $evento (24h)",
+      "title": "Top 10 $breakdown com mais $evento (24h)",
       "type": "bargauge",
       "gridPos": { "h": 10, "w": 12, "x": 0, "y": 15 },
       "datasource": { "type": "influxdb", "uid": "__DATASOURCE_UID__" },
@@ -250,7 +250,7 @@
       "targets": [
         {
           "refId": "A",
-          "query": "from(bucket: \"__BUCKET__\")\n  |> range(start: -24h)\n  |> filter(fn: (r) => r.site_slug == \"${__user.login}\")\n  |> filter(fn: (r) => r._measurement == \"custom_events\" and r._field == \"ocorrencias\" and r.nome == \"${evento}\")\n  |> group(columns: [\"${breakdown}\"])\n  |> sum()\n  |> sort(columns: [\"_value\"], desc: true)\n  |> limit(n: 10)"
+          "query": "from(bucket: \"__BUCKET__\")\n  |> range(start: -24h)\n  |> filter(fn: (r) => r.site_slug == \"${__user.login}\")\n  |> filter(fn: (r) => r._measurement == \"custom_events\" and r._field == \"ocorrencias\" and r.nome == \"${evento}\")\n  |> rename(columns: {\"${breakdown}\": \"breakdown\"})\n  |> group(columns: [\"breakdown\"])\n  |> sum()\n  |> sort(columns: [\"_value\"], desc: true)\n  |> limit(n: 10)"
         }
       ],
       "options": {
@@ -262,7 +262,7 @@
       },
       "fieldConfig": {
         "defaults": {
-          "displayName": "${__field.labels.${breakdown}}",
+          "displayName": "${__field.labels.breakdown}",
           "color": { "mode": "continuous-BlPu" },
           "unit": "short"
         }
