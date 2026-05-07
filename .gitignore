@@ -1,0 +1,38 @@
+# Logs de runtime na raiz do monorepo
+security.log
+*.log
+
+# Dados gerados pelo backend (chaves RSA, DBs de dev)
+backend/data/
+/data/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.ruff_cache/
+
+# Vagrant
+.vagrant/
+
+# Ansible — arquivos com segredos reais (never commit)
+ark/ansible/group_vars/all.yml
+ark/ansible/.vault-password
+ark/ansible/inventory.ini
+ark/monitoring/.env
+ark/crowdsec/.env
+
+# Env com segredos
+.env
+backend/.env
+backend/.env.*
+!backend/.env.example
+
+# Node
+node_modules/
+
+# Builds
+dist/
+build/
+.astro/

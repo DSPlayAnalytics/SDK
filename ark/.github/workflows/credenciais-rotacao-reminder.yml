@@ -80,26 +80,53 @@ jobs:
           if critical_count:
               title += f" ({critical_count} critica(s))"
 
-          req_body = json.dumps({
-              'title': title,
-              'body': body,
-              'labels': ['security', 'rotacao-credenciais'] + (['P0'] if critical_count else ['P2']),
-          }).encode()
-          req = urllib.request.Request(
-              f"https://api.github.com/repos/{os.environ['REPO']}/issues",
-              data=req_body,
-              headers={
-                  'Authorization': f"Bearer {os.environ['GH_TOKEN']}",
-                  'Accept': 'application/vnd.github+json',
-                  'X-GitHub-Api-Version': '2022-11-28',
-              },
-              method='POST',
+          headers = {
+              'Authorization': f"Bearer {os.environ['GH_TOKEN']}",
+              'Accept': 'application/vnd.github+json',
+              'X-GitHub-Api-Version': '2022-11-28',
+          }
+
+          # Deduplica: se ja existe issue aberta com label rotacao-credenciais,
+          # atualiza o corpo em vez de abrir nova.
+          repo = os.environ['REPO']
+          search_url = (
+              f"https://api.github.com/repos/{repo}/issues"
+              "?state=open&labels=rotacao-credenciais&per_page=1"
           )
-          try:
-              with urllib.request.urlopen(req) as resp:
+          with urllib.request.urlopen(
+              urllib.request.Request(search_url, headers=headers)
+          ) as resp:
+              open_issues = json.load(resp)
+
+          if open_issues:
+              existing = open_issues[0]
+              patch_body = json.dumps({'title': title, 'body': body}).encode()
+              patch_req = urllib.request.Request(
+                  f"https://api.github.com/repos/{repo}/issues/{existing['number']}",
+                  data=patch_body,
+                  headers={**headers, 'Content-Type': 'application/json'},
+                  method='PATCH',
+              )
+              with urllib.request.urlopen(patch_req) as resp:
                   out = json.load(resp)
-                  print(f"Issue #{out['number']} criada: {out['html_url']}")
-          except urllib.error.HTTPError as e:
-              print(f"Erro {e.code}: {e.read().decode()}")
-              raise
+              print(f"Issue #{out['number']} atualizada (ja existia aberta): {out['html_url']}")
+          else:
+              req_body = json.dumps({
+                  'title': title,
+                  'body': body,
+                  'labels': ['security', 'rotacao-credenciais'] + (['P0'] if critical_count else ['P2']),
+              }).encode()
+              req = urllib.request.Request(
+                  f"https://api.github.com/repos/{repo}/issues",
+                  data=req_body,
+                  headers={**headers, 'Content-Type': 'application/json'},
+                  method='POST',
+              )
+              try:
+                  with urllib.request.urlopen(req) as resp:
+                      out = json.load(resp)
+                      print(f"Issue #{out['number']} criada: {out['html_url']}")
+              except urllib.error.HTTPError as e:
+                  print(f"Erro {e.code}: {e.read().decode()}")
+                  raise
           PY
