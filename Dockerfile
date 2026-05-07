@@ -12,17 +12,7 @@ WORKDIR /app
 
 COPY package*.json .npmrc ./
 
-# BuildKit secret: NODE_AUTH_TOKEN (PAT GitHub com read:packages) e exposto
-# apenas em /run/secrets durante este RUN — NAO entra em nenhuma layer da
-# imagem final. Necessario para baixar @danpqdan/dsplayground-analytics-sdk
-# do GitHub Packages registry (privado).
-#
-# Uso esperado:
-#   export NODE_AUTH_TOKEN=$(gh auth token)
-#   docker compose build --secret id=NODE_AUTH_TOKEN,env=NODE_AUTH_TOKEN landing
-RUN --mount=type=secret,id=NODE_AUTH_TOKEN \
-    export NODE_AUTH_TOKEN="$(cat /run/secrets/NODE_AUTH_TOKEN)" && \
-    npm ci --include=dev
+RUN npm ci --include=dev
 
 COPY . .
 

@@ -1,0 +1,197 @@
+---
+/**
+ * Redefinir senha — destino do link enviado por /cliente/esqueci-senha.
+ *
+ * O backend (GET /cliente/auth/recuperar-senha/verificar?t=<token>) valida
+ * o token e redireciona aqui com:
+ *   - ?t=<token>   → token válido, exibe formulário de nova senha
+ *   - ?erro=token_invalido → token expirado ou já usado, exibe erro
+ *
+ * O formulário chama POST /cliente/auth/recuperar-senha/confirmar com
+ * { token, nova_senha }. Em sucesso o backend abre sessão (Set-Cookie)
+ * e o usuário é redirecionado para /cliente/painel.
+ *
+ * NUNCA faz login direto via magic link — o token só serve pra trocar senha.
+ */
+import Base from '~/layouts/Base.astro';
+import Button from '~/components/ui/Button.astro';
+import Card from '~/components/ui/Card.astro';
+import FormError from '~/components/ui/FormError.astro';
+import Input from '~/components/ui/Input.astro';
+import Section from '~/components/ui/Section.astro';
+---
+<Base
+  title="Redefinir senha"
+  description="Crie uma nova senha para a sua conta."
+  noindex={true}
+>
+  <Section narrow class="flex min-h-[70vh] flex-col justify-center">
+
+    <!-- TOKEN INVÁLIDO — exibido quando ?erro=token_invalido -->
+    <div id="estado-token-invalido" class="hidden">
+      <Card>
+        <div class="flex flex-col items-center gap-4 py-4 text-center">
+          <span class="text-4xl" aria-hidden="true">⏱️</span>
+          <div>
+            <h1 class="text-2xl font-bold text-white">Link expirado</h1>
+            <p class="mt-2 text-sm text-slate-400">
+              Este link de redefinição já foi usado ou expirou.<br />
+              Os links são válidos por 15 minutos e de uso único.
+            </p>
+          </div>
+          <Button href="/cliente/esqueci-senha" variant="primary" data-cta="redefinir-senha-novo-link">
+            Pedir novo link
+          </Button>
+          <a href="/cliente/login" class="text-sm text-slate-400 hover:text-slate-300">
+            Voltar ao login
+          </a>
+        </div>
+      </Card>
+    </div>
+
+    <!-- FORMULÁRIO — exibido quando ?t=<token> -->
+    <div id="estado-form" class="hidden">
+      <Card>
+        <h1 class="text-2xl font-bold text-white">Redefinir senha</h1>
+        <p class="mt-1 text-sm text-slate-400">
+          Escolha uma nova senha para a sua conta. Mínimo 8 caracteres.
+        </p>
+
+        <form id="form-redefinir-senha" class="mt-6 space-y-4" novalidate>
+          <Input
+            id="nova_senha"
+            type="password"
+            label="Nova senha"
+            autocomplete="new-password"
+            required
+            placeholder="Mínimo 8 caracteres"
+          />
+          <Input
+            id="confirmar_senha"
+            type="password"
+            label="Confirmar nova senha"
+            autocomplete="new-password"
+            required
+            placeholder="Repita a nova senha"
+          />
+
+          <FormError id="erro" />
+
+          <Button type="submit" id="submit" fullWidth data-cta="form-redefinir-senha">
+            Redefinir senha
+          </Button>
+
+          <p class="text-center text-sm text-slate-400">
+            Lembrou da senha? <a href="/cliente/login" class="text-brand-300 hover:text-brand-200">Entrar</a>
+          </p>
+        </form>
+      </Card>
+    </div>
+
+    <!-- SUCESSO — exibido após redefinição bem-sucedida -->
+    <div id="estado-sucesso" class="hidden">
+      <Card>
+        <div class="flex flex-col items-center gap-4 py-4 text-center">
+          <span class="text-4xl" aria-hidden="true">✅</span>
+          <div>
+            <h1 class="text-2xl font-bold text-white">Senha redefinida</h1>
+            <p class="mt-2 text-sm text-slate-400">
+              Sua senha foi alterada com sucesso. Redirecionando para o painel…
+            </p>
+          </div>
+        </div>
+      </Card>
+    </div>
+
+  </Section>
+
+  <script>
+    import { confirmarRecuperarSenha } from '~/lib/api';
+    import { API_URL } from '~/config';
+
+    const elTokenInvalido = document.getElementById('estado-token-invalido')!;
+    const elForm = document.getElementById('estado-form')!;
+    const elSucesso = document.getElementById('estado-sucesso')!;
+    const form = document.getElementById('form-redefinir-senha') as HTMLFormElement | null;
+    const erroBox = document.getElementById('erro')!;
+    const submitBtn = document.getElementById('submit') as HTMLButtonElement | null;
+
+    const params = new URLSearchParams(window.location.search);
+    const token = params.get('t');
+    const erro = params.get('erro');
+
+    function mostrarErro(msg: string) {
+      erroBox.textContent = msg;
+      erroBox.classList.remove('hidden');
+    }
+    function limparErro() {
+      erroBox.textContent = '';
+      erroBox.classList.add('hidden');
+    }
+
+    if (erro === 'token_invalido' || (erro !== null && token === null)) {
+      elTokenInvalido.classList.remove('hidden');
+    } else if (token) {
+      elForm.classList.remove('hidden');
+    } else {
+      // Nenhum parâmetro — redireciona para solicitar novo link.
+      window.location.replace('/cliente/esqueci-senha');
+    }
+
+    form?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      limparErro();
+
+      const fd = new FormData(form);
+      const novaSenha = String(fd.get('nova_senha') ?? '');
+      const confirmar = String(fd.get('confirmar_senha') ?? '');
+
+      if (novaSenha !== confirmar) {
+        mostrarErro('As senhas não coincidem.');
+        return;
+      }
+      if (novaSenha.length < 8) {
+        mostrarErro('A nova senha precisa ter pelo menos 8 caracteres.');
+        return;
+      }
+
+      submitBtn!.disabled = true;
+      submitBtn!.textContent = 'Redefinindo…';
+
+      const r = await confirmarRecuperarSenha(
+        { token: token!, nova_senha: novaSenha },
+        { apiUrl: API_URL },
+      );
+
+      const sdk = (window as any).__dsplayground;
+
+      if (r.ok) {
+        sdk?.enviarEvento?.('senha_redefinida', {});
+        elForm.classList.add('hidden');
+        elSucesso.classList.remove('hidden');
+        setTimeout(() => { window.location.href = '/cliente/painel'; }, 1500);
+        return;
+      }
+
+      sdk?.enviarEvento?.('formulario_erro', {
+        formulario: 'redefinir-senha', code: r.code, status: r.status,
+      });
+
+      if (r.code === 'TOKEN_INVALIDO') {
+        elForm.classList.add('hidden');
+        elTokenInvalido.classList.remove('hidden');
+        return;
+      }
+
+      mostrarErro(
+        r.code === 'SENHA_CURTA'
+          ? 'A nova senha precisa ter pelo menos 8 caracteres.'
+          : r.code === 'REDE'
+            ? 'Sem internet agora. Tenta de novo, por favor.'
+            : 'Não foi possível redefinir a senha. Tenta de novo.',
+      );
+      submitBtn!.disabled = false;
+      submitBtn!.textContent = 'Redefinir senha';
+    });
+  </script>
+</Base>

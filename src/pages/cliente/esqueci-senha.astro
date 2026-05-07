@@ -7,24 +7,24 @@ import Input from '~/components/ui/Input.astro';
 import Section from '~/components/ui/Section.astro';
 ---
 <Base
-  title="Recuperar acesso"
-  description="Receba um link mágico no seu email pra entrar sem senha."
+  title="Esqueci minha senha"
+  description="Redefina sua senha — receba um link seguro no seu email."
   noindex={true}
 >
   <Section narrow class="flex min-h-[70vh] flex-col justify-center">
     <Card>
-      <h1 class="text-2xl font-bold text-white">Recuperar acesso</h1>
+      <h1 class="text-2xl font-bold text-white">Esqueci minha senha</h1>
       <p class="mt-1 text-sm text-slate-400">
-        Digite o email da sua conta. Você vai receber um link que entra
-        direto, sem precisar de senha. Vale por 15 minutos.
+        Digite o email da sua conta. Você vai receber um link para criar
+        uma nova senha. Vale por 15 minutos.
       </p>
 
-      <form id="form-magic-link" class="mt-6 space-y-4" novalidate>
+      <form id="form-esqueci-senha" class="mt-6 space-y-4" novalidate>
         <Input id="email" type="email" label="Email" autocomplete="email" required placeholder="voce@empresa.com" />
 
         <FormError id="erro" />
 
-        <Button type="submit" id="submit" fullWidth data-cta="form-esqueci-senha">Enviar link de acesso</Button>
+        <Button type="submit" id="submit" fullWidth data-cta="form-esqueci-senha">Enviar link de redefinição</Button>
 
         <p class="text-center text-sm text-slate-400">
           Lembrou da senha? <a href="/cliente/login" class="text-brand-300 hover:text-brand-200">Entrar</a>
@@ -39,8 +39,9 @@ import Section from '~/components/ui/Section.astro';
       <FormError id="sucesso" variant="success" class="mt-6">
         <p class="font-semibold">Link enviado.</p>
         <p class="mt-1">
-          Se o email estiver cadastrado, você vai receber um link em alguns
-          segundos. Verifique a caixa de entrada (e a pasta de spam).
+          Se o email estiver cadastrado, você vai receber um link de
+          redefinição em alguns segundos. Verifique a caixa de entrada
+          (e a pasta de spam).
         </p>
         <p class="mt-3 text-xs text-emerald-200/80">
           O link expira em 15 minutos e só pode ser usado uma vez.
@@ -50,10 +51,10 @@ import Section from '~/components/ui/Section.astro';
   </Section>
 
   <script>
-    import { solicitarMagicLink } from '~/lib/api';
+    import { solicitarRecuperarSenha } from '~/lib/api';
     import { API_URL } from '~/config';
 
-    const form = document.getElementById('form-magic-link') as HTMLFormElement | null;
+    const form = document.getElementById('form-esqueci-senha') as HTMLFormElement | null;
     const erroBox = document.getElementById('erro')!;
     const submitBtn = document.getElementById('submit') as HTMLButtonElement | null;
     const sucessoBox = document.getElementById('sucesso')!;
@@ -74,7 +75,7 @@ import Section from '~/components/ui/Section.astro';
       submitBtn!.textContent = 'Enviando…';
 
       const fd = new FormData(form);
-      const r = await solicitarMagicLink(
+      const r = await solicitarRecuperarSenha(
         { email: String(fd.get('email') ?? '').trim() },
         { apiUrl: API_URL },
       );
@@ -82,8 +83,7 @@ import Section from '~/components/ui/Section.astro';
       const sdk = (window as any).__dsplayground;
 
       if (r.ok) {
-        sdk?.enviarEvento?.('magic_link_solicitado', {});
-        // Substitui o form pela mensagem de sucesso (mesma copia anti-enum)
+        sdk?.enviarEvento?.('recuperar_senha_solicitado', {});
         form.classList.add('hidden');
         sucessoBox.classList.remove('hidden');
         return;
@@ -100,7 +100,7 @@ import Section from '~/components/ui/Section.astro';
             : 'Não deu pra enviar o link agora. Tenta de novo.',
       );
       submitBtn!.disabled = false;
-      submitBtn!.textContent = 'Enviar link de acesso';
+      submitBtn!.textContent = 'Enviar link de redefinição';
     });
   </script>
 </Base>

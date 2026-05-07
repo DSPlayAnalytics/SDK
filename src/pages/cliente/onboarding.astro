@@ -253,10 +253,10 @@ const platformTabs = [
 
     function snippetReact(key: string): string {
       return `// 1) instalar
-// npm i @danpqdan/dsplayground-analytics-sdk
+// npm i @dsplayground-analytics/sdk
 
 // 2) src/main.tsx (ou onde sua app inicia)
-import { iniciarAnalytics } from '@danpqdan/dsplayground-analytics-sdk';
+import { iniciarAnalytics } from '@dsplayground-analytics/sdk';
 
 iniciarAnalytics({
   publishableKey: '${key}',
@@ -268,7 +268,7 @@ iniciarAnalytics({
       return `// app/providers.tsx — Client Component
 'use client';
 import { useEffect } from 'react';
-import { iniciarAnalytics } from '@danpqdan/dsplayground-analytics-sdk';
+import { iniciarAnalytics } from '@dsplayground-analytics/sdk';
 
 export function AnalyticsProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {

@@ -73,6 +73,13 @@ const publicos = [
               path.startsWith('/cliente/configuracoes') ? 'text-white' : 'text-slate-300 hover:text-white',
             ]}
           >Configurações</a>
+          <a
+            href="/cliente/exportar"
+            class:list={[
+              'hidden rounded-md px-3 py-1.5 text-sm transition sm:inline-block',
+              path === '/cliente/exportar' ? 'text-white' : 'text-slate-300 hover:text-white',
+            ]}
+          >Exportar</a>
           <a href={DASHBOARD_URL} class="btn-primary !py-1.5 !px-4 ml-1" data-cta="nav-grafana">Métricas</a>
           <button
             id="nav-logout"
