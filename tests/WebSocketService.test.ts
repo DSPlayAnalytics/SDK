@@ -255,6 +255,18 @@ describe('WebSocketService', () => {
     expect(envelope).not.toHaveProperty('group_id');
   });
 
+  it('getDeadLetter acumula itens e limparDeadLetter esvazia', async () => {
+    const modulo = await import('../src');
+    modulo.WebSocketService.configurar(configuracaoComStorageMemoria());
+
+    modulo.WebSocketService.limparDeadLetter();
+    expect(modulo.WebSocketService.getDeadLetter()).toHaveLength(0);
+    expect(Array.isArray(modulo.WebSocketService.getDeadLetter())).toBe(true);
+
+    modulo.WebSocketService.limparDeadLetter();
+    expect(modulo.WebSocketService.getDeadLetter()).toHaveLength(0);
+  });
+
   it('falha de storage no enfileirar: retorna false, emite analytics:enqueue_failed, nao vira unhandled rejection', async () => {
     const modulo = await import('../src');
 

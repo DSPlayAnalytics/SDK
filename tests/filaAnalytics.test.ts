@@ -1,6 +1,6 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { FilaAnalytics, StorageMemoria } from '../src/filaAnalytics.ts';
+import { FilaAnalytics, StorageMemoria, BACKOFF_RETRY_MS } from '../src/filaAnalytics.ts';
 import type { StorageFila } from '../src/filaAnalytics.ts';
 import type { HeatmapDados } from '../src';
 
@@ -153,5 +153,72 @@ describe('FilaAnalytics', () => {
     expect(primeiraLeitura[0].payload.id_registro).toBe(
       segundaLeitura[0].payload.id_registro,
     );
+  });
+
+  describe('Onda 1 — backoff exponencial com jitter', () => {
+    it('incrementarTentativa define proximaTentativaApos no futuro', async () => {
+      const fila = new FilaAnalytics(storage, 10);
+      const antes = Date.now();
+      await fila.enfileirar(criarPayload('x'));
+      const [item] = await fila.proximoLote(1);
+
+      const atualizado = await fila.incrementarTentativa(item.id, 'TIMEOUT');
+
+      expect(atualizado).not.toBeNull();
+      expect(atualizado!.tentativas).toBe(1);
+      // proximaTentativaApos deve ser ao menos BACKOFF_RETRY_MS[0] ms no futuro
+      expect(atualizado!.proximaTentativaApos).toBeGreaterThanOrEqual(
+        antes + BACKOFF_RETRY_MS[0],
+      );
+    });
+
+    it('proximoLote exclui itens com proximaTentativaApos no futuro', async () => {
+      const fila = new FilaAnalytics(storage, 10);
+      await fila.enfileirar(criarPayload('a'));
+      const [item] = await fila.proximoLote(1);
+
+      await fila.incrementarTentativa(item.id, 'TIMEOUT');
+
+      // Imediatamente apos incrementar, o item nao deve aparecer no lote
+      const loteImediato = await fila.proximoLote(1);
+      expect(loteImediato).toHaveLength(0);
+    });
+
+    it('proximoLote inclui item apos o delay expirar', async () => {
+      vi.useFakeTimers();
+      const fila = new FilaAnalytics(storage, 10);
+      await fila.enfileirar(criarPayload('b'));
+      const [item] = await fila.proximoLote(1);
+
+      // Fixa backoff em 100ms para o teste
+      await fila.incrementarTentativa(item.id, 'TIMEOUT', [100]);
+
+      // Antes do delay: nao aparece
+      let lote = await fila.proximoLote(1);
+      expect(lote).toHaveLength(0);
+
+      // Apos o delay: aparece
+      vi.advanceTimersByTime(600);
+      lote = await fila.proximoLote(1);
+      expect(lote).toHaveLength(1);
+
+      vi.useRealTimers();
+    });
+
+    it('usa o delay do ultimo bucket para tentativas alem do array', async () => {
+      const fila = new FilaAnalytics(storage, 10);
+      await fila.enfileirar(criarPayload('c'));
+      const [item] = await fila.proximoLote(1);
+
+      // Incrementa alem do tamanho do array (5 buckets) para garantir o clamp no ultimo
+      const backoff = [100, 200, 400, 800, 1600];
+      for (let i = 0; i < backoff.length; i++) {
+        await fila.incrementarTentativa(item.id, 'X', backoff);
+      }
+      const antes = Date.now();
+      const atualizado = await fila.incrementarTentativa(item.id, 'X', backoff);
+      // 6a tentativa -> clampa no backoff[4] = 1600
+      expect(atualizado!.proximaTentativaApos).toBeGreaterThanOrEqual(antes + 1600);
+    });
   });
 });

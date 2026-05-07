@@ -7,6 +7,7 @@ import {
   emitirEventoDeadLetter,
   emitirEventoEnqueueFailed,
   emitirEventoPayloadRejected,
+  BACKOFF_RETRY_MS,
   type ItemFila,
   type StorageFila,
 } from './filaAnalytics.ts';
@@ -27,8 +28,7 @@ interface ConfigSdk {
 
 const LOTE_DRENAGEM = 5;
 const TIMEOUT_ACK_MS = 10_000;
-const MAX_TENTATIVAS = 5;
-const BACKOFF_MS = [1_000, 2_000, 4_000, 8_000, 30_000];
+const MAX_TENTATIVAS = BACKOFF_RETRY_MS.length;
 
 const ANALYTICS_SESSION_STORAGE_KEY = 'analytics_sdk.session_id';
 const SLOW_MULTIPLIER = 3;
@@ -61,6 +61,7 @@ class WebSocketService {
   private fila: FilaAnalytics | null = null;
   private emVoo: Set<string> = new Set();
   private tamanhoFilaCache: number = 0;
+  private _deadLetter: Array<{ idRegistro: string | null; tentativas: number; ultimoErro?: string; ts: number }> = [];
 
   private realtimeIntervalBaseMs: number = 5000;
   private realtimeIntervalAtualMs: number = 5000;
@@ -375,15 +376,18 @@ class WebSocketService {
             ack?.code ?? 'TIMEOUT',
           );
           if (atualizado && atualizado.tentativas >= MAX_TENTATIVAS) {
-            emitirEventoDeadLetter({
+            const entrada = {
               idRegistro: (item.payload as unknown as { id_registro?: string })?.id_registro ?? null,
               tentativas: atualizado.tentativas,
               ultimoErro: atualizado.ultimoErro,
-            });
+              ts: Date.now(),
+            };
+            this._deadLetter.push(entrada);
+            emitirEventoDeadLetter(entrada);
             await this.fila.confirmar([item.id]);
           }
           todosOk = false;
-          // Respeita backoff: proxima drenagem segura por setInterval.
+          // Proximo ciclo obedece proximaTentativaApos — sem break precisa de guardas.
           break;
         }
       } finally {
@@ -518,6 +522,19 @@ class WebSocketService {
     await this.fila.limpar();
     this.emVoo.clear();
     this.tamanhoFilaCache = 0;
+  }
+
+  /**
+   * Retorna uma copia snapshot dos itens que excederam MAX_TENTATIVAS e foram
+   * descartados da fila (dead-letter). Util para monitoramento ou relay manual.
+   * Chame `limparDeadLetter()` para esvaziar apos inspecionar.
+   */
+  getDeadLetter(): ReadonlyArray<{ idRegistro: string | null; tentativas: number; ultimoErro?: string; ts: number }> {
+    return [...this._deadLetter];
+  }
+
+  limparDeadLetter(): void {
+    this._deadLetter = [];
   }
 
   async tamanhoFilaOffline(): Promise<number> {

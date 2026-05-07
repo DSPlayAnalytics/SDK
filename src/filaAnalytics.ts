@@ -4,6 +4,9 @@ import type { HeatmapDados } from './HeatmapUtils.tsx';
 
 export type PrioridadeFila = 'alta' | 'normal' | 'baixa';
 
+/** Delays por tentativa (1ª, 2ª, 3ª, 4ª, 5ª+). Jitter de 0–500ms somado em cima. */
+export const BACKOFF_RETRY_MS = [1_000, 2_000, 4_000, 8_000, 30_000] as const;
+
 export interface ItemFila {
   id: string;
   timestamp: number;
@@ -11,6 +14,8 @@ export interface ItemFila {
   tentativas: number;
   prioridade: PrioridadeFila;
   ultimoErro?: string;
+  /** Timestamp (ms epoch) antes do qual o item nao deve ser drenado (backoff por tentativa). */
+  proximaTentativaApos?: number;
 }
 
 export interface StorageFila {
@@ -297,8 +302,13 @@ export class FilaAnalytics {
   }
 
   async proximoLote(n: number, excluirIds: Set<string> = new Set()): Promise<ItemFila[]> {
+    const agora = Date.now();
     const todos = await this.storage.listar();
-    const disponiveis = todos.filter((i) => !excluirIds.has(i.id));
+    const disponiveis = todos.filter(
+      (i) =>
+        !excluirIds.has(i.id) &&
+        (i.proximaTentativaApos === undefined || i.proximaTentativaApos <= agora),
+    );
     return disponiveis.slice(0, Math.max(0, n));
   }
 
@@ -314,14 +324,22 @@ export class FilaAnalytics {
     await this.storage.limpar();
   }
 
-  async incrementarTentativa(id: string, erro?: string): Promise<ItemFila | null> {
+  async incrementarTentativa(
+    id: string,
+    erro?: string,
+    backoffMs: readonly number[] = BACKOFF_RETRY_MS,
+  ): Promise<ItemFila | null> {
     const todos = await this.storage.listar();
     const alvo = todos.find((i) => i.id === id);
     if (!alvo) return null;
+    const novasTentativas = alvo.tentativas + 1;
+    const delayBase = backoffMs[Math.min(novasTentativas - 1, backoffMs.length - 1)];
+    const jitter = Math.floor(Math.random() * 500);
     const atualizado: ItemFila = {
       ...alvo,
-      tentativas: alvo.tentativas + 1,
+      tentativas: novasTentativas,
       ultimoErro: erro,
+      proximaTentativaApos: Date.now() + delayBase + jitter,
     };
     await this.storage.atualizar(atualizado);
     return atualizado;
