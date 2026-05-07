@@ -3,7 +3,7 @@
 # 5 rejeicoes por token invalido do mesmo IP em 1 minuto -> ban.
 
 type: leaky
-name: portifolio/admin-auth-abuse
+name: dsplay/admin-auth-abuse
 description: "Tentativa repetida de token admin invalido"
 filter: |
   evt.Parsed.request startsWith "/admin/"
@@ -14,7 +14,7 @@ capacity: 5
 leakspeed: 12s
 blackhole: 10m
 labels:
-  service: portifolio-analytics
+  service: dsplay-analytics
   type: http
   behavior: http-bf
   remediation: true

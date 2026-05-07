@@ -59,7 +59,7 @@
 - name: Aguardar Grafana pronto pra aceitar admin commands
   when: not ansible_check_mode
   ansible.builtin.shell: |
-    docker exec portifolio-grafana wget -q -O /dev/null --tries=1 http://localhost:3000/api/health
+    docker exec dsplay-grafana wget -q -O /dev/null --tries=1 http://localhost:3000/api/health
   register: gf_ready
   retries: 15
   delay: 4
@@ -79,7 +79,7 @@
     - not ansible_check_mode
     - gf_ready.rc | default(1) == 0
   ansible.builtin.shell: |
-    docker exec -e GF_PW="${GF_PW_VALUE}" portifolio-grafana \
+    docker exec -e GF_PW="${GF_PW_VALUE}" dsplay-grafana \
       sh -c 'grafana-cli admin reset-admin-password "$GF_PW"'
   environment:
     GF_PW_VALUE: "{{ grafana_admin_password }}"

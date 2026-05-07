@@ -6,9 +6,9 @@
 # permitir que os cenarios correlacionem.
 
 onsuccess: next_stage
-name: portifolio/backend-analytics
-description: "Parser dos logs estruturados do backend portifolio"
-filter: "evt.Parsed.program == 'portifolio-backend'"
+name: dsplay/backend-analytics
+description: "Parser dos logs estruturados do backend dsplay"
+filter: "evt.Parsed.program == 'dsplay-backend'"
 pattern_syntax:
   TIMESTAMP_BACKEND: '%{YEAR}-%{MONTHNUM}-%{MONTHDAY} %{TIME}'
 nodes:

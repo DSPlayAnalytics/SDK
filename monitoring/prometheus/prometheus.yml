@@ -27,8 +27,8 @@ scrape_configs:
     static_configs:
       - targets: ['node-exporter:9100']
 
-  # Backend do portifolio — quando `/metrics` for exposto (ver docs/plano-backend.md D.2)
-  - job_name: portifolio-backend
+  # Backend dsplay — quando `/metrics` for exposto (ver docs/plano-backend.md D.2)
+  - job_name: dsplay-backend
     metrics_path: /metrics
     scrape_interval: 10s
     static_configs:

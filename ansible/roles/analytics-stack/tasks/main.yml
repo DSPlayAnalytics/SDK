@@ -73,7 +73,7 @@
     dest: "{{ repo_dir }}/.env"
     owner: "{{ deploy_user }}"
     group: analytics
-    mode: "0640"
+    mode: "0600"
 
 - name: Garantir security.log pertence a analytics (0660 permite container escrever via GID)
   file:
@@ -87,7 +87,7 @@
 
 - name: Garantir volume backend_keys existente (chaves RSA do sdk_jwt)
   community.docker.docker_volume:
-    name: portifolio_backend_keys
+    name: dsplay_backend_keys
     state: present
   become_user: "{{ deploy_user }}"
 
@@ -97,23 +97,32 @@
   # for recriado (down -v), esta task reaplica o owner.
   command: >
     docker run --rm
-    -v portifolio_backend_keys:/mnt
+    -v dsplay_backend_keys:/mnt
     alpine:3.19
     chown -R 10001:10001 /mnt
   become_user: "{{ deploy_user }}"
   changed_when: false
 
-# Cleanup de containers parados antes de subir a stack.
+# Cleanup de containers e imagens dangling antes de subir a stack.
 #
-# Bug observado em 2026-05-02: `community.docker.docker_compose_v2` chama
-# `docker compose images --format json` pra detectar mudancas, mas se algum
-# container parado aponta pra imagem que foi removida (rebuild anterior +
-# image prune), o subprocess retorna "No such image: sha256:<id>" no stderr
-# e quebra o parser JSON. Erro: "Expecting value: line 1 column 1 (char 0)".
-# Prune antes de subir cura — remove containers parados orfaos sem afetar
-# os em execucao.
+# Bug observado em 2026-05-02 (e reincidente): `community.docker.docker_compose_v2`
+# chama `docker compose images --format json` pra detectar mudancas. Se qualquer
+# imagem referenciada pelo compose state foi removida do daemon (rebuild anterior
+# + prune automatico), o subprocesso retorna "No such image: sha256:<id>" no
+# stderr e quebra o parser JSON — "Expecting value: line 1 column 1 (char 0)".
+#
+# Dois pruges necessarios:
+#   1. container prune — remove containers parados que apontam pra imagens stale
+#   2. image prune     — remove imagens dangling (sem tag, sem container ativo)
+#      que o daemon ainda registra mas cujo conteudo foi parcialmente removido
+# Ambos sao safe em producao: nao afetam containers rodando nem imagens tagueadas.
 - name: Limpar containers parados orfaos (evita bug compose images JSON)
   command: docker container prune -f
+  become_user: "{{ deploy_user }}"
+  changed_when: false
+
+- name: Limpar imagens dangling (evita SHA stale no compose images JSON)
+  command: docker image prune -f
   become_user: "{{ deploy_user }}"
   changed_when: false
 
@@ -147,7 +156,7 @@
 - name: Aguardar Postgres pronto pra aceitar comandos administrativos
   when: not ansible_check_mode
   ansible.builtin.shell: |
-    docker exec portifolio-postgres pg_isready -U "{{ postgres_user }}" -d "{{ postgres_db }}" -q
+    docker exec dsplay-postgres pg_isready -U "{{ postgres_user }}" -d "{{ postgres_db }}" -q
   register: pg_ready
   retries: 10
   delay: 3
@@ -162,7 +171,7 @@
     - not ansible_check_mode
     - pg_ready.rc | default(1) == 0
   community.docker.docker_container_exec:
-    container: portifolio-postgres
+    container: dsplay-postgres
     # community.docker >=5 espera `argv:` para lista; `command:` e str.
     # Passar lista em `command` faz o modulo serializar como "[psql,...]"
     # e o OCI falha com "executable file not found".
@@ -198,7 +207,7 @@
     - not ansible_check_mode
     - pg_ready.rc | default(1) == 0
   community.docker.docker_container_exec:
-    container: portifolio-postgres
+    container: dsplay-postgres
     argv:
       - psql
       - -U

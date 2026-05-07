@@ -1,0 +1,290 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": { "type": "grafana", "uid": "-- Grafana --" },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "description": "Page Views — visualizacoes, top pages, permanencia e bounce rate. Bucket __BUCKET__. Read-only para Viewers.",
+  "editable": false,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [
+    {
+      "title": "Configurações",
+      "url": "https://dsplayground.com.br/cliente/configuracoes/",
+      "type": "link",
+      "icon": "cog",
+      "tooltip": "Trocar email/senha, publishable key, plano, consumo",
+      "targetBlank": true,
+      "asDropdown": false,
+      "includeVars": false,
+      "keepTime": false,
+      "tags": []
+    },
+    {
+      "title": "Exportar dados",
+      "url": "https://dsplayground.com.br/cliente/exportar/",
+      "type": "link",
+      "icon": "cloud",
+      "tooltip": "Baixar arquivos arquivados (LGPD)",
+      "targetBlank": true,
+      "asDropdown": false,
+      "includeVars": false,
+      "keepTime": false,
+      "tags": []
+    },
+    {
+      "title": "Voltar ao site",
+      "url": "https://dsplayground.com.br/",
+      "type": "link",
+      "icon": "external link",
+      "tooltip": "Página inicial DS Playground",
+      "targetBlank": false,
+      "asDropdown": false,
+      "includeVars": false,
+      "keepTime": false,
+      "tags": []
+    }
+  ],
+  "panels": [
+    {
+      "title": "Visualizacoes (24h)",
+      "type": "stat",
+      "gridPos": { "h": 5, "w": 6, "x": 0, "y": 0 },
+      "datasource": { "type": "influxdb", "uid": "__DATASOURCE_UID__" },
+      "targets": [
+        {
+          "refId": "A",
+          "query": "from(bucket: \"__BUCKET__\")\n  |> range(start: -24h)\n  |> filter(fn: (r) => r._measurement == \"page_analytics\" and r._field == \"visualizacoes\")\n  |> filter(fn: (r) => r.device_type != \"bot\")\n  |> group()\n  |> sum()"
+        }
+      ],
+      "options": {
+        "reduceOptions": { "values": false, "calcs": ["lastNotNull"], "fields": "" },
+        "textMode": "value",
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "center",
+        "orientation": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": { "mode": "thresholds" },
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "blue", "value": null }] }
+        }
+      }
+    },
+    {
+      "title": "Sessoes unicas (24h)",
+      "type": "stat",
+      "gridPos": { "h": 5, "w": 6, "x": 6, "y": 0 },
+      "datasource": { "type": "influxdb", "uid": "__DATASOURCE_UID__" },
+      "description": "session_id distintos nas ultimas 24h. Proxy de visitas unicas.",
+      "targets": [
+        {
+          "refId": "A",
+          "query": "from(bucket: \"__BUCKET__\")\n  |> range(start: -24h)\n  |> filter(fn: (r) => r._measurement == \"page_analytics\" and r._field == \"visualizacoes\")\n  |> filter(fn: (r) => r.device_type != \"bot\")\n  |> keep(columns: [\"session_id\"])\n  |> distinct(column: \"session_id\")\n  |> count()"
+        }
+      ],
+      "options": {
+        "reduceOptions": { "values": false, "calcs": ["lastNotNull"], "fields": "" },
+        "textMode": "value",
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "center",
+        "orientation": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": { "mode": "thresholds" },
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "purple", "value": null }] }
+        }
+      }
+    },
+    {
+      "title": "Permanencia media (s, 24h)",
+      "type": "stat",
+      "gridPos": { "h": 5, "w": 6, "x": 12, "y": 0 },
+      "datasource": { "type": "influxdb", "uid": "__DATASOURCE_UID__" },
+      "description": "Media de permanencia_segundos por batch. Cada batch e ~5s, entao valores baixos indicam sessoes curtas.",
+      "targets": [
+        {
+          "refId": "A",
+          "query": "from(bucket: \"__BUCKET__\")\n  |> range(start: -24h)\n  |> filter(fn: (r) => r._measurement == \"page_analytics\" and r._field == \"permanencia_segundos\")\n  |> filter(fn: (r) => r.device_type != \"bot\")\n  |> group()\n  |> mean()"
+        }
+      ],
+      "options": {
+        "reduceOptions": { "values": false, "calcs": ["lastNotNull"], "fields": "" },
+        "textMode": "value",
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "orientation": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "decimals": 1,
+          "color": { "mode": "thresholds" },
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] }
+        }
+      }
+    },
+    {
+      "title": "Paginas distintas com visitas (24h)",
+      "type": "stat",
+      "gridPos": { "h": 5, "w": 6, "x": 18, "y": 0 },
+      "datasource": { "type": "influxdb", "uid": "__DATASOURCE_UID__" },
+      "targets": [
+        {
+          "refId": "A",
+          "query": "from(bucket: \"__BUCKET__\")\n  |> range(start: -24h)\n  |> filter(fn: (r) => r._measurement == \"page_analytics\" and r._field == \"visualizacoes\")\n  |> filter(fn: (r) => r.device_type != \"bot\")\n  |> keep(columns: [\"page_type\"])\n  |> distinct(column: \"page_type\")\n  |> count()"
+        }
+      ],
+      "options": {
+        "reduceOptions": { "values": false, "calcs": ["lastNotNull"], "fields": "" },
+        "textMode": "value",
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "orientation": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": { "mode": "thresholds" },
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "orange", "value": null }] }
+        }
+      }
+    },
+    {
+      "title": "Visualizacoes timeline por page_type",
+      "type": "timeseries",
+      "gridPos": { "h": 9, "w": 16, "x": 0, "y": 5 },
+      "datasource": { "type": "influxdb", "uid": "__DATASOURCE_UID__" },
+      "description": "Soma de visualizacoes por page_type em janelas auto-escala.",
+      "targets": [
+        {
+          "refId": "A",
+          "query": "from(bucket: \"__BUCKET__\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"page_analytics\" and r._field == \"visualizacoes\")\n  |> filter(fn: (r) => r.device_type != \"bot\")\n  |> group(columns: [\"page_type\"])\n  |> aggregateWindow(every: v.windowPeriod, fn: sum, createEmpty: false)"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "displayName": "${__field.labels.page_type}",
+          "unit": "short",
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "drawStyle": "bars",
+            "lineInterpolation": "linear",
+            "fillOpacity": 70,
+            "showPoints": "never",
+            "stacking": { "mode": "normal", "group": "A" }
+          }
+        }
+      }
+    },
+    {
+      "title": "Top 10 paginas (24h)",
+      "type": "bargauge",
+      "gridPos": { "h": 9, "w": 8, "x": 16, "y": 5 },
+      "datasource": { "type": "influxdb", "uid": "__DATASOURCE_UID__" },
+      "targets": [
+        {
+          "refId": "A",
+          "query": "from(bucket: \"__BUCKET__\")\n  |> range(start: -24h)\n  |> filter(fn: (r) => r._measurement == \"page_analytics\" and r._field == \"visualizacoes\")\n  |> filter(fn: (r) => r.device_type != \"bot\")\n  |> group(columns: [\"page_type\"])\n  |> sum()\n  |> sort(columns: [\"_value\"], desc: true)\n  |> limit(n: 10)"
+        }
+      ],
+      "options": {
+        "displayMode": "gradient",
+        "orientation": "horizontal",
+        "showUnfilled": true,
+        "valueMode": "color",
+        "reduceOptions": { "values": false, "calcs": ["lastNotNull"], "fields": "" }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "displayName": "${__field.labels.page_type}",
+          "color": { "mode": "continuous-BlPu" },
+          "unit": "short"
+        }
+      }
+    },
+    {
+      "title": "Permanencia por pagina (24h)",
+      "type": "bargauge",
+      "gridPos": { "h": 9, "w": 12, "x": 0, "y": 14 },
+      "datasource": { "type": "influxdb", "uid": "__DATASOURCE_UID__" },
+      "description": "Soma de permanencia_segundos por page_type. Cada batch contribui ~5s, entao este e o tempo ativo agregado de todas as sessoes.",
+      "targets": [
+        {
+          "refId": "A",
+          "query": "from(bucket: \"__BUCKET__\")\n  |> range(start: -24h)\n  |> filter(fn: (r) => r._measurement == \"page_analytics\" and r._field == \"permanencia_segundos\")\n  |> filter(fn: (r) => r.device_type != \"bot\")\n  |> group(columns: [\"page_type\"])\n  |> sum()\n  |> sort(columns: [\"_value\"], desc: true)\n  |> limit(n: 10)"
+        }
+      ],
+      "options": {
+        "displayMode": "gradient",
+        "orientation": "horizontal",
+        "showUnfilled": true,
+        "valueMode": "color",
+        "reduceOptions": { "values": false, "calcs": ["lastNotNull"], "fields": "" }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "displayName": "${__field.labels.page_type}",
+          "color": { "mode": "continuous-GrYlRd" },
+          "unit": "s"
+        }
+      }
+    },
+    {
+      "title": "Visitas por device_type (24h)",
+      "type": "piechart",
+      "gridPos": { "h": 9, "w": 12, "x": 12, "y": 14 },
+      "datasource": { "type": "influxdb", "uid": "__DATASOURCE_UID__" },
+      "description": "Proporcao de visualizacoes por tipo de dispositivo. Util pra priorizar otimizacoes mobile vs desktop.",
+      "targets": [
+        {
+          "refId": "A",
+          "query": "from(bucket: \"__BUCKET__\")\n  |> range(start: -24h)\n  |> filter(fn: (r) => r._measurement == \"page_analytics\" and r._field == \"visualizacoes\")\n  |> filter(fn: (r) => r.device_type != \"bot\")\n  |> group(columns: [\"device_type\"])\n  |> sum()"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "values": ["value", "percent"]
+        },
+        "pieType": "donut",
+        "reduceOptions": { "values": false, "calcs": ["lastNotNull"], "fields": "" }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "displayName": "${__field.labels.device_type}",
+          "color": { "mode": "palette-classic" },
+          "unit": "short"
+        }
+      }
+    }
+  ],
+  "refresh": "30s",
+  "schemaVersion": 39,
+  "tags": ["portifolio", "cliente", "page-views"],
+  "templating": { "list": [] },
+  "time": { "from": "now-24h", "to": "now" },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "Page Views",
+  "uid": "portifolio-page-views",
+  "version": 1
+}

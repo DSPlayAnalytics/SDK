@@ -3,7 +3,7 @@
 # 200 eventos do backend em 10 segundos do mesmo IP e suspeito.
 
 type: leaky
-name: portifolio/analytics-flood
+name: dsplay/analytics-flood
 description: "Flood de eventos de analytics do mesmo IP"
 filter: |
   evt.Meta.log_type == "backend-structured"
@@ -14,6 +14,6 @@ capacity: 200
 leakspeed: 20s
 blackhole: 2m
 labels:
-  service: portifolio-analytics
+  service: dsplay-analytics
   type: http
   remediation: true
