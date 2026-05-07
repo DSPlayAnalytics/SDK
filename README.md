@@ -1,6 +1,6 @@
-# @danpqdan/dsplayground-analytics-sdk
+# @dsplayground-analytics/sdk
 
-[![CI](https://github.com/danpqdan/dsplayground-analytics-sdk/actions/workflows/ci.yml/badge.svg)](https://github.com/danpqdan/dsplayground-analytics-sdk/actions/workflows/ci.yml) [![Publish](https://github.com/danpqdan/dsplayground-analytics-sdk/actions/workflows/publish.yml/badge.svg)](https://github.com/danpqdan/dsplayground-analytics-sdk/actions/workflows/publish.yml) [![status](https://img.shields.io/badge/status-alpha-yellow)](#) [![schema](https://img.shields.io/badge/schema-1.1-blue)](#)
+[![CI](https://github.com/DSPlayAnalytics/SDK/actions/workflows/ci.yml/badge.svg)](https://github.com/DSPlayAnalytics/SDK/actions/workflows/ci.yml) [![Publish](https://github.com/DSPlayAnalytics/SDK/actions/workflows/publish.yml/badge.svg)](https://github.com/DSPlayAnalytics/SDK/actions/workflows/publish.yml) [![npm](https://img.shields.io/npm/v/@dsplayground-analytics/sdk)](https://www.npmjs.com/package/@dsplayground-analytics/sdk) [![status](https://img.shields.io/badge/status-alpha-yellow)](#) [![schema](https://img.shields.io/badge/schema-1.1-blue)](#)
 
 SDK para coleta de eventos de navegacao, performance (Web Vitals) e eventos de negocio, com envio em tempo real via Socket.IO. A cada tick (default 5s) o SDK envia somente o que aconteceu desde a ultima emissao, entao queries agregadas no backend somam sem duplicar. Toda a coleta vive em `paginas[pageId][0].eventos` como uma lista unica `{ tipo, timestamp, dados }`.
 
@@ -15,11 +15,11 @@ Exemplos completos:
 ### Via npm (recomendado)
 
 ```bash
-npm install @danpqdan/dsplayground-analytics-sdk
+npm install @dsplayground-analytics/sdk
 ```
 
 ```ts
-import { iniciarAnalytics } from '@danpqdan/dsplayground-analytics-sdk';
+import { iniciarAnalytics } from '@dsplayground-analytics/sdk';
 
 iniciarAnalytics({
   websocketUrl: 'https://api.dsplayground.com.br',
@@ -28,12 +28,6 @@ iniciarAnalytics({
   ambiente: 'production',
 });
 ```
-
-> **Pacote ainda nao publicado em npmjs.org publico** (planejado).
-> Enquanto isso, instalar via GitHub Packages: configure `.npmrc` com
-> `@danpqdan:registry=https://npm.pkg.github.com` e exporte um token GitHub
-> com escopo `read:packages` em `NODE_AUTH_TOKEN`. Mais detalhes em
-> [docs.github.com/packages](https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-npm-registry).
 
 ### Standalone via `<script>` (HTML estatico, sem bundler)
 
@@ -45,13 +39,13 @@ voce so consegue colar HTML+JS. Bundle IIFE com todas as deps inline
 edge cache global e versionamento imutavel:
 
 ```html
-<script src="https://cdn.jsdelivr.net/gh/danpqdan/dsplayground-analytics-sdk@v0.3.2/dist/sdk.umd.js" defer></script>
+<script src="https://cdn.jsdelivr.net/gh/DSPlayAnalytics/SDK@v0.5.0/dist/sdk.umd.js" defer></script>
 ```
 
-**Opcao 2: GitHub Release direto** — funciona apos repo virar publico:
+**Opcao 2: GitHub Release direto**:
 
 ```html
-<script src="https://github.com/danpqdan/dsplayground-analytics-sdk/releases/download/v0.3.2/sdk.umd.js" defer></script>
+<script src="https://github.com/DSPlayAnalytics/SDK/releases/download/v0.5.0/sdk.umd.js" defer></script>
 ```
 
 Ambos servem o mesmo arquivo. Use jsDelivr em prod (cache CDN) e release
@@ -157,7 +151,7 @@ Externals preservados (`react`, `react-dom`, `socket.io-client`, `uuid`, `web-vi
 Chame `iniciarAnalytics` uma vez no boot da aplicacao, antes de qualquer outro uso do SDK. Qualquer chamada anterior a isso vira no-op.
 
 ```ts
-import { iniciarAnalytics } from '@danpqdan/dsplayground-analytics-sdk';
+import { iniciarAnalytics } from '@dsplayground-analytics/sdk';
 
 iniciarAnalytics({
   websocketUrl: 'http://localhost:5000',
@@ -179,7 +173,7 @@ A coleta de cada pagina precisa de um `HeatmapUtils` instanciado no ciclo de vid
 
 ```tsx
 import { useEffect } from 'react';
-import { HeatmapUtils, WebSocketService } from '@danpqdan/dsplayground-analytics-sdk';
+import { HeatmapUtils, WebSocketService } from '@dsplayground-analytics/sdk';
 
 export function useAnalyticsPagina(pageId: string, hoverSelector?: string) {
   useEffect(() => {
@@ -205,7 +199,7 @@ Para consumidores fora do React, o exemplo em [examples/vanilla.js](./examples/v
 Use `enviarEvento` em pontos-chave do funil. O evento entra na pagina ativa como tipo `custom`, junto com os demais:
 
 ```ts
-import { enviarEvento } from '@danpqdan/dsplayground-analytics-sdk';
+import { enviarEvento } from '@dsplayground-analytics/sdk';
 
 enviarEvento('checkout_iniciado', {
   plano: 'pro',
