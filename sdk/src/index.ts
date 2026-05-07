@@ -29,6 +29,7 @@ export {
   StorageLocalStorage,
   StorageIndexedDB,
   criarStorageFila,
+  BACKOFF_RETRY_MS,
   type StorageFila,
   type ItemFila,
 } from './filaAnalytics.ts';
