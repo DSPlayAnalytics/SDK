@@ -1,1 +1,0 @@
-This folder contains the built output assets for the worker "comercial" generated at 2026-04-30T02:42:11.689Z.
