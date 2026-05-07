@@ -1,7 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { FilaAnalytics, StorageMemoria, BACKOFF_RETRY_MS } from '../src/filaAnalytics.ts';
-import type { StorageFila } from '../src/filaAnalytics.ts';
+import {
+  FilaAnalytics,
+  StorageMemoria,
+  DeadLetterStore,
+  BACKOFF_RETRY_MS,
+  derivarPrioridade,
+} from '../src/filaAnalytics.ts';
+import type { StorageFila, ItemDeadLetter } from '../src/filaAnalytics.ts';
 import type { HeatmapDados } from '../src';
 
 const criarPayload = (marca: string): HeatmapDados => ({
@@ -220,5 +226,111 @@ describe('FilaAnalytics', () => {
       // 6a tentativa -> clampa no backoff[4] = 1600
       expect(atualizado!.proximaTentativaApos).toBeGreaterThanOrEqual(antes + 1600);
     });
+  });
+});
+
+describe('derivarPrioridade — Onda 2', () => {
+  const payload = (tipos: string[]): HeatmapDados => ({
+    id_registro: 'x',
+    timestamp_inicial: 1000,
+    timestamp_final: 2000,
+    paginas: {
+      '/': [{ eventos: tipos.map((tipo) => ({ tipo, timestamp: 1500 })) }],
+    },
+  } as unknown as HeatmapDados);
+
+  it('mouse_move → baixa', () => {
+    expect(derivarPrioridade(payload(['mouse_move']))).toBe('baixa');
+  });
+
+  it('hover → baixa', () => {
+    expect(derivarPrioridade(payload(['hover']))).toBe('baixa');
+  });
+
+  it('scroll_depth → normal', () => {
+    expect(derivarPrioridade(payload(['scroll_depth']))).toBe('normal');
+  });
+
+  it('touch → normal', () => {
+    expect(derivarPrioridade(payload(['touch']))).toBe('normal');
+  });
+
+  it('click → alta', () => {
+    expect(derivarPrioridade(payload(['click']))).toBe('alta');
+  });
+
+  it('page_view → alta', () => {
+    expect(derivarPrioridade(payload(['page_view']))).toBe('alta');
+  });
+
+  it('page_exit → alta', () => {
+    expect(derivarPrioridade(payload(['page_exit']))).toBe('alta');
+  });
+
+  it('web_vital → alta', () => {
+    expect(derivarPrioridade(payload(['web_vital']))).toBe('alta');
+  });
+
+  it('mistura mouse_move + click eleva para alta', () => {
+    expect(derivarPrioridade(payload(['mouse_move', 'click']))).toBe('alta');
+  });
+
+  it('mistura hover + scroll_depth sem alta → normal', () => {
+    expect(derivarPrioridade(payload(['hover', 'scroll_depth']))).toBe('normal');
+  });
+
+  it('payload sem paginas → normal', () => {
+    expect(derivarPrioridade({ id_registro: 'x', timestamp_inicial: 0, timestamp_final: 1, paginas: {} } as unknown as HeatmapDados)).toBe('baixa');
+  });
+});
+
+describe('DeadLetterStore — Onda 2', () => {
+  const item = (ts: number): ItemDeadLetter => ({
+    idRegistro: 'reg-' + ts,
+    tentativas: 5,
+    ultimoErro: 'TIMEOUT',
+    ts,
+  });
+
+  beforeEach(() => {
+    // limpa localStorage entre testes
+    if (typeof localStorage !== 'undefined') localStorage.clear();
+  });
+
+  it('adicionar e ler retorna o item', () => {
+    const store = new DeadLetterStore();
+    store.adicionar(item(Date.now()));
+    expect(store.ler()).toHaveLength(1);
+  });
+
+  it('limpar esvazia', () => {
+    const store = new DeadLetterStore();
+    store.adicionar(item(Date.now()));
+    store.limpar();
+    expect(store.ler()).toHaveLength(0);
+  });
+
+  it('purga itens com TTL expirado (> 24h)', () => {
+    const store = new DeadLetterStore();
+    const velho = Date.now() - 25 * 60 * 60 * 1000; // 25h atras
+    store.adicionar(item(velho));
+    expect(store.ler()).toHaveLength(0);
+  });
+
+  it('respeita limite de 100 itens (FIFO — descarta os mais antigos)', () => {
+    const store = new DeadLetterStore();
+    const agora = Date.now();
+    for (let i = 0; i < 105; i++) store.adicionar(item(agora + i));
+    expect(store.ler()).toHaveLength(100);
+    // os 5 primeiros foram descartados; o mais antigo restante e o de indice 5
+    expect(store.ler()[0].idRegistro).toBe('reg-' + (agora + 5));
+  });
+
+  it('nova instancia le do localStorage (persistencia entre reloads)', () => {
+    const store1 = new DeadLetterStore();
+    store1.adicionar(item(Date.now()));
+
+    const store2 = new DeadLetterStore();
+    expect(store2.ler()).toHaveLength(1);
   });
 });
