@@ -18,14 +18,14 @@ jobs:
       contents: read
       pull-requests: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4
         with:
           # Full history pra scan reverter regressoes (commit que vazou
           # secret e foi revertido depois — gitleaks ainda pega).
           fetch-depth: 0
 
       - name: Run gitleaks
-        uses: gitleaks/gitleaks-action@v2
+        uses: gitleaks/gitleaks-action@v2  # TODO: pin to SHA quando subir pra v2.x estavel
         env:
           # Sem licenca, action roda em modo OSS (community rules + custom config).
           GITLEAKS_CONFIG: .gitleaks.toml
@@ -37,9 +37,9 @@ jobs:
     name: npm audit (high+ em prod deps)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e  # v4
         with:
           node-version: '20'
           cache: 'npm'
@@ -53,9 +53,9 @@ jobs:
   build-and-test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e  # v4
         with:
           node-version: '20'
           cache: 'npm'
