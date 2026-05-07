@@ -18,7 +18,7 @@ Este arquivo guia o Claude Code ao operar esta VPS. O foco e gerencia de servido
 - App: `backend/` (Flask + Socket.IO + InfluxDB + Postgres), `frontend/` (React + Vite, build estatico servido por nginx:alpine)
 - **Repos externos relacionados** (este monorepo NAO contem o codigo deles, mas depende):
   - **`landing/` aqui e ESPELHO MANUAL** do repo `danpqdan/comercial` (CF Pages builda do `comercial`, nao deste repo). Mudancas em `landing/` SEM replicar no `comercial` ficam invisiveis em prod do apex `dsplayground.com.br`.
-  - **SDK de analytics** vive no repo separado `danpqdan/dsplayground-analytics-sdk` (publico, GitHub Packages). Frontend consome como dep npm `@danpqdan/dsplayground-analytics-sdk`. **Nao tem pasta `sdk/` aqui** — pra mexer no SDK, ir no repo dele.
+  - **SDK de analytics** vive no repo separado `DSPlayAnalytics/SDK` (publico, npmjs.com `@dsplayground-analytics/sdk`). Landing consome como dep npm. **Nao tem pasta `sdk/` aqui** — pra mexer no SDK, ir no repo dele.
   - Detalhes operacionais: `ark/docs/embed-iframe.md` -> "Gotchas conhecidos da Fase 1" #2.
 - Leitura obrigatoria antes de mexer em app: `/opt/portifolio/AGENTS.md` e `/opt/portifolio/README.md`
 - Leitura obrigatoria antes de mexer em infra: `/opt/portifolio/ark/README.md` e `/opt/portifolio/ark/docs/servidor-producao.md` (**este e a fonte canonica da arquitetura atual** — CLAUDE.md e resumo)
@@ -201,9 +201,9 @@ Detalhes do plano de migracao para CORS dinamico (por `sites.dominios_permitidos
 - ✅ Certbot removido; CF Origin Cert e a unica fonte de TLS (validade ate 2041).
 - ✅ Prometheus (`9090`) e node-exporter (`9100`) bindam em `127.0.0.1` no `ark/monitoring/docker-compose.monitoring.yml`. Sem porta publica externa.
 
-**Codigo pronto no repo, falta efetivar via ansible-apply:**
-- 🟡 Logger root do Flask separado do `security_logger` em `backend/app.py:91-96` (`propagate = False`, file handler exclusivo no logger nomeado `security`).
-- 🟡 `roles/analytics-stack/tasks/main.yml` ja tem `when: not ansible_check_mode` nas tasks de health.
+**Aplicados via commit (2026-05-06):**
+- ✅ Logger root do Flask separado do `security_logger` em `backend/app.py:91-96` (`propagate = False`, file handler exclusivo no logger nomeado `security`).
+- ✅ `roles/analytics-stack/tasks/main.yml` tem `when: not ansible_check_mode` nas tasks de health.
 
 **A confirmar via SSH (so dah pra validar no host):**
 - 🔍 **Vault encryption:** `group_vars/all.yml` na VPS deve estar criptografado (`$ANSIBLE_VAULT;1.1;AES256` na primeira linha).
@@ -245,6 +245,48 @@ Vitest: 245/245 verde. astro check 0 errors. astro build 18 paginas.
 **Workflow worktree:** trabalho em `D:/comercial-wt`, `D:/portifolio-wt`, `D:/portifolio-fix2/3` (criados ad-hoc com `git worktree add`) pra nao conflitar com working tree principal. Removidos no fim de cada PR.
 
 **Nao e mais pendencia (do bloco anterior):** instalacao do bouncer-nginx via packagecloud — bouncer (`crowdsec-firewall-bouncer-nftables`) ja vem por default com a instalacao do CrowdSec via repo oficial.
+
+## Como ativar email transacional (Resend)
+
+Sem `RESEND_API_KEY`, magic-link e recuperacao de senha caem no stdout do container (inviavel em prod).
+
+```bash
+# 1. resend.com → criar conta → Add Domain → adicionar DNS SPF/DKIM/DMARC no CF
+# 2. API Keys → criar sending key (escopo dominio dsplayground.com.br)
+# 3. Adicionar ao vault:
+cd ark/ansible && ansible-vault edit group_vars/all.yml
+# setar: resend_api_key: "re_xxxx..."  e  email_from: "no-reply@dsplayground.com.br"
+
+# 4. Aplicar:
+make -f ark/Makefile ansible-apply
+# Valida:
+docker exec portifolio-backend env | grep RESEND_API_KEY
+```
+
+Fallback stdout continua ativo em dev local (RESEND_API_KEY ausente = stdout sender automatico).
+
+## Como ativar billing Stripe em prod
+
+Codigo pronto em `backend/billing/`. Requer apenas variaveis no vault:
+
+```bash
+# Variaveis necessarias:
+#   stripe_api_key        — painel Stripe → Developers → API keys (Secret key)
+#   stripe_price_ids      — JSON: {"free":"price_xxx","pro":"price_yyy"}
+#   stripe_webhook_secret — painel Stripe → Webhooks → endpoint secret (whsec_...)
+#   billing_success_url   — ex: "https://dsplayground.com.br/cliente/painel?plano=ok"
+#   billing_cancel_url    — ex: "https://dsplayground.com.br/precos"
+
+cd ark/ansible && ansible-vault edit group_vars/all.yml
+# setar as 5 vars acima com valores reais
+
+make -f ark/Makefile ansible-apply
+# Valida:
+docker exec portifolio-backend env | grep STRIPE_API_KEY
+```
+
+Endpoint webhook Stripe: `https://api.dsplayground.com.br/billing/webhook`
+Eventos necessarios: `payment_intent.succeeded`, `customer.subscription.updated`, `customer.subscription.deleted`.
 
 ## Quando em duvida
 

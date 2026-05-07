@@ -95,9 +95,19 @@ r2_bucket: "dsplayground-analytics-archive"
 archiver_run_on_start: "false"
 
 # === Stripe billing (preencher via ansible-vault edit) ===
+# stripe_api_key    — painel Stripe → Developers → API keys (Secret key sk_live_...)
+# stripe_price_ids  — JSON com price_id por plano: {"free":"price_xxx","pro":"price_yyy"}
+#                     painel Stripe → Products → preco criado → copiar Price ID
+# stripe_webhook_secret — painel Stripe → Webhooks → endpoint → Signing secret (whsec_...)
+#                         endpoint: https://api.dsplayground.com.br/billing/webhook
+#                         eventos: payment_intent.succeeded, customer.subscription.updated/deleted
+# billing_success_url — URL de retorno pos-checkout bem-sucedido
+# billing_cancel_url  — URL de retorno se cliente cancelar o checkout
 stripe_api_key: ""
 stripe_price_ids: "{}"
 stripe_webhook_secret: ""
+billing_success_url: "https://dsplayground.com.br/cliente/painel?plano=ok"
+billing_cancel_url: "https://dsplayground.com.br/precos"
 
 # === Landing comercial (apex dsplayground.com.br) ===
 # PAT GitHub com `read:packages` — baixa @danpqdan/dsplayground-analytics-sdk

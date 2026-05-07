@@ -13,7 +13,7 @@ O frontend tem duas responsabilidades: renderizar a experiência atual do portf�
 - `backend/dto/`: objetos de transferência usados para analytics.
 - `frontend/src/components/`, `pages/`, `hooks/`, `utils/`: UI, telas e utilitários de coleta/envio.
 - `landing/`: **espelho manual** da landing comercial — repo canônico é `danpqdan/comercial` (CF Pages builda dele). Qualquer alteração aqui em `landing/` precisa ser replicada no `comercial` para chegar em produção no apex `dsplayground.com.br`. Não é submodule, não há sync automático. Ver `ark/docs/embed-iframe.md` → "Gotchas conhecidos da Fase 1" para histórico do problema.
-- **SDK** (`@danpqdan/dsplayground-analytics-sdk`): repo separado público em `danpqdan/dsplayground-analytics-sdk`, consumido aqui via npm package. **Não há pasta `sdk/` aqui** — extraído em 2026-04-28. Para mexer no SDK, ir no repo dedicado e fazer release; consumidores (este repo + `comercial`) atualizam `package.json` + `npm install`. Detalhes operacionais no README do SDK.
+- **SDK** (`@dsplayground-analytics/sdk`): repo separado público em `DSPlayAnalytics/SDK` (npmjs.com), consumido aqui via npm package. **Não há pasta `sdk/` aqui** — extraído em 2026-04-28. Para mexer no SDK, ir no repo dedicado e fazer release; consumidores (este repo + `landing`) atualizam `package.json` + `npm install`. Detalhes operacionais no README do SDK.
 - `ark/`: infraestrutura (Nginx, Ansible, CrowdSec, monitoring) — ver `ark/docs/servidor-producao.md` (canônico).
 - `docs/`: documentação técnica, deploy, InfluxDB e histórico de correções.
 - `continue/`: problemas encontrados, decisões em aberto e próximos passos documentados.
