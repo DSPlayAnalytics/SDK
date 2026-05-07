@@ -543,7 +543,7 @@ docker exec portifolio-influxdb influx backup /var/lib/influxdb2/backups
 | ✅ ~~**P2**~~ | ~~Tags derivadas server-side: `device_type`, `pais` (GeoIP), `referrer_dominio`~~ — **feito 2026-05-02**, `backend/ingestao/derivacoes.py` | — | — | — |
 | ✅ ~~**P2**~~ | ~~Org-per-cliente fim-a-fim no Grafana: `/gate` força membership idempotente~~ — **implementado**, `backend/auth/grafana_sync.py` com `GrafanaSyncService` (TTL cache 1h, idempotente via add_org_user + set_user_current_org); ativado quando `GRAFANA_URL` + creds presentes | — | — | — |
 | 🟢 **P3** | Backend `/metrics` Prometheus-client | Dashboards de operação | `backend/app.py` + scrape config | 1d |
-| 🟢 **P3** | DNS Cloudflare: criar `portifolio.dsplayground.com.br` A proxiado — **documentado em `ark/ambiente-c/dns-cloudflare.md`** (tabela completa de subdominios); falta apenas clicar no painel CF | Subdomínio portfolio pessoal não resolve | painel CF | 5min |
+| ✅ ~~**P3**~~ | ~~DNS Cloudflare: `portifolio.dsplayground.com.br`~~ — **ativo**, registro A proxiado confirmado no painel CF | — | — | — |
 | 🟢 **P3** | Validação E2E nos 5 cenários de recovery em `ark/teste-ambiente-{a,b}` | SLO interno antes de virar chave comercial | `ark/teste-ambiente-*/` | 1-2d cada |
 | 🟢 **P3** | 2FA TOTP no dashboard do cliente | v2 — não MVP | `sessao_service.py` + `clientes_users.totp_secret` | 3-5d |
 | ✅ ~~**P3**~~ | ~~Migração backup → S3-compatible~~ — **feito 2026-05-01 direto**, R2 desde dia 1 (free tier 10 GB cobre ~55 clientes plano medio). Pulou fase intermediaria de backup local. | — | — | — |
