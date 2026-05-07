@@ -22,6 +22,30 @@ const ESTADO = {
   SEM_DADOS: 'sem_dados',
 };
 
+// Tokens alinhados com o design system do landing (slate + brand azul)
+const C = {
+  bg:        '#0b0f1a',
+  bgBar:     '#111827',
+  borda:     'rgba(148,163,184,0.12)',
+  texto:     '#cbd5e1',
+  muted:     '#64748b',
+  marca:     '#549cf0',
+  marcaBg:   'rgba(84,156,240,0.7)',
+  perigo:    '#f87171',
+  aviso:     '#fbbf24',
+  grade:     'rgba(148,163,184,0.07)',
+  tooltip:   '#1a2235',
+};
+
+const SKELETON_ALTS = [60, 40, 80, 55, 70, 45, 65, 50, 75, 30, 60, 50];
+
+const CSS_EMBED = `
+  @keyframes embed-pulse {
+    0%,100% { opacity:.35; }
+    50%      { opacity:.75; }
+  }
+`;
+
 function postParaParent(mensagem) {
   if (window.parent && window.parent !== window) {
     window.parent.postMessage(mensagem, '*');
@@ -30,10 +54,43 @@ function postParaParent(mensagem) {
 
 async function fetchDados(siteId, graficoId, token) {
   const url = `${API_URL.replace(/\/$/, '')}/embed/dados/${siteId}/${graficoId}`;
-  const resp = await fetch(url, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
-  return resp;
+  return fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+}
+
+function Skeleton() {
+  return (
+    <div style={{ display:'flex', alignItems:'flex-end', gap:6, height:'100%', padding:'4px 0' }}>
+      {SKELETON_ALTS.map((h, i) => (
+        <div
+          key={i}
+          style={{
+            flex: 1,
+            height: `${h}%`,
+            borderRadius: '4px 4px 0 0',
+            background: C.bgBar,
+            border: `1px solid ${C.borda}`,
+            animation: `embed-pulse 1.4s ease-in-out ${(i * 0.08).toFixed(2)}s infinite`,
+          }}
+        />
+      ))}
+    </div>
+  );
+}
+
+function Estado({ icone, titulo, descricao, cor }) {
+  return (
+    <div style={{
+      display:'flex', flexDirection:'column', alignItems:'center',
+      justifyContent:'center', height:'100%', gap:8,
+      textAlign:'center', padding:'0 20px',
+    }}>
+      <span style={{ fontSize:28 }} role="img" aria-hidden="true">{icone}</span>
+      <p style={{ margin:0, fontWeight:600, fontSize:14, color: cor ?? C.texto }}>{titulo}</p>
+      {descricao && (
+        <p style={{ margin:0, fontSize:12, color: C.muted, lineHeight:1.5 }}>{descricao}</p>
+      )}
+    </div>
+  );
 }
 
 export default function EmbedWidget() {
@@ -46,17 +103,29 @@ export default function EmbedWidget() {
   const [pontos, setPontos] = useState([]);
   const inicioRef = useRef(performance.now());
 
+  // Injeta CSS de animacao uma unica vez
   useEffect(() => {
-    function onMensagem(ev) {
+    if (!document.getElementById('embed-widget-css')) {
+      const el = document.createElement('style');
+      el.id = 'embed-widget-css';
+      el.textContent = CSS_EMBED;
+      document.head.appendChild(el);
+    }
+  }, []);
+
+  // Escuta renovacao de token enviada pelo host via postMessage
+  useEffect(() => {
+    function onMsg(ev) {
       if (!ev.data || typeof ev.data !== 'object') return;
       if (ev.data.tipo === 'embed.token_renovado' && typeof ev.data.token === 'string') {
         setToken(ev.data.token);
       }
     }
-    window.addEventListener('message', onMensagem);
-    return () => window.removeEventListener('message', onMensagem);
+    window.addEventListener('message', onMsg);
+    return () => window.removeEventListener('message', onMsg);
   }, []);
 
+  // Carrega dados quando token/grafico muda
   useEffect(() => {
     let cancelado = false;
     if (!token) {
@@ -76,11 +145,7 @@ export default function EmbedWidget() {
         }
         if (!resp.ok) {
           setEstado(ESTADO.ERRO_REDE);
-          postParaParent({
-            tipo: 'embed.erro',
-            codigo: 'erro_servidor',
-            status: resp.status,
-          });
+          postParaParent({ tipo: 'embed.erro', codigo: 'erro_servidor', status: resp.status });
           return;
         }
         const body = await resp.json();
@@ -105,74 +170,101 @@ export default function EmbedWidget() {
         postParaParent({ tipo: 'embed.erro', codigo: 'erro_rede' });
       });
 
-    return () => {
-      cancelado = true;
-    };
+    return () => { cancelado = true; };
   }, [siteId, graficoId, token]);
 
-  const chartData = useMemo(() => {
-    const labels = pontos.map((p) => p.page_type || 'desconhecido');
-    const valores = pontos.map((p) => Number(p?.totais?.visualizacoes || 0));
-    return {
-      labels,
-      datasets: [
-        {
-          label: 'Visualizações',
-          data: valores,
-          backgroundColor: 'rgba(99, 102, 241, 0.7)',
-          borderColor: 'rgba(99, 102, 241, 1)',
-          borderWidth: 1,
-        },
-      ],
-    };
-  }, [pontos]);
+  const chartData = useMemo(() => ({
+    labels: pontos.map((p) => p.page_type || 'desconhecido'),
+    datasets: [{
+      label: 'Visualizações',
+      data: pontos.map((p) => Number(p?.totais?.visualizacoes || 0)),
+      backgroundColor: C.marcaBg,
+      borderColor: C.marca,
+      borderWidth: 1,
+      borderRadius: 4,
+      borderSkipped: false,
+    }],
+  }), [pontos]);
 
-  const chartOptions = useMemo(
-    () => ({
-      responsive: true,
-      maintainAspectRatio: false,
-      plugins: {
-        legend: { display: true, position: 'top' },
-        title: { display: false },
+  const chartOptions = useMemo(() => ({
+    responsive: true,
+    maintainAspectRatio: false,
+    animation: { duration: 400 },
+    plugins: {
+      legend: {
+        display: true,
+        position: 'top',
+        labels: { color: C.texto, boxWidth: 12, font: { size: 12 } },
       },
-      scales: {
-        y: { beginAtZero: true, ticks: { precision: 0 } },
+      title: { display: false },
+      tooltip: {
+        backgroundColor: C.tooltip,
+        titleColor: C.texto,
+        bodyColor: C.muted,
+        borderColor: C.borda,
+        borderWidth: 1,
+        padding: 10,
+        cornerRadius: 6,
       },
-    }),
-    [],
-  );
+    },
+    scales: {
+      x: {
+        ticks: { color: C.muted, font: { size: 11 } },
+        grid: { color: C.grade },
+        border: { color: C.borda },
+      },
+      y: {
+        beginAtZero: true,
+        ticks: { precision: 0, color: C.muted, font: { size: 11 } },
+        grid: { color: C.grade },
+        border: { color: C.borda },
+      },
+    },
+  }), []);
 
   return (
     <div
       style={{
         height: '100dvh',
         width: '100vw',
-        padding: 12,
-        background: '#0b0b14',
-        color: '#e6e6f0',
-        fontFamily: 'system-ui, sans-serif',
+        padding: 16,
+        background: C.bg,
+        color: C.texto,
+        fontFamily: '"Inter", system-ui, sans-serif',
         boxSizing: 'border-box',
         display: 'flex',
         flexDirection: 'column',
       }}
       data-testid="embed-widget"
     >
-      {estado === ESTADO.CARREGANDO && (
-        <p role="status" style={{ margin: 0 }}>Carregando…</p>
-      )}
+      {estado === ESTADO.CARREGANDO && <Skeleton />}
+
       {estado === ESTADO.ERRO_TOKEN && (
-        <p role="alert" style={{ margin: 0, color: '#f87171' }}>
-          Sessão de embed expirada. Recarregue para reautenticar.
-        </p>
+        <Estado
+          icone="🔒"
+          titulo="Sessão expirada"
+          descricao="Recarregue a página para continuar"
+          cor={C.perigo}
+        />
       )}
+
       {estado === ESTADO.ERRO_REDE && (
-        <p role="alert" style={{ margin: 0, color: '#fbbf24' }}>
-          Não foi possível carregar os dados.
-        </p>
+        <Estado
+          icone="⚠️"
+          titulo="Não foi possível carregar"
+          descricao="Verifique sua conexão e tente novamente"
+          cor={C.aviso}
+        />
       )}
+
       {estado === ESTADO.SEM_DADOS && (
-        <p role="status" style={{ margin: 0 }}>Sem dados no período.</p>
+        <Estado
+          icone="📊"
+          titulo="Sem dados no período"
+          descricao="Quando chegarem eventos, o gráfico aparece aqui"
+        />
       )}
+
       {estado === ESTADO.PRONTO && (
         <div style={{ flex: 1, minHeight: 0 }} data-testid="embed-grafico">
           <Bar data={chartData} options={chartOptions} />

@@ -103,17 +103,26 @@
   become_user: "{{ deploy_user }}"
   changed_when: false
 
-# Cleanup de containers parados antes de subir a stack.
+# Cleanup de containers e imagens dangling antes de subir a stack.
 #
-# Bug observado em 2026-05-02: `community.docker.docker_compose_v2` chama
-# `docker compose images --format json` pra detectar mudancas, mas se algum
-# container parado aponta pra imagem que foi removida (rebuild anterior +
-# image prune), o subprocess retorna "No such image: sha256:<id>" no stderr
-# e quebra o parser JSON. Erro: "Expecting value: line 1 column 1 (char 0)".
-# Prune antes de subir cura — remove containers parados orfaos sem afetar
-# os em execucao.
+# Bug observado em 2026-05-02 (e reincidente): `community.docker.docker_compose_v2`
+# chama `docker compose images --format json` pra detectar mudancas. Se qualquer
+# imagem referenciada pelo compose state foi removida do daemon (rebuild anterior
+# + prune automatico), o subprocesso retorna "No such image: sha256:<id>" no
+# stderr e quebra o parser JSON — "Expecting value: line 1 column 1 (char 0)".
+#
+# Dois pruges necessarios:
+#   1. container prune — remove containers parados que apontam pra imagens stale
+#   2. image prune     — remove imagens dangling (sem tag, sem container ativo)
+#      que o daemon ainda registra mas cujo conteudo foi parcialmente removido
+# Ambos sao safe em producao: nao afetam containers rodando nem imagens tagueadas.
 - name: Limpar containers parados orfaos (evita bug compose images JSON)
   command: docker container prune -f
+  become_user: "{{ deploy_user }}"
+  changed_when: false
+
+- name: Limpar imagens dangling (evita SHA stale no compose images JSON)
+  command: docker image prune -f
   become_user: "{{ deploy_user }}"
   changed_when: false
 

@@ -542,6 +542,10 @@ try:
         tenants_repo=_tenants_repo_singleton,
         clientes_users_repo=_clientes_users_repo,
     )
+    # Injeta email_sender + clientes_users_repo no servico de ingestao para
+    # que alertas de cardinalidade (80%/95%) cheguem por email ao dono do site.
+    servico_ingestao.email_sender = _cliente_routes_mod._obter_email_sender()
+    servico_ingestao.clientes_users_repo = _clientes_users_repo
     app.register_blueprint(_cliente_routes_mod.cliente_auth_bp)
     # /cliente/auth/gate e endpoint interno chamado pelo nginx auth_request
     # a cada request de Grafana embed (assets, datasources, etc). Sob default

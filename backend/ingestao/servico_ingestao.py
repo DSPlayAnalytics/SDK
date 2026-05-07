@@ -162,7 +162,8 @@ class ServicoIngestao:
     """
 
     def __init__(self, influxdb_service=None, sites_cache=None, tenants_repo=None,
-                 cardinalidade_tracker: Optional[TrackerCardinalidade] = None):
+                 cardinalidade_tracker: Optional[TrackerCardinalidade] = None,
+                 email_sender=None, clientes_users_repo=None):
         self.influxdb_service = influxdb_service
         self.sites_cache = sites_cache
         # tenants_repo: usado para enforcement de quota (sec 18 do dashboard-cliente.md).
@@ -171,6 +172,10 @@ class ServicoIngestao:
         # cardinalidade_tracker: enforcement por plano (sec 20). Sem tracker
         # nao ha enforcement — preserva compat com testes que nao se importam.
         self.cardinalidade_tracker = cardinalidade_tracker
+        # email_sender + clientes_users_repo: notifica o dono do site quando
+        # cardinalidade atinge 80%/95% do limite. Opcionais — sem eles so loga.
+        self.email_sender = email_sender
+        self.clientes_users_repo = clientes_users_repo
         self._cache = obter_cache_idempotencia()
         self._ultimos = obter_registro_ultimo()
         self._sequenciador = obter_sequenciador()
@@ -458,6 +463,7 @@ class ServicoIngestao:
                 emitir_log(logger, logging.WARNING, 'cardinalidade_alerta',
                            site_id=site_id, plano=plano, limite=limite,
                            nivel_pct=nivel, total=total)
+                self._enviar_email_cardinalidade(site_id, plano, limite, nivel, total)
             return None
         emitir_log(logger, logging.WARNING, 'rejeitado_cardinalidade_excedida',
                    session_id=session_id, id_registro=id_registro,
@@ -473,6 +479,58 @@ class ServicoIngestao:
             erros=[tag_dominante or 'tags'],
             retriable=False,
         )
+
+    def _enviar_email_cardinalidade(
+        self,
+        site_id: str,
+        plano: Optional[str],
+        limite: int,
+        nivel_pct: int,
+        total: int,
+    ) -> None:
+        """Envia email de alerta de cardinalidade ao dono do site. Best-effort."""
+        if not self.email_sender or not self.clientes_users_repo:
+            return
+        try:
+            user = self.clientes_users_repo.obter_user_por_site(site_id)
+            if user is None:
+                return
+            slug = site_id
+            if self.sites_cache:
+                site = self.sites_cache.obter_site(site_id)
+                if site:
+                    slug = site.slug
+            if nivel_pct >= 95:
+                assunto = f"[dsplayground] URGENTE: cardinalidade em 95% — {slug}"
+                detalhe = (
+                    f"Seu site está usando {total} valores únicos de tags, "
+                    f"equivalente a {nivel_pct}% do limite do plano {plano or 'free'} ({limite}).\n\n"
+                    f"Novos eventos com combinações de tags inéditas serão recusados "
+                    f"quando o limite for atingido. Considere fazer upgrade do plano "
+                    f"ou revisar a diversidade de valores de tags no SDK."
+                )
+            else:
+                assunto = f"[dsplayground] Cardinalidade em {nivel_pct}% — {slug}"
+                detalhe = (
+                    f"Seu site está usando {total} valores únicos de tags, "
+                    f"equivalente a {nivel_pct}% do limite do plano {plano or 'free'} ({limite}).\n\n"
+                    f"Se continuar crescendo, novos eventos poderão ser recusados "
+                    f"quando o limite for atingido."
+                )
+            corpo = (
+                f"{detalhe}\n\n"
+                f"Acompanhe seus dados em https://app.dsplayground.com.br/cliente/metricas\n"
+                f"Configurações: https://dsplayground.com.br/cliente/configuracoes\n\n"
+                f"—\ndsplayground.com.br"
+            )
+            self.email_sender.enviar(
+                destinatario=user.email,
+                assunto=assunto,
+                corpo_texto=corpo,
+            )
+        except Exception as exc:  # noqa: BLE001
+            logger.error("evento=email_cardinalidade_falhou site_id=%s motivo=%s",
+                         site_id, exc)
 
     def _quota_excedida(self, site_id: Optional[str]) -> bool:
         """Verifica `consumo_diario.eventos >= quotas.eventos_por_dia`.

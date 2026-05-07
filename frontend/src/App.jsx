@@ -8,7 +8,7 @@ import About from './pages/About';
 import ClienteLogin from './pages/ClienteLogin';
 import ClienteMetricas from './pages/ClienteMetricas';
 import EmbedWidget from './pages/EmbedWidget';
-import { iniciarAnalytics, enviarEvento, trackConversion } from '@danpqdan/dsplayground-analytics-sdk';
+import { iniciarAnalytics, enviarEvento, trackConversion } from '@dsplayground-analytics/sdk';
 import { WEBSOCKET_URL, DEBUG_ENABLED, NODE_ENV, PUBLISHABLE_KEY } from './config.js';
 
 const AMBIENTES_SUPORTADOS = ['development', 'test', 'staging', 'production'];
