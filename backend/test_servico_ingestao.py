@@ -171,6 +171,41 @@ class ServicoIngestaoFluxoInvalidoTest(unittest.TestCase):
         resumo = servico.ingerir(session_id='s1', data=payload)
         self.assertEqual(resumo.status, 'error')
         self.assertEqual(resumo.code, 'INVALID_TIMESTAMP')
+        self.assertFalse(resumo.retriable)
+        self.assertIsNotNone(resumo.server_time_ms)
+
+    def test_timestamp_no_futuro_rejeita(self):
+        servico = ServicoIngestao(influxdb_service=InfluxDBCapturador())
+        payload = payload_valido("sessao-futuro")
+        agora = int(time.time() * 1000)
+        payload['timestamp_inicial'] = agora + 10 * 60 * 1000  # 10min no futuro
+        payload['timestamp_final'] = agora + 11 * 60 * 1000
+        resumo = servico.ingerir(session_id='s1', data=payload)
+        self.assertEqual(resumo.status, 'error')
+        self.assertEqual(resumo.code, 'INVALID_TIMESTAMP')
+        self.assertFalse(resumo.retriable)
+
+    def test_timestamp_final_anterior_ao_inicial_rejeita(self):
+        servico = ServicoIngestao(influxdb_service=InfluxDBCapturador())
+        payload = payload_valido("sessao-inv")
+        agora = int(time.time() * 1000)
+        payload['timestamp_inicial'] = agora - 1000
+        payload['timestamp_final'] = agora - 5000  # final < inicial
+        resumo = servico.ingerir(session_id='s1', data=payload)
+        self.assertEqual(resumo.status, 'error')
+        self.assertEqual(resumo.code, 'INVALID_TIMESTAMP')
+        self.assertFalse(resumo.retriable)
+
+    def test_janela_maior_que_1h_rejeita(self):
+        servico = ServicoIngestao(influxdb_service=InfluxDBCapturador())
+        payload = payload_valido("sessao-longa")
+        agora = int(time.time() * 1000)
+        payload['timestamp_inicial'] = agora - 90 * 60 * 1000  # 90min atras
+        payload['timestamp_final'] = agora - 29 * 60 * 1000   # 29min atras => janela = 61min
+        resumo = servico.ingerir(session_id='s1', data=payload)
+        self.assertEqual(resumo.status, 'error')
+        self.assertEqual(resumo.code, 'INVALID_TIMESTAMP')
+        self.assertFalse(resumo.retriable)
 
     def test_resumo_to_dict_schema_1_2_erro(self):
         resumo = ResumoIngestao(

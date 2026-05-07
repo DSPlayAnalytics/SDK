@@ -25,6 +25,7 @@ export { UserStore, criarUserStoreMemoria, userStore } from './identidade/userSt
 
 export {
   FilaAnalytics,
+  DeadLetterStore,
   StorageMemoria,
   StorageLocalStorage,
   StorageIndexedDB,
@@ -32,4 +33,5 @@ export {
   BACKOFF_RETRY_MS,
   type StorageFila,
   type ItemFila,
+  type ItemDeadLetter,
 } from './filaAnalytics.ts';

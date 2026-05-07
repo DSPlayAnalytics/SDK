@@ -523,7 +523,7 @@ docker exec portifolio-influxdb influx backup /var/lib/influxdb2/backups
 
 | Prio | Item | Bloqueia | Onde | Estimativa |
 |---|---|---|---|---|
-| 🟢 **P2** | **CrowdSec nginx-bouncer task ansible** — packagecloud retorna HTML (404). `ignore_errors: true` adicionado em 2026-04-30 pra ansible-apply não abortar; firewall-bouncer (nftables) já cobre. Decidir: abandonar nginx-bouncer ou instalar `.rpm` direto | Próximos `ansible-apply` continuam verdes | `ark/ansible/roles/crowdsec/tasks/main.yml` | 30min |
+| ✅ ~~**P2**~~ | ~~CrowdSec nginx-bouncer task ansible~~ — task atual em `ark/ansible/roles/crowdsec/tasks/main.yml` ja esta limpa (sem `ignore_errors`, sem nginx-bouncer); firewall-bouncer-nftables instalado pelo script oficial `install.crowdsec.net` | — | — | — |
 | 🟢 **P3** | **Decidir destino do `landing/` no monorepo** — hoje é espelho da canônica em CF Pages (`comercial`). Manter como fallback até Phase 4 da migração ou remover já | `deploy.yml` rebuilda landing redundante | `landing/` + `docker-compose.yml` + `deploy.yml` | 1h se decidir remover |
 | 🟡 **P1** | **Email transacional (Resend)** — sem isso magic-link em prod cai no stdout do container = "esqueci senha" totalmente quebrado | Recover password de cliente real | `group_vars/all.yml` + `email_sender.py` (já tem stub) | 0.5d |
 | 🟡 **P1** | **Email do produto `contato@dsplayground.com.br`** — landing referencia (plano Business). Cloudflare Email Routing → forward Gmail (free) é o caminho mais rápido | UX de contato comercial | painel CF | 1-2h |
@@ -537,7 +537,7 @@ docker exec portifolio-influxdb influx backup /var/lib/influxdb2/backups
 | 🟡 **P1** | Backup offline de credenciais (1Password ou age key + pen drive): vault Ansible, recovery codes, age key dos backups | Recovery em catástrofe | externo + processo | 1-2h |
 | 🚧 **P2** | **Upgrade de plano** — `POST /billing/checkout` implementado (cria sessao Stripe Checkout via urllib, 7 testes); webhook + plano_service ja prontos. Falta: `STRIPE_API_KEY` + `STRIPE_PRICE_IDS` + `STRIPE_WEBHOOK_SECRET` no vault Ansible para ativar em prod | Cliente Pro/Business sem caminho de pagamento | `backend/billing/routes.py`, `backend/billing/stripe_webhook.py` | vault + deploy |
 | ✅ ~~**P2**~~ | ~~Onda 1 do contrato SDK↔Backend: retry exponencial + dead-letter~~ — **feito 2026-05-06**, `sdk/src/filaAnalytics.ts` (`BACKOFF_RETRY_MS`, `proximaTentativaApos`, `incrementarTentativa`); `WebSocketService` acumula dead-letter via `getDeadLetter()`/`limparDeadLetter()`; 138/138 testes verdes | — | — | — |
-| 🟢 **P2** | Onda 2: validação timestamp + skew correction + overflow priority | Onda 3 depende | SDK repo | 2-3d |
+| ✅ ~~**P2**~~ | ~~Onda 2: validação timestamp + skew correction + overflow priority~~ — **feito 2026-05-06**: backend `_validar_timestamps` + 4 testes novos; SDK `derivarPrioridade` refinado (mouse_move/hover→baixa, scroll/touch→normal, click/page_view/…→alta); `DeadLetterStore` localStorage TTL 24h max 100; 154/154 SDK + 450/450 backend verdes | — | — | — |
 | 🟢 **P2** | Onda 3: backpressure dinâmico + schema version negotiation | Coordenação dinâmica em escala | SDK + backend | 2-3d |
 | ✅ ~~**P2**~~ | ~~CORS dinâmico via `sites.dominios_permitidos`~~ — **feito 2026-05-02**, `backend/ingestao/origins_dinamicos.py` consulta `site_dominios` em runtime | — | — | — |
 | ✅ ~~**P2**~~ | ~~Tags derivadas server-side: `device_type`, `pais` (GeoIP), `referrer_dominio`~~ — **feito 2026-05-02**, `backend/ingestao/derivacoes.py` | — | — | — |

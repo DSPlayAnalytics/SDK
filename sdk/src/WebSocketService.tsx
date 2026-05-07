@@ -3,12 +3,14 @@ import { HeatmapDados } from './HeatmapUtils.tsx';
 import type { Ambiente } from './iniciarAnalytics.ts';
 import {
   FilaAnalytics,
+  DeadLetterStore,
   criarStorageFila,
   emitirEventoDeadLetter,
   emitirEventoEnqueueFailed,
   emitirEventoPayloadRejected,
   BACKOFF_RETRY_MS,
   type ItemFila,
+  type ItemDeadLetter,
   type StorageFila,
 } from './filaAnalytics.ts';
 import { AuthClient, SDK_SCHEMA_VERSION, type BackpressureHint } from './authClient.ts';
@@ -61,7 +63,7 @@ class WebSocketService {
   private fila: FilaAnalytics | null = null;
   private emVoo: Set<string> = new Set();
   private tamanhoFilaCache: number = 0;
-  private _deadLetter: Array<{ idRegistro: string | null; tentativas: number; ultimoErro?: string; ts: number }> = [];
+  private _deadLetterStore = new DeadLetterStore();
 
   private realtimeIntervalBaseMs: number = 5000;
   private realtimeIntervalAtualMs: number = 5000;
@@ -376,13 +378,13 @@ class WebSocketService {
             ack?.code ?? 'TIMEOUT',
           );
           if (atualizado && atualizado.tentativas >= MAX_TENTATIVAS) {
-            const entrada = {
+            const entrada: ItemDeadLetter = {
               idRegistro: (item.payload as unknown as { id_registro?: string })?.id_registro ?? null,
               tentativas: atualizado.tentativas,
               ultimoErro: atualizado.ultimoErro,
               ts: Date.now(),
             };
-            this._deadLetter.push(entrada);
+            this._deadLetterStore.adicionar(entrada);
             emitirEventoDeadLetter(entrada);
             await this.fila.confirmar([item.id]);
           }
@@ -525,16 +527,15 @@ class WebSocketService {
   }
 
   /**
-   * Retorna uma copia snapshot dos itens que excederam MAX_TENTATIVAS e foram
-   * descartados da fila (dead-letter). Util para monitoramento ou relay manual.
-   * Chame `limparDeadLetter()` para esvaziar apos inspecionar.
+   * Retorna snapshot dos itens que excederam MAX_TENTATIVAS (dead-letter).
+   * Persiste em localStorage com TTL 24h e limite 100. Veja `limparDeadLetter()`.
    */
-  getDeadLetter(): ReadonlyArray<{ idRegistro: string | null; tentativas: number; ultimoErro?: string; ts: number }> {
-    return [...this._deadLetter];
+  getDeadLetter(): ReadonlyArray<ItemDeadLetter> {
+    return this._deadLetterStore.ler();
   }
 
   limparDeadLetter(): void {
-    this._deadLetter = [];
+    this._deadLetterStore.limpar();
   }
 
   async tamanhoFilaOffline(): Promise<number> {

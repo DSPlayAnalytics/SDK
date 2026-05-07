@@ -251,8 +251,21 @@ const ORDEM_DESCARTE_POR_PRIORIDADE: Record<PrioridadeFila, number> = {
   alta: 2,
 };
 
-/** Deriva prioridade do payload (page_exit = alta; mousemove/hover = baixa). */
+// Onda 2: ordem de descarte (menor = descarta antes).
+// mouse_move/hover = ruido de alto volume → baixa
+// scroll_depth/touch = util mas abundante → normal
+// click/element_exposure/page_view/page_exit/web_vital/custom → alta (nunca descartado)
+const PRIORIDADE_POR_TIPO: Record<string, PrioridadeFila> = {
+  mouse_move: 'baixa',
+  hover: 'baixa',
+  scroll_depth: 'normal',
+  touch: 'normal',
+};
+
+/** Deriva prioridade do payload inspecionando tipos de evento.
+ * Qualquer evento de alta prioridade (click, page_view, page_exit…) eleva o lote inteiro. */
 export function derivarPrioridade(payload: HeatmapDados): PrioridadeFila {
+  let melhor: PrioridadeFila = 'baixa';
   try {
     const paginas = (payload as unknown as { paginas?: Record<string, unknown[]> }).paginas;
     if (!paginas) return 'normal';
@@ -261,14 +274,16 @@ export function derivarPrioridade(payload: HeatmapDados): PrioridadeFila {
       for (const registro of registros) {
         const eventos = (registro as { eventos?: Array<{ tipo?: string }> })?.eventos ?? [];
         for (const ev of eventos) {
-          if (ev?.tipo === 'page_exit') return 'alta';
+          const p = PRIORIDADE_POR_TIPO[ev?.tipo ?? ''] ?? 'alta';
+          if (p === 'alta') return 'alta';
+          if (p === 'normal' && melhor === 'baixa') melhor = 'normal';
         }
       }
     }
-    return 'normal';
   } catch {
     return 'normal';
   }
+  return melhor;
 }
 
 /** Remove funcoes e outros nao-serializaveis. IndexedDB recusa via structured clone
@@ -384,5 +399,65 @@ export class FilaAnalytics {
     if (todos.length <= this.limite) return;
     const excesso = todos.length - this.limite;
     await this.descartarPorPrioridade(excesso);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// DeadLetterStore — Onda 2
+// Persiste itens exauridos em localStorage com TTL 24h e limite de 100 entradas.
+// ---------------------------------------------------------------------------
+
+export interface ItemDeadLetter {
+  idRegistro: string | null;
+  tentativas: number;
+  ultimoErro?: string;
+  ts: number;
+}
+
+const DEAD_LETTER_KEY = 'analytics_sdk.dead_letter';
+const DEAD_LETTER_MAX = 100;
+const DEAD_LETTER_TTL_MS = 24 * 60 * 60 * 1000;
+
+export class DeadLetterStore {
+  private _memoria: ItemDeadLetter[] = [];
+
+  private _lerStorage(): ItemDeadLetter[] {
+    if (typeof localStorage === 'undefined') return this._memoria;
+    try {
+      const raw = localStorage.getItem(DEAD_LETTER_KEY);
+      return raw ? (JSON.parse(raw) as ItemDeadLetter[]) : [];
+    } catch {
+      return [];
+    }
+  }
+
+  private _escreverStorage(itens: ItemDeadLetter[]): void {
+    if (typeof localStorage === 'undefined') {
+      this._memoria = itens;
+      return;
+    }
+    try {
+      localStorage.setItem(DEAD_LETTER_KEY, JSON.stringify(itens));
+    } catch {
+      this._memoria = itens;
+    }
+  }
+
+  adicionar(item: ItemDeadLetter): void {
+    const agora = Date.now();
+    const itens = this._lerStorage()
+      .filter((i) => agora - i.ts < DEAD_LETTER_TTL_MS)  // purga expirados
+      .concat(item)
+      .slice(-DEAD_LETTER_MAX);                           // FIFO, mantém os mais recentes
+    this._escreverStorage(itens);
+  }
+
+  ler(): ItemDeadLetter[] {
+    const agora = Date.now();
+    return this._lerStorage().filter((i) => agora - i.ts < DEAD_LETTER_TTL_MS);
+  }
+
+  limpar(): void {
+    this._escreverStorage([]);
   }
 }
