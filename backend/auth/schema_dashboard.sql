@@ -9,6 +9,8 @@ CREATE TABLE IF NOT EXISTS clientes_users (
     papel           TEXT NOT NULL DEFAULT 'viewer' CHECK (papel IN ('admin','viewer')),
     ativo           INTEGER NOT NULL DEFAULT 1,
     ultimo_login    TEXT,
+    totp_habilitado INTEGER NOT NULL DEFAULT 0,
+    totp_secret     TEXT,
     criado_em       TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 

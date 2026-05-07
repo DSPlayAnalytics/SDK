@@ -545,7 +545,7 @@ docker exec portifolio-influxdb influx backup /var/lib/influxdb2/backups
 | ✅ ~~**P3**~~ | ~~Backend `/metrics` Prometheus-client~~ — **feito 2026-05-06**: `metrics.py` completo (Counter eventos, Gauge WS, Histogram latencia); hooks wired em `handle_connect`/`handle_disconnect` (gauge) e `before_request`/`after_request` (histogram); scrape config `ark/monitoring/prometheus/prometheus.yml` ja apontava para `backend:5000`; 11/11 testes verdes; 455/455 backend | — | — | — |
 | ✅ ~~**P3**~~ | ~~DNS Cloudflare: `portifolio.dsplayground.com.br`~~ — **ativo**, registro A proxiado confirmado no painel CF | — | — | — |
 | 🟢 **P3** | Validação E2E nos 5 cenários de recovery em `ark/teste-ambiente-{a,b}` | SLO interno antes de virar chave comercial | `ark/teste-ambiente-*/` | 1-2d cada |
-| 🟢 **P3** | 2FA TOTP no dashboard do cliente | v2 — não MVP | `sessao_service.py` + `clientes_users.totp_secret` | 3-5d |
+| ✅ **P3** | 2FA TOTP no dashboard do cliente | implementado | `sessao_service.py` + `clientes_users.totp_secret/totp_habilitado` + 4 endpoints `/totp/*` + 24 testes | — |
 | ✅ ~~**P3**~~ | ~~Migração backup → S3-compatible~~ — **feito 2026-05-01 direto**, R2 desde dia 1 (free tier 10 GB cobre ~55 clientes plano medio). Pulou fase intermediaria de backup local. | — | — | — |
 
 ---

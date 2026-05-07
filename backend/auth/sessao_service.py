@@ -20,6 +20,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
+import pyotp
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from .clientes_users_repo import (
@@ -265,6 +266,64 @@ class SessaoService:
         self._repo.atualizar_senha_hash(magic.user_id, novo_hash)
         self._repo.registrar_login(magic.user_id)
         return self.criar_sessao(magic.user_id, ip=ip, user_agent=user_agent)
+
+    # ---------- totp ----------
+
+    def iniciar_configuracao_totp(self, user_id: str) -> tuple[str, str]:
+        """Gera secret TOTP (nao salva ainda). Retorna (secret, otpauth_uri).
+        Cliente exibe QR code e chama confirmar_totp_setup com o mesmo secret.
+        """
+        user = self._repo.obter_user(user_id)
+        if user is None:
+            raise ValueError("user nao encontrado")
+        secret = pyotp.random_base32()
+        uri = pyotp.TOTP(secret).provisioning_uri(
+            name=user.email, issuer_name="DSPlay Analytics"
+        )
+        return secret, uri
+
+    def confirmar_totp_setup(self, user_id: str, secret: str, codigo: str) -> bool:
+        """Verifica o codigo contra o secret pendente e salva se valido."""
+        if not pyotp.TOTP(secret).verify(codigo, valid_window=1):
+            return False
+        self._repo.habilitar_totp(user_id, secret)
+        return True
+
+    def verificar_totp(self, user_id: str, codigo: str) -> bool:
+        """Verifica codigo TOTP do usuario. Retorna False se TOTP nao habilitado."""
+        secret = self._repo.obter_totp_secret(user_id)
+        if not secret:
+            return False
+        return pyotp.TOTP(secret).verify(codigo, valid_window=1)
+
+    def completar_login_totp(
+        self, user_id: str, codigo: str, *, ip: Optional[str] = None,
+        user_agent: Optional[str] = None,
+    ) -> Optional["SessaoCriada"]:
+        """Verifica TOTP e cria sessao se valido. None se codigo errado."""
+        if not self.verificar_totp(user_id, codigo):
+            return None
+        self._repo.registrar_login(user_id)
+        return self.criar_sessao(user_id, ip=ip, user_agent=user_agent)
+
+    def desabilitar_totp(self, user_id: str, codigo_ou_senha: str) -> Optional[str]:
+        """Desabilita TOTP. Aceita codigo TOTP valido OU senha atual.
+        Retorna None se OK ou codigo de erro: TOTP_NAO_HABILITADO, CREDENCIAL_INVALIDA.
+        """
+        user = self._repo.obter_user(user_id)
+        if user is None:
+            return "CREDENCIAL_INVALIDA"
+        if not user.totp_habilitado:
+            return "TOTP_NAO_HABILITADO"
+        secret = self._repo.obter_totp_secret(user_id)
+        ok_totp = bool(secret and pyotp.TOTP(secret).verify(codigo_ou_senha, valid_window=1))
+        ok_senha = bool(
+            user.senha_hash and check_password_hash(user.senha_hash, codigo_ou_senha)
+        )
+        if not (ok_totp or ok_senha):
+            return "CREDENCIAL_INVALIDA"
+        self._repo.desabilitar_totp(user_id)
+        return None
 
     # ---------- helpers ----------
     def _validar_magic_link_disponivel(self, token_plaintext: str):

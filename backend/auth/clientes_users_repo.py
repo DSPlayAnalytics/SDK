@@ -53,6 +53,7 @@ class ClienteUser:
     papel: str
     ativo: bool
     ultimo_login: Optional[datetime]
+    totp_habilitado: bool = False
 
 
 @dataclass(frozen=True)
@@ -95,6 +96,11 @@ class ClientesUsersRepo(Protocol):
     def atualizar_senha_hash(self, user_id: str, senha_hash: str) -> None: ...
     def atualizar_email(self, user_id: str, novo_email: str) -> None: ...
 
+    # totp
+    def habilitar_totp(self, user_id: str, secret: str) -> None: ...
+    def desabilitar_totp(self, user_id: str) -> None: ...
+    def obter_totp_secret(self, user_id: str) -> Optional[str]: ...
+
     # sessoes
     def criar_sessao(self, user_id: str, token_hash: str, *,
                      expira_em: datetime, ip: Optional[str] = None,
@@ -131,6 +137,14 @@ class SqliteClientesUsersRepo:
         schema = SCHEMA_SQLITE_PATH.read_text(encoding="utf-8")
         with self._connect() as conn:
             conn.executescript(schema)
+            cols = {r["name"] for r in conn.execute("PRAGMA table_info(clientes_users)")}
+            if "totp_habilitado" not in cols:
+                conn.execute(
+                    "ALTER TABLE clientes_users "
+                    "ADD COLUMN totp_habilitado INTEGER NOT NULL DEFAULT 0"
+                )
+            if "totp_secret" not in cols:
+                conn.execute("ALTER TABLE clientes_users ADD COLUMN totp_secret TEXT")
 
     def _connect(self) -> sqlite3.Connection:
         conn = sqlite3.connect(self._db_path, isolation_level=None, timeout=10.0)
@@ -207,6 +221,28 @@ class SqliteClientesUsersRepo:
         with self._lock, self._connect() as conn:
             conn.execute("UPDATE clientes_users SET email = ? WHERE id = ?",
                          (email_norm, user_id))
+
+    # totp
+    def habilitar_totp(self, user_id: str, secret: str) -> None:
+        with self._lock, self._connect() as conn:
+            conn.execute(
+                "UPDATE clientes_users SET totp_habilitado = 1, totp_secret = ? WHERE id = ?",
+                (secret, user_id),
+            )
+
+    def desabilitar_totp(self, user_id: str) -> None:
+        with self._lock, self._connect() as conn:
+            conn.execute(
+                "UPDATE clientes_users SET totp_habilitado = 0, totp_secret = NULL WHERE id = ?",
+                (user_id,),
+            )
+
+    def obter_totp_secret(self, user_id: str) -> Optional[str]:
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT totp_secret FROM clientes_users WHERE id = ?", (user_id,)
+            ).fetchone()
+        return row["totp_secret"] if row else None
 
     # sessoes
     def criar_sessao(self, user_id, token_hash, *, expira_em, ip=None, user_agent=None):
@@ -332,10 +368,12 @@ def _parse_iso(raw: Optional[str]) -> Optional[datetime]:
 
 
 def _row_to_user(row: sqlite3.Row) -> ClienteUser:
+    keys = row.keys()
     return ClienteUser(
         id=row["id"], site_id=row["site_id"], email=row["email"],
         senha_hash=row["senha_hash"], papel=row["papel"],
         ativo=bool(row["ativo"]), ultimo_login=_parse_iso(row["ultimo_login"]),
+        totp_habilitado=bool(row["totp_habilitado"]) if "totp_habilitado" in keys else False,
     )
 
 
@@ -452,6 +490,27 @@ class PostgresClientesUsersRepo:
             cur.execute("UPDATE clientes_users SET email = %s WHERE id = %s",
                         (email_norm, user_id))
 
+    # totp
+    def habilitar_totp(self, user_id: str, secret: str) -> None:
+        with self._conn() as conn, conn.cursor() as cur:
+            cur.execute(
+                "UPDATE clientes_users SET totp_habilitado = true, totp_secret = %s WHERE id = %s",
+                (secret, user_id),
+            )
+
+    def desabilitar_totp(self, user_id: str) -> None:
+        with self._conn() as conn, conn.cursor() as cur:
+            cur.execute(
+                "UPDATE clientes_users SET totp_habilitado = false, totp_secret = NULL WHERE id = %s",
+                (user_id,),
+            )
+
+    def obter_totp_secret(self, user_id: str) -> Optional[str]:
+        with self._conn() as conn, conn.cursor() as cur:
+            cur.execute("SELECT totp_secret FROM clientes_users WHERE id = %s", (user_id,))
+            row = cur.fetchone()
+        return row["totp_secret"] if row else None
+
     # sessoes
     def criar_sessao(self, user_id, token_hash, *, expira_em, ip=None, user_agent=None):
         sessao_id = str(uuid.uuid4())
@@ -547,6 +606,7 @@ def _dict_to_user(row: dict) -> ClienteUser:
         id=str(row["id"]), site_id=str(row["site_id"]), email=row["email"],
         senha_hash=row["senha_hash"], papel=row["papel"],
         ativo=bool(row["ativo"]), ultimo_login=row["ultimo_login"],
+        totp_habilitado=bool(row.get("totp_habilitado", False)),
     )
 
 

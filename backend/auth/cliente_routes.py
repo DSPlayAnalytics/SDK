@@ -33,7 +33,7 @@ import sqlite3
 from typing import Optional
 from urllib.parse import urlencode
 
-from flask import Blueprint, jsonify, make_response, redirect, request
+from flask import Blueprint, current_app, jsonify, make_response, redirect, request
 
 from .clientes_users_repo import ClientesUsersRepo
 from .email_sender import EmailSender, criar_sender_padrao
@@ -412,6 +412,16 @@ def login():
             email, ip, ua,
         )
         return _erro("CREDENCIAIS_INVALIDAS", "email ou senha incorretos", 401)
+
+    if user.totp_habilitado:
+        from itsdangerous import URLSafeTimedSerializer
+        s = URLSafeTimedSerializer(current_app.config["SECRET_KEY"], salt="totp-pendente")
+        totp_pendente_token = s.dumps(user.id)
+        security_logger.info(
+            "evento=auth_cliente_login_totp_pendente site_id=%s user_id=%s ip=%s",
+            user.site_id, user.id, ip,
+        )
+        return jsonify({"status": "totp_required", "totp_pendente_token": totp_pendente_token})
 
     criada = svc.criar_sessao(user.id, ip=ip, user_agent=ua)
     security_logger.info(
@@ -875,6 +885,139 @@ def confirmar_recuperar_senha():
         sessao.sessao.user_id, ip,
     )
     return resp
+
+
+# ============================================================================
+# 2FA TOTP
+# ============================================================================
+
+_TOTP_PENDENTE_TTL = 300  # segundos (5 min)
+
+
+def _totp_serializer() -> "URLSafeTimedSerializer":
+    from itsdangerous import URLSafeTimedSerializer
+    return URLSafeTimedSerializer(current_app.config["SECRET_KEY"], salt="totp-pendente")
+
+
+@cliente_auth_bp.route("/totp/verificar", methods=["POST"])
+def totp_verificar():
+    """Completa login quando TOTP habilitado.
+    Body: {totp_pendente_token, code}.
+    """
+    body = request.get_json(silent=True) or {}
+    token = (body.get("totp_pendente_token") or "").strip()
+    codigo = (body.get("code") or "").strip()
+    if not token or not codigo:
+        return _erro("PARAMETROS_INVALIDOS", "totp_pendente_token e code obrigatorios", 400)
+
+    from itsdangerous import BadSignature, SignatureExpired
+    try:
+        user_id = _totp_serializer().loads(token, max_age=_TOTP_PENDENTE_TTL)
+    except SignatureExpired:
+        return _erro("TOKEN_EXPIRADO", "codigo de autenticacao expirou — faca login novamente", 401)
+    except BadSignature:
+        return _erro("TOKEN_INVALIDO", "token invalido", 401)
+
+    ip = _ip_cliente()
+    ua = request.headers.get("User-Agent")
+    svc = _obter_svc()
+    sessao = svc.completar_login_totp(user_id, codigo, ip=ip, user_agent=ua)
+    if sessao is None:
+        security_logger.info(
+            "evento=auth_cliente_totp_fail user_id=%s ip=%s", user_id, ip,
+        )
+        return _erro("CODIGO_INVALIDO", "codigo TOTP incorreto", 401)
+
+    user = svc._repo.obter_user(user_id)  # noqa: SLF001
+    security_logger.info(
+        "evento=auth_cliente_login_ok site_id=%s user_id=%s ip=%s (via totp)",
+        user.site_id if user else "?", user_id, ip,
+    )
+    resp = make_response(jsonify({
+        "status": "success",
+        "user": {
+            "id": user.id, "site_id": user.site_id,
+            "email": user.email, "papel": user.papel,
+        } if user else None,
+    }))
+    _set_cookie(resp, sessao.cookie_plaintext, max_age=svc._sessao_ttl)  # noqa: SLF001
+    return resp
+
+
+@cliente_auth_bp.route("/totp/setup", methods=["POST"])
+def totp_setup():
+    """Inicia configuracao TOTP. Requer sessao valida.
+    Retorna {secret, otpauth_uri} — cliente exibe QR code.
+    Chame /totp/confirmar para ativar.
+    """
+    cookie = request.cookies.get(COOKIE_NAME, "")
+    user = _obter_svc().validar_cookie(cookie)
+    if user is None:
+        return _erro("NAO_AUTENTICADO", "sessao ausente ou invalida", 401)
+    if user.totp_habilitado:
+        return _erro("TOTP_JA_HABILITADO", "2FA ja esta ativo — desabilite primeiro", 409)
+
+    secret, uri = _obter_svc().iniciar_configuracao_totp(user.id)
+    return jsonify({"status": "success", "secret": secret, "otpauth_uri": uri})
+
+
+@cliente_auth_bp.route("/totp/confirmar", methods=["POST"])
+def totp_confirmar():
+    """Confirma setup TOTP com o secret retornado em /totp/setup.
+    Body: {secret, code}. Habilita 2FA se code valido.
+    """
+    cookie = request.cookies.get(COOKIE_NAME, "")
+    user = _obter_svc().validar_cookie(cookie)
+    if user is None:
+        return _erro("NAO_AUTENTICADO", "sessao ausente ou invalida", 401)
+
+    body = request.get_json(silent=True) or {}
+    secret = (body.get("secret") or "").strip()
+    codigo = (body.get("code") or "").strip()
+    if not secret or not codigo:
+        return _erro("PARAMETROS_INVALIDOS", "secret e code obrigatorios", 400)
+
+    ok = _obter_svc().confirmar_totp_setup(user.id, secret, codigo)
+    if not ok:
+        security_logger.info(
+            "evento=auth_cliente_totp_setup_fail user_id=%s ip=%s", user.id, _ip_cliente(),
+        )
+        return _erro("CODIGO_INVALIDO", "codigo incorreto — verifique seu aplicativo autenticador", 422)
+
+    security_logger.info(
+        "evento=auth_cliente_totp_habilitado user_id=%s ip=%s", user.id, _ip_cliente(),
+    )
+    return jsonify({"status": "success", "totp_habilitado": True})
+
+
+@cliente_auth_bp.route("/totp", methods=["DELETE"])
+def totp_desabilitar():
+    """Desabilita 2FA. Requer sessao valida + codigo TOTP atual ou senha.
+    Body: {code} ou {senha}.
+    """
+    cookie = request.cookies.get(COOKIE_NAME, "")
+    user = _obter_svc().validar_cookie(cookie)
+    if user is None:
+        return _erro("NAO_AUTENTICADO", "sessao ausente ou invalida", 401)
+
+    body = request.get_json(silent=True) or {}
+    credencial = (body.get("code") or body.get("senha") or "").strip()
+    if not credencial:
+        return _erro("PARAMETROS_INVALIDOS", "informe `code` (TOTP) ou `senha`", 400)
+
+    erro = _obter_svc().desabilitar_totp(user.id, credencial)
+    if erro == "TOTP_NAO_HABILITADO":
+        return _erro("TOTP_NAO_HABILITADO", "2FA nao esta ativo", 409)
+    if erro == "CREDENCIAL_INVALIDA":
+        security_logger.info(
+            "evento=auth_cliente_totp_disable_fail user_id=%s ip=%s", user.id, _ip_cliente(),
+        )
+        return _erro("CREDENCIAL_INVALIDA", "codigo TOTP ou senha incorretos", 403)
+
+    security_logger.info(
+        "evento=auth_cliente_totp_desabilitado user_id=%s ip=%s", user.id, _ip_cliente(),
+    )
+    return jsonify({"status": "success", "totp_habilitado": False})
 
 
 __all__ = ["cliente_auth_bp", "configurar", "COOKIE_NAME"]

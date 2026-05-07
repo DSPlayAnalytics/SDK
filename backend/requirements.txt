@@ -41,6 +41,7 @@ rich==14.2.0
 APScheduler==3.11.2
 boto3==1.43.2
 prometheus-client==0.25.0
+pyotp==2.9.0
 setuptools==80.9.0
 simple-websocket==1.1.0
 six==1.17.0

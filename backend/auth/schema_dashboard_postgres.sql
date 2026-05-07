@@ -65,3 +65,7 @@ BEGIN
 END$$;
 
 CREATE INDEX IF NOT EXISTS idx_clientes_magic_user ON clientes_magic_links(user_id);
+
+-- TOTP 2FA — migração idempotente
+ALTER TABLE clientes_users ADD COLUMN IF NOT EXISTS totp_habilitado BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE clientes_users ADD COLUMN IF NOT EXISTS totp_secret TEXT;

@@ -54,10 +54,9 @@
       delegate_to: localhost
 
     - name: Garantir openssl para gerar cert mock do nginx
-      apt:
+      dnf:
         name: openssl
         state: present
-        update_cache: false
 
     - name: Criar diretorio do cert mock
       file:
