@@ -1,4 +1,4 @@
-FROM python:3.14-slim
+FROM python:3.12-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1
@@ -15,7 +15,7 @@ RUN groupadd --system --gid ${ANALYTICS_GID} analytics \
 WORKDIR /app
 
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends build-essential \
+    && apt-get install -y --no-install-recommends build-essential=12.9 \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --chown=app:analytics requirements.txt ./
