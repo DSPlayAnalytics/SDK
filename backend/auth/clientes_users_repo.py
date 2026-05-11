@@ -100,6 +100,8 @@ class ClientesUsersRepo(Protocol):
     def habilitar_totp(self, user_id: str, secret: str) -> None: ...
     def desabilitar_totp(self, user_id: str) -> None: ...
     def obter_totp_secret(self, user_id: str) -> Optional[str]: ...
+    def registrar_otp_usado(self, user_id: str, codigo: str) -> None: ...
+    def obter_ultimo_otp_usado(self, user_id: str) -> Optional[str]: ...
 
     # sessoes
     def criar_sessao(self, user_id: str, token_hash: str, *,
@@ -145,6 +147,10 @@ class SqliteClientesUsersRepo:
                 )
             if "totp_secret" not in cols:
                 conn.execute("ALTER TABLE clientes_users ADD COLUMN totp_secret TEXT")
+            if "last_used_otp" not in cols:
+                conn.execute("ALTER TABLE clientes_users ADD COLUMN last_used_otp TEXT")
+            if "last_used_otp_at" not in cols:
+                conn.execute("ALTER TABLE clientes_users ADD COLUMN last_used_otp_at TEXT")
 
     def _connect(self) -> sqlite3.Connection:
         conn = sqlite3.connect(self._db_path, isolation_level=None, timeout=10.0)
@@ -243,6 +249,21 @@ class SqliteClientesUsersRepo:
                 "SELECT totp_secret FROM clientes_users WHERE id = ?", (user_id,)
             ).fetchone()
         return row["totp_secret"] if row else None
+
+    def registrar_otp_usado(self, user_id: str, codigo: str) -> None:
+        agora = _iso(datetime.now(timezone.utc))
+        with self._lock, self._connect() as conn:
+            conn.execute(
+                "UPDATE clientes_users SET last_used_otp = ?, last_used_otp_at = ? WHERE id = ?",
+                (codigo, agora, user_id),
+            )
+
+    def obter_ultimo_otp_usado(self, user_id: str) -> Optional[str]:
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT last_used_otp FROM clientes_users WHERE id = ?", (user_id,)
+            ).fetchone()
+        return row["last_used_otp"] if row else None
 
     # sessoes
     def criar_sessao(self, user_id, token_hash, *, expira_em, ip=None, user_agent=None):
@@ -417,6 +438,11 @@ class PostgresClientesUsersRepo:
         schema = SCHEMA_POSTGRES_PATH.read_text(encoding="utf-8")
         with self._conn() as conn, conn.cursor() as cur:
             cur.execute(schema)
+            cur.execute("""
+                ALTER TABLE clientes_users
+                ADD COLUMN IF NOT EXISTS last_used_otp TEXT,
+                ADD COLUMN IF NOT EXISTS last_used_otp_at TIMESTAMPTZ
+            """)
 
     @contextmanager
     def _conn(self) -> Iterator:
@@ -510,6 +536,19 @@ class PostgresClientesUsersRepo:
             cur.execute("SELECT totp_secret FROM clientes_users WHERE id = %s", (user_id,))
             row = cur.fetchone()
         return row["totp_secret"] if row else None
+
+    def registrar_otp_usado(self, user_id: str, codigo: str) -> None:
+        with self._conn() as conn, conn.cursor() as cur:
+            cur.execute(
+                "UPDATE clientes_users SET last_used_otp = %s, last_used_otp_at = NOW() WHERE id = %s",
+                (codigo, user_id),
+            )
+
+    def obter_ultimo_otp_usado(self, user_id: str) -> Optional[str]:
+        with self._conn() as conn, conn.cursor() as cur:
+            cur.execute("SELECT last_used_otp FROM clientes_users WHERE id = %s", (user_id,))
+            row = cur.fetchone()
+        return row["last_used_otp"] if row else None
 
     # sessoes
     def criar_sessao(self, user_id, token_hash, *, expira_em, ip=None, user_agent=None):

@@ -290,11 +290,16 @@ class SessaoService:
         return True
 
     def verificar_totp(self, user_id: str, codigo: str) -> bool:
-        """Verifica codigo TOTP do usuario. Retorna False se TOTP nao habilitado."""
+        """Verifica codigo TOTP. Rejeita replay do mesmo OTP dentro da janela de validade."""
         secret = self._repo.obter_totp_secret(user_id)
         if not secret:
             return False
-        return pyotp.TOTP(secret).verify(codigo, valid_window=1)
+        if not pyotp.TOTP(secret).verify(codigo, valid_window=1):
+            return False
+        if self._repo.obter_ultimo_otp_usado(user_id) == codigo:
+            return False
+        self._repo.registrar_otp_usado(user_id, codigo)
+        return True
 
     def completar_login_totp(
         self, user_id: str, codigo: str, *, ip: Optional[str] = None,
