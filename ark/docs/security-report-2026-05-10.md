@@ -33,9 +33,9 @@ Ambiente de teste: Vagrant + Rocky Linux 9 (`ark/teste-ambiente-b`).
 | F-008 | MEDIUM | TOTP replay attack | ✅ REMEDIADO | `14a7ded` |
 | F-005 | MEDIUM | Security headers ausentes (api.X) | ✅ REMEDIADO | `0aae234` |
 | F-004 | MEDIUM | .env.production rastreado no git | ✅ REMEDIADO | `4e1fdf5` |
-| F-001 | HIGH* | fast-uri CVE (build-only) | ⏳ PENDENTE | `npm audit fix` |
+| F-001 | HIGH* | fast-uri CVE (build-only) | ✅ REMEDIADO | `b80dad5` |
 | F-003 | MEDIUM | apt-get sem versão pinada | ✅ REMEDIADO | `569c769` |
-| F-006 | LOW | nginx versão exposta | ⏳ PENDENTE | containers landing/frontend |
+| F-006 | LOW | nginx versão exposta | ✅ REMEDIADO | `b80dad5` |
 | A-003 | — | Sem MAX_CONTENT_LENGTH no Flask | ✅ REMEDIADO | `5dd27d6` |
 | F3-06 | — | HSTS max-age 6 meses | ✅ REMEDIADO | `0aae234` |
 
@@ -47,13 +47,12 @@ Ambiente de teste: Vagrant + Rocky Linux 9 (`ark/teste-ambiente-b`).
 
 ### HIGH
 
-#### [F-001] fast-uri ≤ 3.1.1 — path traversal + host confusion
+#### [F-001] fast-uri ≤ 3.1.1 — path traversal + host confusion — ✅ REMEDIADO `b80dad5`
 - **Componentes:** `sdk/` (via vite-plugin-dts → @microsoft/api-extractor → ajv) e `landing/` (via @astrojs/check → yaml-language-server → ajv)
 - **CVEs:** GHSA-q3j6-qgpj-74h6 (CWE-22) · GHSA-v39h-62p7-jpjc
 - **CVSS:** 7.5 (AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:H/A:N)
-- **Contexto:** Dependência transitiva de tooling de **build** (não runtime). Não exposta em produção.
-- **Risco efetivo:** Baixo — afeta apenas o processo de build local/CI, não o app em produção.
-- **Remediação:** `npm audit fix` em `sdk/` e `landing/`. Fix disponível.
+- **Risco efetivo:** Baixo — dependência de tooling de build, não runtime.
+- **Remediação aplicada:** `npm audit fix` em `sdk/` e `landing/`. `found 0 vulnerabilities`. Commit `b80dad5`.
 - **Fase:** 2 (npm audit)
 
 #### [F-002] Dockerfile usa Python 3.14-slim (pré-release) — ✅ REMEDIADO `569c769`
@@ -92,11 +91,10 @@ Ambiente de teste: Vagrant + Rocky Linux 9 (`ark/teste-ambiente-b`).
 - **Pendente:** `server_tokens off` nos containers landing/frontend (F-006), e verificar cobertura via Cloudflare Managed Transforms para X-Frame-Options nas outras rotas.
 - **Fase:** 7 (Nikto)
 
-#### [F-006] Nginx versão exposta no header Server
+#### [F-006] Nginx versão exposta no header Server — ✅ REMEDIADO `b80dad5`
 - **Componentes:** `dsplay-landing` (nginx/1.27.5) e `dsplay-frontend` (nginx/1.29.8)
 - **Severidade:** LOW (CWE-200)
-- **Descrição:** Header `Server: nginx/1.27.5` expõe versão específica — facilita fingerprint para exploits CVE-específicos.
-- **Remediação:** Adicionar `server_tokens off;` no nginx.conf dentro dos containers, ou na config de Nginx do host.
+- **Remediação aplicada:** `server_tokens off;` adicionado a `landing/docker-nginx.conf` e `portifolio/frontend/docker-nginx.conf`. Commit `b80dad5`.
 - **Fase:** 7 (Nikto)
 
 #### [F-004] .env.production rastreado no git (git hygiene) — ✅ REMEDIADO `4e1fdf5`
