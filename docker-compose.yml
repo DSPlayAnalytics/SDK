@@ -64,6 +64,19 @@ services:
     mem_reservation: 256m
     restart: unless-stopped
 
+  redis:
+    image: redis:7-alpine
+    container_name: dsplay-redis
+    command: redis-server --save "" --appendonly no
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    mem_limit: 64m
+    mem_reservation: 32m
+    restart: unless-stopped
+
   backend:
     build:
       context: ./backend
@@ -72,6 +85,8 @@ services:
       influxdb:
         condition: service_healthy
       postgres:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     ports:
       - "127.0.0.1:5000:5000"
@@ -83,6 +98,7 @@ services:
       - ./ark/monitoring/dashboards:/app/dashboards:ro
     environment:
       DASHBOARDS_TEMPLATE_DIR: /app/dashboards
+      REDIS_URL: redis://redis:6379
     mem_limit: 768m
     mem_reservation: 384m
     restart: unless-stopped

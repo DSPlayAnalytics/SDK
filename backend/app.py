@@ -43,7 +43,8 @@ app.config.update(
     WTF_CSRF_TIME_LIMIT=None,
     # ✅ CONFIGURAÇÃO PARA PROXY REVERSO
     APPLICATION_ROOT='/api' if env == 'production' else '/',
-    PREFERRED_URL_SCHEME='https' if env == 'production' else 'http'
+    PREFERRED_URL_SCHEME='https' if env == 'production' else 'http',
+    MAX_CONTENT_LENGTH=1 * 1024 * 1024,
 )
 
 # ✅ RATE LIMITING
@@ -51,7 +52,7 @@ limiter = Limiter(
     key_func=get_remote_address,
     app=app,
     default_limits=["200 per day", "50 per hour"],
-    storage_uri="memory://"
+    storage_uri=os.environ.get("REDIS_URL", "memory://")
 )
 
 # ✅ LOGGING SEGURO com rotacao
