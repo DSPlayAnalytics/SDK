@@ -28,6 +28,9 @@ ark/crowdsec/.env
 backend/.env
 backend/.env.*
 !backend/.env.example
+portifolio/backend/.env
+portifolio/backend/.env.*
+!portifolio/backend/.env.example
 
 # Node
 node_modules/
