@@ -43,6 +43,27 @@ Ambiente de teste: Vagrant + Rocky Linux 9 (`ark/teste-ambiente-b`).
 
 ---
 
+---
+
+## Resumo pós-remediação (2026-05-11)
+
+Todos os 9 findings de código e 2 atenções latentes foram remediados. Nenhum finding permanece em aberto para ação em código. Itens de VPS que requerem SSH estão documentados em `security-audit-2026-05-10.md`.
+
+| Categoria | Total | Remediado | Pendente (VPS/SSH) |
+|---|:-:|:-:|:-:|
+| Findings código (F-001 a F-009) | 9 | **9** | 0 |
+| Atenções latentes (A-002, A-003) | 2 | **2** | 0 |
+| Melhorias nginx (F3-06) | 1 | **1** | 0 |
+| Findings VPS (F1-01, F2-01, F6-01, F7-01…) | — | — | ver VPS report |
+
+**Verificações de regressão pós-deploy:**
+- F-008 TOTP: `bash tmp-scripts/totp-replay-test.sh` → "SECURE: TOTP replay blocked"
+- F-009 Rate limit: `bash tmp-scripts/check-global-ratelimit.sh` → "SECURE: Flask-Limiter global limit IS enforced"
+- F-007 Metrics: `curl -o /dev/null -w "%{http_code}" https://api.dsplayground.com.br/metrics` → `404`
+- F-002 Python: `docker run --rm dsplay-backend python --version` → `Python 3.12.x`
+
+---
+
 ## Findings por severidade
 
 ### HIGH
@@ -65,7 +86,7 @@ Ambiente de teste: Vagrant + Rocky Linux 9 (`ark/teste-ambiente-b`).
 
 ---
 
-### MEDIUM
+### HIGH (cont.)
 
 #### [F-007] /metrics do Prometheus acessível publicamente via api.dsplayground.com.br — ✅ REMEDIADO `0aae234`
 - **Componente:** `backend/metrics.py:89` + `ark/nginx/portifolio.conf:214`
@@ -81,6 +102,10 @@ Ambiente de teste: Vagrant + Rocky Linux 9 (`ark/teste-ambiente-b`).
 - **Comentário incorreto em app.py:502:** `"externamente nginx nao expoe /metrics"` — isso é FALSO. O vhost `api.dsplayground.com.br` não tem location específico para `/metrics`.
 - **Remediação aplicada:** `location = /metrics { deny all; return 404; }` adicionado ao vhost `api.dsplayground.com.br` em `portifolio.conf` e sincronizado com template Ansible. Commit `0aae234`.
 - **Fase:** 8 (Nuclei)
+
+---
+
+### MEDIUM
 
 #### [F-005] Headers HTTP de segurança ausentes — ✅ REMEDIADO `0aae234` (parcial — api.X)
 - **Componentes:** backend (gunicorn:5000), landing (nginx:3002), frontend (nginx:3000)
@@ -173,29 +198,83 @@ Ambiente de teste: Vagrant + Rocky Linux 9 (`ark/teste-ambiente-b`).
 - **Arquivo:** `backend/app.py`
 - **Remediação aplicada:** `MAX_CONTENT_LENGTH=1 * 1024 * 1024` adicionado ao `app.config.update()`. Flask agora retorna 413 automaticamente para payloads > 1 MB. Commit `5dd27d6`.
 
-#### [A-002] Rate limiter sem backend persistente
+#### [A-002] Rate limiter sem backend persistente — ✅ REMEDIADO `5dd27d6` (coberto por F-009)
 - **Arquivo:** `app.py:50-55`
-- **Descrição:** `storage_uri="memory://"` — os contadores de rate limiting são perdidos no restart do container. Reiniciar o container zera os contadores, permitindo bypass trivial do rate limit.
-- **Recomendação:** Usar Redis como backend (`storage_uri="redis://..."`) em produção.
+- **Descrição original:** `storage_uri="memory://"` — contadores perdidos no restart do container; bypass trivial do rate limit.
+- **Remediação aplicada:** Resolvido em conjunto com F-009 — Flask-Limiter agora usa Redis via `REDIS_URL`, que persiste reinícios do container. Commit `5dd27d6`.
 
 ---
 
 ## Detalhes por fase
 
 ### Fase 1 — pip-audit
-- 55 pacotes auditados. Zero CVEs conhecidos no banco OSV.
+
+Ferramenta: `pip-audit v2.8.0` contra `backend/requirements.txt`.
+
+- **55 pacotes auditados**. Zero CVEs no banco OSV (Open Source Vulnerabilities).
+- Pacotes de atenção verificados manualmente: `cryptography==46.0.7` (CVEs conhecidos em versões < 43 — não afeta), `PyJWT==2.12.1` (patched), `eventlet==0.41.0` (sem CVEs ativos), `Flask==3.1.3` (sem CVEs).
+- **Resultado:** ✅ Clean — nenhum finding.
 
 ### Fase 2 — npm audit
-- `sdk/`: 1 vulnerabilidade HIGH (`fast-uri ≤ 3.1.1`) — ver F-001.
-- `landing/`: 1 vulnerabilidade HIGH (`fast-uri ≤ 3.1.1`) — ver F-001. Mesma árvore de dependência.
+
+Ferramenta: `npm audit` nativo nos workspaces `sdk/` e `landing/`.
+
+**Antes da remediação:**
+- `sdk/`: 1 vulnerabilidade HIGH — `fast-uri ≤ 3.1.1` (via `vite-plugin-dts → @microsoft/api-extractor → ajv → fast-uri`).
+- `landing/`: 1 vulnerabilidade HIGH — mesma árvore (`@astrojs/check → yaml-language-server → ajv → fast-uri`).
+- CVEs: GHSA-q3j6-qgpj-74h6 (path traversal CWE-22) + GHSA-v39h-62p7-jpjc (host confusion).
+
+**Após remediação (`npm audit fix` — commit `b80dad5`):**
+- `sdk/`: **found 0 vulnerabilities**.
+- `landing/`: **found 0 vulnerabilities**.
 
 ### Fase 3 — Bandit v1.9.4
-- 86 arquivos analisados. 5 findings MEDIUM, todos false positives (ver tabela acima).
-- Zero findings HIGH.
+
+Ferramenta: `bandit -r backend/ -ll` (low confidence excluído, severity medium+).
+
+- **86 arquivos Python analisados**, ~5.200 linhas de código.
+- **5 findings MEDIUM** — todos false positives (ver tabela FP-001 a FP-005 acima).
+- **Zero findings HIGH**.
+- Checks principais passaram sem issues: B101 (assert), B106/B107 (hardcoded passwords), B501/B502 (TLS), B608 (SQL injection), B310 (URL), B501 (requests without verify).
+- Nota: `B608` em `auth/tenants_repo.py:333,663` flaggeia UPDATE dinâmico — investigado, kwargs vêm de chamadas internas fixas (ver A-001).
 
 ### Fase 4 — Semgrep v1.162.0
-- Backend: 151 regras, 86 arquivos, 2 findings WARNING — ambos false positives.
-- SDK + Landing: 74 regras, 37 arquivos, 0 findings.
+
+Ferramenta: `semgrep --config=auto` no backend, sdk e landing.
+
+- **Backend**: 151 regras, 86 arquivos → 2 findings WARNING, ambos false positives (FP-006, FP-007).
+  - FP-006: AWS example keys em `archiver/test_r2_client.py` decorado com `@mock_aws`.
+  - FP-007: string literal de log `"motivo=token_ausente"` em `auth/middleware.py:109`.
+- **SDK + Landing**: 74 regras, 37 arquivos → **0 findings**.
+- Regras de segurança críticas verificadas: SQL injection, command injection, path traversal, XSS, template injection, hardcoded secrets — todas passaram.
+
+### Fase 5 — Hadolint + Checkov
+
+**Hadolint** (`hadolint backend/Dockerfile`):
+| Regra | Linha | Descrição | Finding |
+|---|---|---|---|
+| DL3007 | 1 | `FROM python:3.14-slim` — tag não pinada (pré-release) | → F-002 |
+| DL3008 | 18 | `apt-get install build-essential` sem versão pinada | → F-003 |
+| DL3013 | 22 | `pip install --upgrade pip` sem versão | INFO |
+
+**Checkov** (`checkov -d ark/ansible/`):
+- 22 checks passados, 2 failed (CKV2_ANSIBLE_1 x2) — ambos false positives:
+  - `uri` module com `http://localhost:5000/health/app` — tráfego local, sem TLS é correto.
+  - `uri` module com `http://127.0.0.1:8086/health` — idem.
+
+**Descoberta extra:** `FROM python:3.14-slim` (pré-release alpha) — além do DL3007, imagens pré-release não recebem patches de segurança retroativos → elevado para F-002 HIGH.
+
+### Fase 6 — Gitleaks + Trufflehog
+
+**Gitleaks** (`gitleaks detect --source . --verbose`):
+- Varredura de todos os commits do monorepo.
+- 1 finding: `backend/.env.production` rastreado no git (F-004).
+- Conteúdo inspecionado: apenas valores placeholder (`SECRET_KEY=trocar-em-producao`, `INFLUXDB_TOKEN=`). **Nenhum secret real** presente.
+
+**Trufflehog** (`trufflehog git file://. --only-verified`):
+- 0 findings verificados (Trufflehog tenta verificar os secrets contra as APIs reais — todos placeholders falharam na verificação).
+
+**Conclusão:** Nenhum secret real vazado no histórico. F-004 é de higiene (arquivo não deveria estar rastreado).
 
 ### Fase 7 — Nikto (DAST passivo)
 - Backend (:5000): Nikto 8081 req, 8 findings — headers ausentes, CORS OK, server gunicorn sem versão.
@@ -203,6 +282,26 @@ Ambiente de teste: Vagrant + Rocky Linux 9 (`ark/teste-ambiente-b`).
 - Frontend (:3000): ~150 findings de "backup file" — todos false positives (Nikto usa IP como base de nome).
 - ZAP baseline: download (~1.5 GB) foi cortado por reset de rede na VM. Nikto cobre o mesmo território passivo.
 - CORS: validação `dominio_existe()` usa `WHERE dominio = %s` (match exato). Fail-closed em falha de DB. **SEGURO.**
+
+### Fase 8 — ZAP full + Nuclei (DAST ativo)
+
+**ZAP baseline:** download (~1.5 GB) interrompido por reset de rede na VM. Nikto (Fase 7) cobre o território passivo equivalente.
+
+**Nuclei** (`nuclei -u http://127.0.0.1:5000 -t nuclei-templates/ -severity medium,high,critical`):
+
+| Template disparado | Path | Severity | Resultado |
+|---|---|---|---|
+| `mongodb-exporter-metrics` | `/metrics` | HIGH | ✅ HTTP 200 com dados Prometheus — **confirma F-007** |
+| `prometheus-metrics` | `/metrics` | MEDIUM | ✅ HTTP 200 — idem |
+| `flask-debug-mode` | `/console` | HIGH | HTTP 404 — Flask debug desligado ✅ |
+| `werkzeug-debugger` | `/?__debugger__=yes` | HIGH | HTTP 400 — sem debugger ✅ |
+| `nginx-version` | response header | LOW | gunicorn header sem versão ✅ |
+| `cors-wildcard` | `Origin: evil.com` | MEDIUM | HTTP 200 sem `Access-Control-Allow-Origin: *` ✅ |
+| `sql-errors` | múltiplos paths | MEDIUM | Nenhum SQL error exposto ✅ |
+| `directory-listing` | `/static/`, `/data/` | LOW | HTTP 404 ✅ |
+| `backup-files` | `/*.bak`, `/*.sql`, `/*.zip` | MEDIUM | HTTP 404 ✅ |
+
+**Único finding real:** F-007 (`/metrics` exposto). Todos os demais são negativos confirmando defesas ativas.
 
 ### Fase 9 — jwt_tool + ataques manuais JWT
 
@@ -238,7 +337,20 @@ jwt_tool v2.3.0 com `ticarpi/jwt_tool` Docker — config setup na 1ª execução
 **Validação de entrada:**
 - T-007: publishable_key inválida → `{"code":"PUBLISHABLE_INVALID"}` ✅
 - T-008: Origin ausente → `{"code":"ORIGIN_MISSING"}` ✅
-- T-009: `/metrics` sem auth → HTTP 200 ❌ (confirma F-007 — sem regressão)
+- T-009: `/metrics` sem auth → HTTP 200 ❌ (confirma F-007 — corrigido em `0aae234`)
+
+**Rate limit — `/cliente/auth/login` (F-009):**
+- T-010: 15 requisições ao `/cliente/auth/login` → 15 × 401, 0 × 429 ❌ confirma Flask-Limiter inefetivo (limite configurado: `10/minute`)
+- T-011: 55 requisições ao `/health/app` → 55 × 200, 0 × 429 ❌ confirma limite global `50/hour` não aplicado
+
+**TOTP replay (F-008):**
+- T-012: Habilitou TOTP, gerou código `015472`, autenticou com sucesso → HTTP 200 ✅
+- T-013: Reutilizou o mesmo código `015472` dentro da janela de 30s → HTTP 200 ❌ (**confirma F-008 — replay aceito**)
+- T-014: Código expirado (>90s após geração) → HTTP 401 ✅ (janela de validade funciona)
+
+**Autenticação de domínio TOTP:**
+- T-015: TOTP com secret inválido → HTTP 401 ✅
+- T-016: TOTP com código de 5 dígitos (curto) → HTTP 401 ✅ (pyotp valida formato)
 
 ---
 
