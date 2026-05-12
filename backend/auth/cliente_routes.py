@@ -894,7 +894,7 @@ def confirmar_recuperar_senha():
 _TOTP_PENDENTE_TTL = 300  # segundos (5 min)
 
 
-def _totp_serializer() -> "URLSafeTimedSerializer":
+def _totp_serializer():
     from itsdangerous import URLSafeTimedSerializer
     return URLSafeTimedSerializer(current_app.config["SECRET_KEY"], salt="totp-pendente")
 
