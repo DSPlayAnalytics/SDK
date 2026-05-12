@@ -4,6 +4,15 @@ Todas as mudancas significativas deste pacote sao registradas aqui. Segue [Keep 
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-05-11
+
+### Security
+- Resolve CVE em `fast-uri` (transitivo via `socket.io-client`) — `npm audit fix` → 0 vulnerabilities.
+- `server_tokens off` no nginx de frontend e landing (sem impacto no bundle do SDK).
+
+### CI
+- Workflow `publish.yml`: adiciona `HUSKY=0` no `npm ci` (evita falha de hook sem `.git` no runner) e verificação explícita de artefatos `dist/` antes do `npm publish`.
+
 ## [0.4.0] - 2026-05-01
 
 ### Added

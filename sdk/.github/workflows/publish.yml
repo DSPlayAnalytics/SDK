@@ -23,11 +23,17 @@ jobs:
 
       - name: Install
         run: npm ci
+        env:
+          HUSKY: 0
 
       - name: Test + build
         run: |
           npm run test
           npm run build
+
+      - name: Verificar artefatos dist
+        run: |
+          ls dist/index.js dist/index.cjs dist/index.d.ts dist/sdk.umd.js || exit 1
 
       - name: Publish no npmjs.com
         run: npm publish --access public
