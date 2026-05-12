@@ -40,6 +40,20 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          registry-url: 'https://npm.pkg.github.com'
+          scope: '@dsplayanalytics'
+
+      - name: Publish no GitHub Packages
+        run: |
+          npm pkg set name="@dsplayanalytics/sdk"
+          npm publish --access public
+          npm pkg set name="@dsplayground-analytics/sdk"
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Criar GitHub Release com bundle UMD anexado
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
